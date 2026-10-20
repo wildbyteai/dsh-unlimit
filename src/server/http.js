@@ -17,6 +17,10 @@ const ASSETS = new Map([
   ["/dsh-unlimit/ui/workspace-rules.js", ["workspace-rules.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/rewind.js", ["rewind.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/maintenance.js", ["maintenance.js", "text/javascript; charset=utf-8"]],
+  [
+    "/dsh-unlimit/ui/connection-checks.js",
+    ["connection-checks.js", "text/javascript; charset=utf-8"],
+  ],
   ["/dsh-unlimit/ui/styles.css", ["styles.css", "text/css; charset=utf-8"]],
 ]);
 
@@ -129,6 +133,7 @@ export function createHandler(controller, getOrigin, { rejectRequest } = {}) {
             "UNINSTALL_STATE_CHANGED",
             "UNINSTALL_INCOMPLETE",
             "UNINSTALL_UNKNOWN",
+            "CONNECTION_CHECK_PARTIAL",
           ].includes(error.code) && error.partial
             ? { partial: error.partial }
             : {}),

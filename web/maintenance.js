@@ -30,6 +30,7 @@ export function renderReceipt({ receipt, error }) {
     presets: "停止预设任务",
     controls: "还原运行控制",
     probes: "停止所属探测",
+    checks: "停止连接检查",
   };
   const returnedSteps = Array.isArray(prepared?.steps) ? prepared.steps : [];
   const preparation = prepared

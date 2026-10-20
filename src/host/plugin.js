@@ -24,6 +24,7 @@ import { DesktopWorkflowPlan } from "./workflow-plan.js";
 import { RepeatReminder } from "./repeat-reminder.js";
 import { ReadLimits } from "./read-limits.js";
 import { DesktopMaintenance } from "./maintenance.js";
+import { ConnectionChecks } from "../core/connection-checks.js";
 
 export const name = "dsh-unlimit";
 export const inject = ["webServer", "connection"];
@@ -45,6 +46,7 @@ export function mount(ctx, host) {
   const repeat = new RepeatReminder(ctx, store, host);
   const readLimits = new ReadLimits(ctx, store, host);
   const admission = new DrillAdmission(store, host.dataRoot);
+  const connectionChecks = new ConnectionChecks(store, { admission });
   const workflow = new DesktopWorkflow(ctx, store, flow, { admission });
   const environment = new LocalEnvironment(realpathSync(host.dataRoot));
   const catalog = new HostCatalog(ctx, { library: skills, toolkit, environment });
@@ -69,6 +71,7 @@ export function mount(ctx, host) {
     workflow,
     continuation,
     admission,
+    connectionChecks,
     plans,
     environment,
     host,
@@ -78,6 +81,7 @@ export function mount(ctx, host) {
   ctx.effect(() => async () => {
     const errors = [];
     for (const cleanup of [
+      () => connectionChecks.close(),
       () => controller.revertControls(),
       async () => {
         const result = await plans.close();

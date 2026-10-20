@@ -30,6 +30,7 @@ export class Controller {
     plans,
     environment,
     maintenance,
+    connectionChecks,
     onSkillsChanged,
   }) {
     Object.assign(this, {
@@ -53,6 +54,7 @@ export class Controller {
       plans,
       environment,
       maintenance,
+      connectionChecks,
       onSkillsChanged,
     });
   }
@@ -126,6 +128,10 @@ export class Controller {
       ["continuation.stop", this.host.supported && Boolean(this.continuation)],
       ["maintenance.install", false],
       ["maintenance.uninstall", maintenance?.available === true],
+      ...["prepare", "run", "status", "stop"].map((operation) => [
+        `connectionChecks.${operation}`,
+        Boolean(this.connectionChecks),
+      ]),
     ];
     return {
       version: manifest.version,
@@ -199,9 +205,6 @@ export class Controller {
   }
 
   async prepareUninstall() {
-    // Let already accepted actions finish; no new action enters while the
-    // maintenance operation is active. This also covers an awaited apply/save.
-    await Promise.allSettled([...this.#pending]);
     const prepared = {
       controlsDisabled: false,
       admissionRevoked: false,
@@ -216,6 +219,10 @@ export class Controller {
         prepared.steps.push({ id, status: "failed" });
       }
     };
+    if (this.connectionChecks) await step("checks", () => this.connectionChecks.stopAll());
+    // Cancel owned connections before draining accepted actions. No new action
+    // enters while maintenance is active; awaited apply/save still finish.
+    await Promise.allSettled([...this.#pending]);
     await step("settings", () => {
       const current = this.store.dispatch("settings.get", {});
       const saved = current.value.enabled
@@ -272,11 +279,12 @@ export class Controller {
         "workflow.plan.stop",
         "flow.status",
         "flow.release",
+        "connectionChecks.stop",
       ].includes(action) ||
       (action === "workflow.presets" &&
         ["status", "unregister"].includes(payload.operation ?? "status"));
     if (
-      /^(workspaces|assets|findings|records|roles|report|flow|files|workflow|knowledge)\./.test(
+      /^(workspaces|assets|findings|records|roles|report|flow|files|workflow|knowledge|connectionChecks)\./.test(
         action,
       ) &&
       !cleanupOrStatus
@@ -295,7 +303,7 @@ export class Controller {
         if (!this.admission) return unavailable("演练入场确认服务未加载");
         const result = this.admission.dispatch(action, payload);
         const errors = [];
-        for (const service of [this.plans, this.workflow])
+        for (const service of [this.connectionChecks, this.plans, this.workflow])
           try {
             const stopped = await service?.stopAll();
             if (stopped?.stopped === false) errors.push(new Error("执行计划仍有未确认清理的收据"));
@@ -377,6 +385,9 @@ export class Controller {
         const result = this.store.dispatch(action, payload);
         const errors = [];
         for (const change of [
+          ...(JSON.stringify(current.value.ownServers) !== JSON.stringify(result.value.ownServers)
+            ? [() => this.connectionChecks?.stopAll()]
+            : []),
           () => this.continuation?.changed(),
           ...(this.runtime.enabled
             ? [
@@ -452,6 +463,10 @@ export class Controller {
       case "maintenance.install":
         return unavailable("此版尚未验证桌面端的本地包安装接口，请使用宿主插件管理器");
       default:
+        if (action.startsWith("connectionChecks.")) {
+          if (!this.connectionChecks) return unavailable("连接检查服务未加载");
+          return this.connectionChecks.dispatch(action, payload);
+        }
         if (action.startsWith("admission.")) {
           if (!this.admission) return unavailable("演练入场确认服务未加载");
           return this.admission.dispatch(action, payload);

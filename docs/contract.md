@@ -43,6 +43,8 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 记录类型：`credential`、`access`、`webshell`、`tunnel`、`screenshot`、`http`、`chain`、`file`、`score-point`、`score-hit`、`stage`、`session`。这些是本地证据记录，写入记录不执行远程操作。
 
+连接检查使用独立的 `connectionChecks.prepare/run/status/stop` 接口，不向模型工具开放；只有预览后明确确认才检查精确登记目标。WebShell 使用 HTTP HEAD，隧道使用明确的 `listenHost/listenPort`，不解析备注或命令。实际回执独立存储，不覆盖手工登记状态；撤销入场、清单变化与退出停止所属连接。范围、失败和结果字段见 [连接检查合同](connection-checks-contract.md)。
+
 凭据的字段白名单、安全读回、秘密保留/替换/清空及旧字段处理见 [credentials-contract.md](credentials-contract.md)。`records.list/save` 只返回非秘密元数据和 `secretState`，同 ID 不能变换记录类型、项目或数据域绕过投影。数据库仍为本地明文存储。
 
 设置默认值：
@@ -88,7 +90,7 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 提示词 replace 仅替换三个人设槽及当前 scope 的明确 complete 定义；工具、模式、SDK 和未知功能段保持原序与正文。complete 元数据使用固定版本只读适配，详见 [提示词功能段合同](prompt-sections-contract.md)。
 
-`maintenance.info` 返回离线维护说明与卸载能力、阶段和禁用原因。`maintenance.uninstall` 仅接受 `{bundle:"dsh-unlimit",confirmed:true}`，不向模型工具开放。先排空已接纳动作、持久禁用和撤销入场、停止所属任务并还原控制，再用官方管理器移除和读回。准备失败不移除，未知结果不自动重试；成功后只返回普通回执，不再读取已经释放的数据服务。资料保留、所有权、失败字段和真实未验边界见 [卸载合同](maintenance-contract.md)。
+`maintenance.info` 返回离线维护说明与卸载能力、阶段和禁用原因。`maintenance.uninstall` 仅接受 `{bundle:"dsh-unlimit",confirmed:true}`，不向模型工具开放。先停止连接检查、排空已接纳动作、持久禁用和撤销入场、停止所属任务并还原控制，再用官方管理器移除和读回。准备失败不移除，未知结果不自动重试；成功后只返回普通回执，不再读取已经释放的数据服务。资料保留、所有权、失败字段和真实未验边界见 [卸载合同](maintenance-contract.md)。
 
 技能新导入或保存最多200个普通文件，正文256KiB、ZIP12MiB、展开总量50MiB；ZIP目录项与文件合计另有512条解析上限。既存技能保留最多512文件的读取能力，超200文件的编辑保存明确拒绝，不截断原文件；需要先由用户整理到当前导入规模。
 

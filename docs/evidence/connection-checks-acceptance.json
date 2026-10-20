@@ -1,0 +1,116 @@
+{
+  "sourceBase": "e540d7665b099df6c1255ae1100de0879dec2fb9",
+  "sourceRevision": "the commit containing this evidence; not the base revision",
+  "date": "2026-10-21",
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "24.21.0",
+    "hostTarget": "0.2.1-rc.2",
+    "realDesktopInstalled": false,
+    "realProfileUsed": false,
+    "realTargetsUsed": false
+  },
+  "isolatedSuite": {
+    "passed": 434,
+    "failed": 0,
+    "skipped": 0,
+    "syntaxChecked": 109,
+    "newTransportTests": 13,
+    "newServiceTests": 13,
+    "newUiTests": 16,
+    "newOfficialMountTest": 1
+  },
+  "browser": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "server": "task-owned loopback, temporary synthetic SQLite",
+    "confirmCancelledConnections": 0,
+    "unregisteredTargetDnsAndConnections": 0,
+    "runRequests": 3,
+    "stopRequests": 1,
+    "transportCalls": 5,
+    "dnsCalls": 0,
+    "headRequests": [
+      {
+        "method": "HEAD",
+        "url": "/health?sample=demo"
+      },
+      {
+        "method": "HEAD",
+        "url": "/slow"
+      },
+      {
+        "method": "HEAD",
+        "url": "/slow"
+      }
+    ],
+    "observedScenarios": [
+      "HTTP 403 is reachable, not authenticated",
+      "closed port refused",
+      "one request timed out at about 6 seconds",
+      "explicit stop reported cancelled",
+      "TCP listener connected without an HTTP request",
+      "missing listener unsupported",
+      "edited record retained prior result as stale",
+      "refresh and page reload retained saved results without new checks"
+    ],
+    "consoleWarningsAndErrors": 0,
+    "finalResults": [
+      {
+        "kind": "webshell",
+        "state": "reachable",
+        "reason": "http-response",
+        "stale": true,
+        "persisted": true
+      },
+      {
+        "kind": "webshell",
+        "state": "denied",
+        "reason": "scope-unverified",
+        "stale": false,
+        "persisted": true
+      },
+      {
+        "kind": "webshell",
+        "state": "unreachable",
+        "reason": "refused",
+        "stale": false,
+        "persisted": true
+      },
+      {
+        "kind": "webshell",
+        "state": "cancelled",
+        "reason": "cancelled",
+        "stale": false,
+        "persisted": true
+      },
+      {
+        "kind": "tunnel",
+        "state": "reachable",
+        "reason": "tcp-connected",
+        "stale": false,
+        "persisted": true
+      },
+      {
+        "kind": "tunnel",
+        "state": "unsupported",
+        "reason": "invalid-listener",
+        "stale": false,
+        "persisted": true
+      }
+    ],
+    "temporaryTabClosed": true,
+    "temporaryServerClosed": true,
+    "temporaryDataRemoved": true
+  },
+  "remaining": [
+    "regional classification and unregistered-region policy",
+    "cross-record derived-IP exceptions",
+    "host general network enforcement",
+    "real desktop installation and embedded UI",
+    "real targets and IPv6 transport acceptance"
+  ]
+}

@@ -20,13 +20,14 @@ import { LocalEnvironment } from "../src/core/environment.js";
 import { DesktopWorkflowPlan } from "../src/host/workflow-plan.js";
 import { Controller } from "../src/server/controller.js";
 import { createHandler } from "../src/server/http.js";
+import { ConnectionChecks } from "../src/core/connection-checks.js";
 
 const { values } = parseArgs({ options: { port: { type: "string", default: "4177" } } });
 const port = Number(values.port);
 if (!Number.isInteger(port) || port < 0 || port > 65535)
   throw new Error("--port 必须是 0 到 65535 之间的整数");
 const temporary = mkdtempSync(join(tmpdir(), "dsh-unlimit-synthetic-preview-"));
-let store, toolkit, flow, server, origin;
+let store, toolkit, flow, server, origin, connectionChecks;
 let closing;
 async function close() {
   if (closing) return closing;
@@ -38,6 +39,7 @@ async function close() {
         })
       : Promise.resolve();
     try {
+      await connectionChecks?.close();
       await toolkit?.close();
       await stopped;
     } finally {
@@ -130,6 +132,7 @@ try {
   flow = new Flow(store);
   const skills = new SkillLibrary(join(temporary, "skills"));
   const admission = new DrillAdmission(store, temporary);
+  connectionChecks = new ConnectionChecks(store, { admission });
   const environment = new LocalEnvironment(realpathSync(temporary));
   const catalog = new HostCatalog(
     { get: () => undefined },
@@ -154,6 +157,7 @@ try {
     sessions: { list: () => [] },
     host: hostInfo,
     admission,
+    connectionChecks,
   });
   server = createServer(createHandler(controller, () => origin));
   await new Promise((resolve, reject) => {

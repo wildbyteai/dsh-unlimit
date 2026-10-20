@@ -5,6 +5,12 @@ import { environmentSettings } from "./environment-settings.js";
 import { workflowPlans } from "./workflow-plans.js";
 import { openWorkspaceRules } from "./workspace-rules.js";
 import { uninstallSection, uninstallFlow, renderReceipt } from "./maintenance.js";
+import {
+  connectionCheckFlow,
+  connectionCheckPanel,
+  connectionPreview,
+  connectionResultText,
+} from "./connection-checks.js";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -299,7 +305,7 @@ const recordFields = {
     field("name", "名称"),
     field("url", "地址"),
     field("language", "语言"),
-    field("status", "状态"),
+    field("status", "手工登记状态"),
     field("notes", "证据说明", "textarea"),
   ],
   tunnel: [
@@ -307,6 +313,15 @@ const recordFields = {
     field("source", "来源地址"),
     field("destination", "目标地址"),
     field("protocol", "协议"),
+    field("listenHost", "监听端地址", "text", {
+      help: "仅检查此明确登记的监听地址，不从来源或目标推断。",
+    }),
+    field("listenPort", "监听端口（可选）", "number", {
+      optional: true,
+      min: 1,
+      max: 65535,
+      step: 1,
+    }),
     field("notes", "说明", "textarea"),
   ],
   screenshot: [
@@ -2143,6 +2158,75 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
   const payload = { ...workspacePayload(), kind };
   const data = await api("records.list", payload);
   const items = data.items.map((item) => ({ ...item.data, ...item }));
+  const checkable = ["webshell", "tunnel"].includes(kind);
+  const page = state.page;
+  const serial = state.request;
+  const checkStatus = checkable
+    ? await api("connectionChecks.status", { workspaceId: payload.workspaceId })
+    : null;
+  let checkRoot;
+  let checkDialog;
+  const inCheckContext = () =>
+    state.workspaceId === payload.workspaceId &&
+    state.page === page &&
+    state.request === serial &&
+    checkRoot?.isConnected;
+  const checks = checkable
+    ? connectionCheckFlow({
+        api,
+        workspaceId: payload.workspaceId,
+        initialStatus: checkStatus,
+        isCurrent: inCheckContext,
+        confirm: (prepared) => {
+          if (!canLeaveEditor() || !inCheckContext()) return Promise.resolve(false);
+          const dialog = $("#editor");
+          checkDialog = dialog;
+          const ready = prepared.items.some((item) => item.state === "ready");
+          dialog.innerHTML = `<div class="dialoghead"><h2>确认本次连接检查</h2><button type="button" class="quiet small" data-check-close aria-label="关闭">✕</button></div>${connectionPreview(prepared)}<div class="dialogfoot"><button type="button" data-check-cancel>${ready ? "取消" : "关闭"}</button>${ready ? '<button type="button" class="primary" data-check-accept>确认并检查允许的项目</button>' : ""}</div>`;
+          dialog.oncancel = null;
+          return new Promise((resolve) => {
+            dialog.addEventListener(
+              "close",
+              () => {
+                checkDialog = null;
+                resolve(false);
+              },
+              { once: true },
+            );
+            $("[data-check-close]", dialog).onclick = () => dialog.close();
+            $("[data-check-cancel]", dialog).onclick = () => dialog.close();
+            const accept = $("[data-check-accept]", dialog);
+            if (accept)
+              accept.onclick = () => {
+                accept.disabled = true;
+                resolve(true);
+                dialog.close();
+              };
+            dialog.showModal();
+          });
+        },
+        changed(view) {
+          checkRoot.innerHTML = connectionCheckPanel(view);
+          bindChecks();
+          const results = new Map((view.status?.items || []).map((item) => [item.recordId, item]));
+          $$("[data-record-check]").forEach((button) => {
+            button.disabled = view.busy || view.refreshing || view.status?.active === true;
+            const item = items[Number(button.dataset.recordCheck)];
+            const cell = button
+              .closest("tr")
+              .querySelector(`td:nth-child(${columns.length}) > div`);
+            if (cell) cell.textContent = connectionResultText(results.get(item.id));
+          });
+        },
+      })
+    : null;
+  function bindChecks() {
+    if (!checkRoot) return;
+    $("[data-connection-batch]", checkRoot).onclick = () =>
+      checks.start(items.map((item) => item.id));
+    $("[data-connection-stop]", checkRoot).onclick = () => checks.stop();
+    $("[data-connection-refresh]", checkRoot).onclick = () => checks.refresh();
+  }
   let fields = recordFields[kind];
   let points = [],
     assets = [],
@@ -2232,33 +2316,59 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
               ...item,
               storedContent: `${item.secretState.hasSecret ? "标准内容已保存 · 不回显" : "标准内容未保存"}${item.secretState.legacyFieldCount ? ` · ${item.secretState.legacyFieldCount} 个旧隐藏字段` : ""}`,
             }
-          : item,
+          : checkable
+            ? {
+                ...item,
+                registeredStatus: item.status,
+                connectionStatus: connectionResultText(
+                  checkStatus.items.find((entry) => entry.recordId === item.id),
+                ),
+              }
+            : item,
   );
   const columns =
-    kind === "score-hit"
+    kind === "webshell"
       ? [
-          ["name", "命中名称"],
-          ["pointLabel", "得分点"],
-          ["assetLabel", "资产"],
-          ["targetLabel", "计分目标"],
+          ["name", "名称"],
+          ["url", "登记地址"],
+          ["language", "语言"],
+          ["registeredStatus", "手工登记状态"],
+          ["connectionStatus", "上次连接检查（只读）"],
         ]
-      : kind === "score-point"
+      : kind === "tunnel"
         ? [
-            ["name", "得分点名称"],
-            ["points", "基准分值"],
-            ["stageLabel", "阶段"],
+            ["name", "名称"],
+            ["source", "来源地址"],
+            ["destination", "目标地址"],
+            ["protocol", "协议"],
+            ["listenHost", "监听地址"],
+            ["listenPort", "监听端口"],
+            ["connectionStatus", "上次连接检查（只读）"],
           ]
-        : kind === "credential"
+        : kind === "score-hit"
           ? [
-              ["name", "名称"],
-              ["username", "账号"],
-              ["target", "登记目标"],
-              ["storedContent", "内容状态"],
+              ["name", "命中名称"],
+              ["pointLabel", "得分点"],
+              ["assetLabel", "资产"],
+              ["targetLabel", "计分目标"],
             ]
-          : fields
-              .filter((f) => !["textarea", "password"].includes(f.type))
-              .slice(0, 4)
-              .map((f) => [f.name, f.label]);
+          : kind === "score-point"
+            ? [
+                ["name", "得分点名称"],
+                ["points", "基准分值"],
+                ["stageLabel", "阶段"],
+              ]
+            : kind === "credential"
+              ? [
+                  ["name", "名称"],
+                  ["username", "账号"],
+                  ["target", "登记目标"],
+                  ["storedContent", "内容状态"],
+                ]
+              : fields
+                  .filter((f) => !["textarea", "password"].includes(f.type))
+                  .slice(0, 4)
+                  .map((f) => [f.name, f.label]);
   const noPoints = kind === "score-hit" && !points.length;
   return {
     html:
@@ -2276,10 +2386,18 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
                 )
                 .join(
                   "",
-                )}</div><div class="note">这是本地证据台账。记录凭据、隧道或 WebShell 信息不会连接目标或执行操作。凭据内容不回显，编辑留空保留，明确勾选才清空；普通说明字段不适合填写秘密。</div>`
-        }${noPoints ? '<div class="note">请先在「得分点」中创建计分点，再记录命中。</div>' : ""}${shown.length ? table(shown, columns, (item, index) => `<button class="small quiet" data-record-edit="${index}">编辑</button><button class="small quiet danger" data-record-delete="${index}">删除</button>`) : empty(`暂无${kinds[kind]}记录`)}${embedded ? `<button id="create-record" style="margin-top:15px" class="small" ${noPoints ? 'disabled title="请先创建得分点"' : ""}>＋ 新增记录</button>` : ""}`,
-      ),
+                )}</div><div class="note">这是本地证据台账。保存凭据、隧道或 WebShell 信息不会连接目标或执行操作；连接检查需要单独预览并确认。凭据内容不回显，编辑留空保留，明确勾选才清空；普通说明字段不适合填写秘密。</div>`
+        }${noPoints ? '<div class="note">请先在「得分点」中创建计分点，再记录命中。</div>' : ""}${shown.length ? table(shown, columns, (item, index) => `${checkable ? `<button class="small" data-record-check="${index}" ${checkStatus.active ? "disabled" : ""}>检查连接</button>` : ""}<button class="small quiet" data-record-edit="${index}">编辑</button><button class="small quiet danger" data-record-delete="${index}">删除</button>`) : empty(`暂无${kinds[kind]}记录`)}${embedded ? `<button id="create-record" style="margin-top:15px" class="small" ${noPoints ? 'disabled title="请先创建得分点"' : ""}>＋ 新增记录</button>` : ""}`,
+      ) +
+      (checks ? `<div id="connection-checks">${connectionCheckPanel(checks.view())}</div>` : ""),
     bind() {
+      if (checks) {
+        checkRoot = $("#connection-checks");
+        bindChecks();
+        $$("[data-record-check]").forEach((button) => {
+          button.onclick = () => checks.start([items[Number(button.dataset.recordCheck)].id]);
+        });
+      }
       const edit = (item) => {
         const values = { ...item };
         let dynamic = ["score-hit", "credential"].includes(kind)
@@ -2326,6 +2444,15 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
               delete outgoing.clearLegacyFields;
               if (input.clearSecret) outgoing.secret = "";
               else if (!input.secret) delete outgoing.secret;
+            }
+            if (kind === "tunnel") {
+              if (input.listenPort === undefined) delete outgoing.listenPort;
+              else if (
+                !Number.isInteger(input.listenPort) ||
+                input.listenPort < 1 ||
+                input.listenPort > 65535
+              )
+                throw new Error("监听端口必须是 1 到 65535 的整数");
             }
             if (["score-point", "score-hit"].includes(kind) && !outgoing.stageId)
               delete outgoing.stageId;
@@ -2425,6 +2552,10 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
               clearObjectDraft(state.page, `record:${id}`, { workspaceId: payload.workspaceId });
             })),
       );
+    },
+    dispose() {
+      checks?.dispose();
+      if (checkDialog?.open) checkDialog.close();
     },
   };
 }

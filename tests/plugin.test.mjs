@@ -24,6 +24,73 @@ const hostOnly = {
   timeout: 10000,
 };
 let official;
+test(
+  "mounted connection checks preserve HTTP partial receipts and reject model-initiated network work",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const workspace = await f.request({
+      action: "workspaces.save",
+      payload: { name: "Synthetic connection scope" },
+    });
+    const workspaceId = workspace.json.data.item.id;
+    const record = await f.request({
+      action: "records.save",
+      payload: {
+        workspaceId,
+        kind: "webshell",
+        data: { name: "Synthetic endpoint", url: "http://127.0.0.1:12345/health" },
+      },
+    });
+    const selection = { workspaceId, recordIds: [record.json.data.item.id] };
+    let networkCalls = 0;
+    f.controller.connectionChecks.resolve = async () =>
+      assert.fail("literal address does not resolve");
+    f.controller.connectionChecks.transport = async () => {
+      networkCalls++;
+      return {
+        state: "reachable",
+        reason: "http-response",
+        latencyMs: 1,
+        transport: { type: "http", address: "127.0.0.1", family: 4, httpStatus: 403 },
+      };
+    };
+    const denied = await f.request({ action: "connectionChecks.prepare", payload: selection });
+    assert.equal(denied.json.data.items[0].state, "denied");
+    const settings = f.controller.store.dispatch("settings.get");
+    await f.request({
+      action: "settings.save",
+      payload: {
+        revision: settings.revision,
+        value: { ...settings.value, ownServers: ["127.0.0.1"] },
+      },
+    });
+    const prepared = await f.request({ action: "connectionChecks.prepare", payload: selection });
+    assert.equal(prepared.json.data.items[0].state, "ready");
+    const payload = { ...selection, snapshot: prepared.json.data.snapshot, confirmed: true };
+    assert.equal(networkCalls, 0);
+    const parent = f.agent("synthetic-network-parent");
+    const schema = JSON.stringify(
+      f.ctx.tools.schemas().find((item) => item.name === "unlimit_workspace"),
+    );
+    assert.ok(!schema.includes("connectionChecks."));
+    assert.equal((await f.execute(parent, "connectionChecks.run", payload)).isError, true);
+    assert.equal(networkCalls, 0);
+    const setMeta = f.controller.store.setMeta.bind(f.controller.store);
+    f.controller.store.setMeta = (key, value) => {
+      if (key.startsWith("connection-check:")) throw new Error("synthetic disk failure");
+      return setMeta(key, value);
+    };
+    const partial = await f.request({ action: "connectionChecks.run", payload });
+    assert.equal(partial.status, 400);
+    assert.equal(partial.json.error.code, "CONNECTION_CHECK_PARTIAL");
+    assert.equal(partial.json.error.partial.items[0].state, "reachable");
+    assert.equal(partial.json.error.partial.items[0].persisted, false);
+    assert.equal(networkCalls, 1);
+    assert.doesNotMatch(partial.body, /synthetic disk failure/);
+  },
+);
+
 function loadOfficial() {
   official ??= (async () => {
     const descriptor = JSON.parse(readFileSync(join(runtimeRoot, "desktop-runtime.json"), "utf8"));
@@ -564,6 +631,9 @@ test(
       "sessions.attachment",
       "sessions.releaseAttachments",
       "maintenance.uninstall",
+      "connectionChecks.prepare",
+      "connectionChecks.run",
+      "connectionChecks.stop",
     ])
       assert.equal((await f.execute(parent, action, {})).isError, true);
     let result = await f.request({
@@ -650,6 +720,12 @@ test(
     assert.equal(ui.status, 200);
     assert.match(ui.body, /DSH Unlimit/);
     assert.match(ui.headers["Content-Security-Policy"], /default-src 'self'/);
+    const checksUi = await f.request({
+      method: "GET",
+      url: "/dsh-unlimit/ui/connection-checks.js",
+    });
+    assert.equal(checksUi.status, 200);
+    assert.match(checksUi.body, /connectionCheckFlow/);
     const status = await f.request();
     assert.equal(status.status, 200);
     assert.equal(status.json.data.host.version, "0.2.1-rc.2");
