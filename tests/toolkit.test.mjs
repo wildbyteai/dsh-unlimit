@@ -258,3 +258,226 @@ test(
     await assert.rejects(call("toolkit.probe", { tool: "nmap" }), code("UNSUPPORTED"));
   },
 );
+
+test(
+  "legacy roots and partial configuration updates preserve explicit directory precedence and templates",
+  executableTests,
+  async (t) => {
+    const { directory, root, database, store, call, tool } = fixture(t);
+    const first = join(directory, "extra first");
+    const second = join(directory, "extra second");
+    const templateDir = join(directory, "templates ; literal");
+    for (const path of [first, second, templateDir]) mkdirSync(path);
+    writeFileSync(join(templateDir, "not-executed.txt"), "synthetic template, never loaded");
+    const rootTool = tool("nmap", "process.stdout.write('root');");
+    const firstTool = tool("nmap", "process.stdout.write('first');", first);
+    const secondTool = tool("nmap", "process.stdout.write('second');", second);
+    const alias = tool(
+      "chosen script with spaces ; literal",
+      "process.stdout.write('explicit');",
+      second,
+    );
+    // An existing toolkit.root is migrated on first new-format save, never discarded.
+    store.setMeta("toolkit.root", root);
+    assert.equal(call("toolkit.status").root, root);
+    const status = call("toolkit.save", { searchDirs: [first, second, first], templateDir });
+    assert.deepEqual(status.searchDirs, [first, second]);
+    const nmap = () => call("toolkit.status").tools.find((item) => item.id === "nmap");
+    assert.equal(nmap().path, rootTool);
+    assert.equal(nmap().source, "root");
+    call("toolkit.save", { root: "" });
+    assert.equal(nmap().path, firstTool);
+    assert.equal(nmap().source, "search");
+    call("toolkit.save", { searchDirs: [second, first] });
+    assert.equal(nmap().path, secondTool);
+    call("toolkit.save", { root, toolPaths: { nmap: alias } });
+    assert.equal(nmap().path, alias);
+    assert.equal(nmap().source, "explicit");
+    assert.equal((await call("toolkit.probe", { tool: "nmap" })).stdout, "explicit");
+    const other = new WorkspaceStore(database);
+    try {
+      const persisted = new Toolkit(other).status();
+      assert.equal(persisted.templateDir, templateDir);
+      assert.deepEqual(persisted.searchDirs, [second, first]);
+      assert.deepEqual(persisted.toolPaths, { nmap: alias });
+    } finally {
+      other.close();
+    }
+    // The original {root} request stays compatible and does not erase newer fields.
+    assert.equal(call("toolkit.save", { root }).templateDir, templateDir);
+    call("toolkit.save", { toolPaths: {} });
+    assert.equal(nmap().path, rootTool);
+  },
+);
+
+test(
+  "configuration rejects invalid directories, unknown overrides and nonexecutable aliases without partial writes",
+  executableTests,
+  (t) => {
+    const { directory, root, store, call, tool } = fixture(t);
+    const valid = tool("nmap", "");
+    const nonExecutable = tool("not executable", "");
+    chmodSync(nonExecutable, 0o600);
+    call("toolkit.save", { root });
+    const before = store.meta("toolkit.config");
+    for (const payload of [
+      { searchDirs: ["relative"] },
+      { searchDirs: [join(directory, "missing")] },
+      { searchDirs: root },
+      { templateDir: valid },
+      { templateDir: join(directory, "missing") },
+      { toolPaths: { unknown: valid } },
+      { toolPaths: { nmap: "relative" } },
+      { toolPaths: { nmap: root } },
+      { toolPaths: { nmap: nonExecutable } },
+      { toolPaths: { nmap: [valid, "--unsafe"] } },
+    ])
+      assert.throws(() => call("toolkit.save", payload), code("INVALID_INPUT"));
+    assert.deepEqual(store.meta("toolkit.config"), before);
+  },
+);
+
+test(
+  "broken explicit overrides never fall back and replaced search directories cannot expand scope",
+  executableTests,
+  (t) => {
+    const { directory, root, call, tool } = fixture(t);
+    tool("nmap", "");
+    const extra = join(directory, "extra");
+    const outside = join(directory, "outside config");
+    mkdirSync(extra);
+    mkdirSync(outside);
+    const alias = tool("named alias", "", outside);
+    call("toolkit.save", { root, searchDirs: [extra], toolPaths: { nmap: alias } });
+    rmSync(alias);
+    const missing = call("toolkit.status").tools.find((item) => item.id === "nmap");
+    assert.equal(missing.path, null);
+    assert.equal(missing.source, "explicit");
+    assert.equal(missing.available, false);
+    assert.match(missing.detail, /未采用其他候选/);
+    call("toolkit.save", { toolPaths: {} });
+    rmSync(extra, { recursive: true });
+    symlinkSync(outside, extra, "dir");
+    assert.throws(() => call("toolkit.status"), code("INVALID_INPUT"));
+  },
+);
+
+const pdHelp = "httpx HTTP toolkit using retryablehttp\n-status-code -tech-detect\n";
+const pythonHelp =
+  "HTTPX\nA next generation HTTP client.\nUsage: httpx <URL> [OPTIONS]\n--method METHOD\n";
+
+test(
+  "httpx requires product identity, supplements ambiguous versions with fixed help and invalidates changed files",
+  executableTests,
+  async (t) => {
+    const { root, call, tool } = fixture(t);
+    const path = tool(
+      "httpx",
+      `const args = process.argv.slice(2); if (JSON.stringify(args) === '["-version"]') process.stdout.write('httpx v1 synthetic\\n'); else if (JSON.stringify(args) === '["--help"]') process.stdout.write(${JSON.stringify(pdHelp)}); else process.exit(9);`,
+    );
+    call("toolkit.save", { root });
+    let item = call("toolkit.status").tools.find((item) => item.id === "httpx");
+    assert.equal(item.path, path);
+    assert.equal(item.available, false);
+    assert.equal(item.identity, "unverified");
+    const result = await call("toolkit.probe", { tool: "httpx" });
+    assert.equal(result.identity, "verified");
+    assert.equal(result.available, true);
+    assert.deepEqual(
+      result.attempts.map((item) => item.args),
+      [["-version"], ["--help"]],
+    );
+    assert.equal(call("toolkit.status").tools.find((item) => item.id === "httpx").available, true);
+    tool("httpx", "process.stdout.write('httpx 99 unknown');");
+    item = call("toolkit.status").tools.find((item) => item.id === "httpx");
+    assert.equal(item.path, path);
+    assert.equal(item.available, false);
+    assert.equal(item.identity, "unverified");
+    assert.equal((await call("toolkit.probe", { tool: "httpx" })).identity, "unknown");
+    assert.equal(call("toolkit.status").tools.find((item) => item.id === "httpx").available, false);
+  },
+);
+
+test(
+  "Python HTTPX, mixed identities and generic versions are not security-tool availability",
+  executableTests,
+  async (t) => {
+    const { directory, root, call, tool } = fixture(t);
+    const extra = join(directory, "second httpx");
+    mkdirSync(extra);
+    tool("httpx", "process.stdout.write('httpx ProjectDiscovery.io synthetic version');", extra);
+    tool(
+      "httpx",
+      `if (process.argv[2] === '-version') process.exit(2); process.stdout.write(${JSON.stringify(pythonHelp)});`,
+    );
+    call("toolkit.save", { root, searchDirs: [extra] });
+    let result = await call("toolkit.probe", { tool: "httpx" });
+    assert.equal(result.identity, "mismatch");
+    assert.equal(result.available, false);
+    assert.equal(call("toolkit.status").tools.find((item) => item.id === "httpx").source, "root");
+    tool("httpx", `process.stdout.write(${JSON.stringify(pythonHelp + pdHelp)});`);
+    result = await call("toolkit.probe", { tool: "httpx" });
+    assert.equal(result.identity, "unknown");
+    assert.equal(result.available, false);
+    call("toolkit.save", { root: "" });
+    result = await call("toolkit.probe", { tool: "httpx" });
+    assert.equal(result.identity, "verified");
+    assert.equal(result.attempts.length, 1);
+    assert.equal(result.source, "search");
+  },
+);
+
+test(
+  "fixed identity attempts share timeout and total output limits",
+  executableTests,
+  async (t) => {
+    const { root, call, tool, toolkit } = fixture(t);
+    tool(
+      "httpx",
+      "setTimeout(() => process.stdout.write('httpx unknown'), process.argv[2] === '-version' ? 350 : 550);",
+    );
+    call("toolkit.save", { root });
+    await assert.rejects(call("toolkit.probe", { tool: "httpx", timeoutMs: 750 }), code("TIMEOUT"));
+    assert.equal(toolkit.pending.size, 0);
+    assert.equal(
+      call("toolkit.status").tools.find((item) => item.id === "httpx").identity,
+      "unverified",
+    );
+    tool("httpx", "process.stdout.write('x'.repeat(40000));");
+    await assert.rejects(call("toolkit.probe", { tool: "httpx" }), code("OUTPUT_LIMIT"));
+    assert.equal(toolkit.pending.size, 0);
+  },
+);
+
+test(
+  "revoking configured paths cancels an owned probe and removes its disposable home",
+  executableTests,
+  async (t) => {
+    const { directory, root, call, tool, toolkit } = fixture(t);
+    const observed = join(directory, "environment.json");
+    tool(
+      "httpx",
+      `require('node:fs').writeFileSync(${JSON.stringify(observed)}, JSON.stringify({ pid: process.pid, home: process.env.HOME, cwd: process.cwd(), xdg: process.env.XDG_CONFIG_HOME })); setInterval(() => {}, 1000);`,
+    );
+    call("toolkit.save", { root });
+    const checking = call("toolkit.probe", { tool: "httpx" });
+    const rejected = assert.rejects(checking, code("CANCELLED"));
+    for (let attempt = 0; !existsSync(observed) && attempt < 100; attempt++)
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    const environment = JSON.parse(readFileSync(observed, "utf8"));
+    assert.equal(realpathSync(environment.home), realpathSync(environment.cwd));
+    assert.equal(environment.xdg, environment.home);
+    assert.notEqual(environment.home, root);
+    const cleared = call("toolkit.save", {
+      root: "",
+      searchDirs: [],
+      toolPaths: {},
+      templateDir: "",
+    });
+    await rejected;
+    assert.equal(toolkit.pending.size, 0);
+    assert.equal(existsSync(environment.home), false);
+    assert.throws(() => process.kill(environment.pid, 0), code("ESRCH"));
+    assert.ok(cleared.tools.every((item) => item.path === null && !item.available));
+  },
+);

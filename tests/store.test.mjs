@@ -33,6 +33,43 @@ function code(expected) {
   return (error) => error instanceof StoreError && error.code === expected;
 }
 
+test("asset paths return a shortest recorded chain without cycles or cross-workspace edges", (t) => {
+  const { call, workspace, asset } = fixture(t);
+  const first = workspace("Path fixtures");
+  const second = workspace("Other path fixtures");
+  const [a, b, c, d] = ["A", "B", "C", "D"].map((name) => asset(first.id, name));
+  const foreign = asset(second.id, "Foreign");
+  const link = (from, to) =>
+    call("assets.link", { workspaceId: first.id, from: from.id, to: to.id, relation: "fixture" })
+      .item;
+  link(a, b);
+  link(b, c);
+  link(c, a);
+  const direct = link(a, c);
+  const query = (from, to, extra = {}) =>
+    call("assets.path", { workspaceId: first.id, from: from.id, to: to.id, ...extra });
+  assert.deepEqual(
+    query(a, c).nodes.map((node) => node.id),
+    [a.id, c.id],
+  );
+  assert.deepEqual(
+    query(a, c).edges.map((edge) => edge.id),
+    [direct.id],
+  );
+  assert.equal(query(a, d).found, false);
+  assert.deepEqual(
+    query(a, a).nodes.map((node) => node.id),
+    [a.id],
+  );
+  link(d, c);
+  assert.equal(query(c, d).found, false);
+  assert.deepEqual(
+    query(c, d, { direction: "undirected" }).nodes.map((node) => node.id),
+    [c.id, d.id],
+  );
+  assert.throws(() => query(a, foreign), code("NOT_FOUND"));
+});
+
 test("settings defaults, validation, persistence and optimistic revision conflict", (t) => {
   const { call, database } = fixture(t);
   const initial = call("settings.get");
@@ -87,7 +124,7 @@ test("settings support the shared prompt and workspace policy contract only", (t
         ...current.value,
         promptMode: "append",
         workspacePolicy,
-        ownServers: ["synthetic-server"],
+        ownServers: ["synthetic.example.invalid"],
       },
     });
     assert.equal(next.value.workspacePolicy, workspacePolicy);

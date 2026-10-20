@@ -59,14 +59,18 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
   "maxDepth": 10,
   "readLimit": 1048576,
   "autoReapply": true,
+  "retryOverride": false,
   "retryLimit": 0,
+  "autoContinue": false,
+  "continueLimit": 3,
+  "continueText": "请承接刚才因输出长度限制而未完成的内容，继续完成剩余部分，避免重复已有输出。",
   "ownServers": []
 }
 ```
 
 ## 宿主层接口
 
-`status` 返回包版本、宿主版本、平台、启用状态、能力列表、当前设置、会话列表和离线更新模式。`control.apply` / `control.revert` 启用与撤销本插件拥有的运行时注册。`sessions.rewind` 使用官方 fork 路径保留原会话。`skills.*` 仅处理本插件明确选定的技能根目录。`toolkit.*` 管理用户指定的本地工具目录与受控进程。
+`status` 返回包版本、宿主版本、平台、启用状态、能力列表、当前设置、会话列表和离线更新模式。`control.apply` / `control.revert` 启用与撤销本插件拥有的运行时注册。`sessions.rewind` 使用官方 fork 路径保留原会话。`skills.*` 仅处理本插件明确选定的技能根目录。`toolkit.*` 管理用户指定的本地工具目录与固定版本探测进程。
 
 ## 发布边界
 
@@ -83,3 +87,95 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 `flow.status / configure / assign / acquire / release` 管理已绑定会话的明确角色与本地执行槽，槽位默认3、允许1至10。这里的槽登记不会启动任务或替代宿主子代理限制；活动槽不持久化。角色正文按绑定会话注入，普通未分配会话不带演练角色稿。
 
 `workspacePolicy` 仅控制本插件主动选择的规则：`strict` 忽略所选规则，`fallback` 在规则库和自写正文为空时使用所选规则，`always` 合并所选规则。原生宿主运行上下文仍保留；不能把这个设置解释为移除所有宿主工作区基线。
+
+服务器清单只接受 IP、完整主机名或 `username@host`。空行忽略，主机名转小写和 IDNA，IPv6 使用规范化方括号格式，按完整项去重。密码、密钥、URL、端口、网段、通配符和多目标表达式拒绝，错误不回显输入。清单仍是本地库存，不提供 DNS/地区判定或出口授权。
+
+`assets.path` 接受 `{workspaceId, from, to, direction?}`，返回 `{found, direction, nodes, edges}`；默认有向，`undirected` 按无向连接查询。返回保存关系中的一条最短路径，不执行网络路径探测；不同工作区的端点拒绝，无路径明确返回 `found:false`。
+
+## 工作区材料
+
+`WorkspaceFiles(root, store)` 仅在本插件的材料目录中管理文件。所有请求带 `workspaceId`，路径必须是工作区相对路径。文本不执行，HTML/SVG 不内嵌预览。模型工具沿用会话的项目绑定，不能指定其他项目读取材料。
+
+| action        | 主要输入                                                | 返回                                                             |
+| ------------- | ------------------------------------------------------- | ---------------------------------------------------------------- |
+| files.list    | `{workspaceId}`                                         | `{items, limits}`，真实文件列表，不含内部备份                    |
+| files.read    | `{workspaceId,path,encoding?}`                          | `{item}`，`utf8` 返回 `content`，默认返回 `contentBase64`        |
+| files.write   | `{workspaceId,path,content}` 或 `contentBase64`         | `{item}`，覆盖时带 `backupId`                                    |
+| files.import  | `{workspaceId,items:[{path,contentBase64,mediaType?}]}` | `{items}`，预检查后整批写入                                      |
+| files.preview | `{workspaceId,path}`                                    | `{item}`，带图片字节、媒体类型和宽高                             |
+| files.delete  | `{workspaceId,path}`                                    | `{item}`，带 `deleted:true` 和 `backupId`                        |
+| files.restore | `{workspaceId,backupId}`                                | `{item}`，带 `restoredFrom`，若覆盖当前版本也返回新的 `backupId` |
+| files.backups | `{workspaceId}`                                         | `{items}`，持久备份清单，可在重开页面后恢复                      |
+
+每项包含相对路径、字节数、SHA-256 和检测到的媒体类型，可保存资产关联、来源和用途。单文件上限 10 MiB，UTF-8 文本读写上限 1 MiB，批量导入最多 128 文件、合计 20 MiB。覆盖/删除保留原字节和元信息。拒绝路径逃逸、符号链接、保留内部名称和大小写别名。
+
+PNG/JPEG/WebP/GIF 的预览先检查格式结构与尺寸，最长边 16384 像素、总像素 4000 万以内。`imageValidation:"structure-only"` 明确表示没有完整解码像素；浏览器加载失败也必须显示失败，不能把结构检查当作成功渲染。
+
+## 本地工具路径
+
+`toolkit.save` 部分更新 `{root, searchDirs, toolPaths, templateDir}`；`toolPaths` 为工具 ID 到绝对可执行文件路径的映射，替换整张映射。查找优先级为逐工具路径、工具根、按顺序列出的额外目录，各目录只枚举根及一层子目录，不自动搜索环境 PATH。失效的逐工具路径不静默回退；此配置动作只校验和登记模板目录，正文由下述 `templates.*` 明确读取。
+
+`toolkit.status` 返回完整配置、`tools` 和空 `runs`。每项分开返回 `path/source/identity/available/detail`；存在文件不一定确认了产品。`httpx` 在版本/帮助输出被识别为 ProjectDiscovery 产品前不可标可用，Python HTTPX 标为不匹配。身份随文件指纹变化撤回，不能当作代码签名或文件可信证明。
+
+`toolkit.probe` 只运行固定参数：普通工具 `--version`，`httpx` 为 `-version`，必要时追加 `--help`。两次调用共享超时与 64 KiB 输出上限，临时 HOME/工作目录隔离真实工具配置。没有扫描、下载或通用命令入口。
+
+## 请求重试
+
+`retryOverride:false` 默认保留提供方策略；只有插件已启用且显式打开此开关，`retryLimit` 才覆盖每请求的重试次数（0–20，0 表示不重试）。这改变官方 `prepareCall` 返回的策略，不叠加新的请求循环，不修改提供方注册或持久 profile。
+
+仍由官方 `llm-retry` 执行退避、Retry-After、取消与日志。仅允许 `EMPTY_RESPONSE / RATE_LIMIT / SERVER / TIMEOUT / TRANSPORT` 与提供方原允许列表的交集；原 `always` 策略也收窄到这些瞬态错误。认证、额度、无效参数、模型缺失、上下文溢出不由本项目扩大重试。手动/自动“继续下一轮”使用独立的继续服务。
+
+能力依赖当前版本的 `llmRetry v1` 活动投影注册和可撤销的 `prepareCall` 接口。缺少官方执行器时明确不支持，不阻断其他已支持的运行控制；重新挂载可选服务后需重新应用。未来宿主升级必须复验该内部适配点。
+
+## 截断后继续
+
+`continuation.status / continuation.continue / continuation.stop` 均只接受明确的 `sessionId`。当前仅支持根会话：最新结束事件明确为 `max-tokens`、代理空闲且无排队输入时，才允许继续；子代理、原生用户停止、传输错误、限流等不会被转成新一轮继续。手动动作每个截断事件只允许一次，状态接口返回当前原因与自动链计数。
+
+自动继续默认关闭，且仅在运行控制已启用时注册。`continueLimit` 为每次真实人工输入后的自动链上限，范围 0–20；`continueText` 必须非空且不超过 4 KiB。手动继续不重置自动次数；重新应用时从事件重建计数。新人工输入、关闭开关或撤销控制会阻止尚未提交的自动继续。
+
+继续调用官方消息构造和 `followup`。官方入口需要 `role:user`，但消息明确携带 `source.kind: "dsh-unlimit/continuation"`、模式和触发事件序号；不得标成人工发言。下一轮仍从官方提示词路径读取当前正文，原生重试不会被新增继续循环替代。
+
+停止仅移除本模块自动消息；只有能证明当前运行由本模块自动继续独占且无人工待发消息时才取消运行。保存配置后若停止未确认，API 返回 `SETTINGS_APPLIED_PARTIAL` 和 `partial.savedRevision`，明确配置已落盘。它不是“保存失败所以什么都没发生”。
+
+## 会话能力目录
+
+`HostCatalog` 聚合官方 `SkillRegistry`、本项目技能库、官方 `ToolRuntime` 和已配置工具目录。显式 `sessionId` 必须对应实际代理；使用该会话的工作目录和注册表可见性，不静默回退到全局目录。模型工具强制使用调用会话，拒绝指定其他会话。
+
+| action            | 输入                                                                  | 返回                                                                    |
+| ----------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| catalog.list      | `{sessionId?}`                                                        | `{context, skills, tools, toolkit, sources}`                            |
+| catalog.read      | `{sessionId?, origin:"host" 或 "project", id}`                        | `{context, item}`，正文读取与依赖状态分开                               |
+| catalog.preflight | `{sessionId?, skills?:[{origin,id,requirements?}], requirements?:[]}` | `{status, skills, checks, sources, toolkit, executionAuthorized:false}` |
+
+依赖只接受本次显式输入或项目命名空间 `metadata["dsh-unlimit"].requirements`。每项为 `{kind:"tool"|"toolkit"|"skill",name}` 或 `{kind:"directory",path}`，不是宿主通用元信息标准。未声明依赖为 `unknown`；缺失依赖为 `blocked`；`ready` 仅说明所声明条件通过。来源读取失败保留在 `sources`，不伪造空成功。
+
+官方工具名称与 MCP 公开命名空间可观察，不意味着连接健康、权限充足或实际执行成功。本模块不主动联网、执行或下载；调用已注册 provider 的公开目录/读取接口时，该 provider 自己的 I/O 行为仍由宿主负责。
+
+## 本地模板
+
+`templates.list({query?,limit?})` 在明确配置的 `templateDir` 中按相对路径或正文搜索，返回 `items / inspected / skipped / truncated / limits`。每项包含 `path / bytes / sha256 / excerpt / verification:"unverified"`。`templates.read({path})` 返回完整 UTF-8 正文、摘要与相对路径，不执行文件。
+
+支持 `.md / .txt / .yaml / .yml / .json / .toml`；每文件最多 1 MiB、枚举最多 10,000 项、深度最多 12 层，结果上限默认 100、允许 1–500。拒绝路径逃逸、链接、非 UTF-8 和二进制正文。未配置目录明确报 `NOT_CONFIGURED`。
+
+页面可将已读取正文整理为新的知识条目，保留 `local-template:<相对路径>#sha256=<摘要>` 来源，初始为未验证；随后按知识库既有证据约定保存。文件被检索到不意味着模板有效。
+
+## 演练执行者
+
+`DesktopWorkflow` 通过官方 `subagents.startActivation` 创建进程内子代理；先预留会话标识并绑定项目、分配角色、领取槽位，再启动第一轮。只分派明确提供的任务，沿用当前宿主工具和权限，不因项目登记或角色名称扩大授权。结果通过调用收据返回，不发送到其他聊天。
+
+| action            | 输入                                                 | 返回                             |
+| ----------------- | ---------------------------------------------------- | -------------------------------- | -------------- | ------------------------------------------------ |
+| workflow.dispatch | `{workspaceId,parentSessionId,role,task,usePreset?}` | `{item}`，含运行编号与实际子会话 |
+| workflow.status   | `{workspaceId,id?}`                                  | `{item}` 或 `{items}`            |
+| workflow.stop     | `{workspaceId,id}`                                   | `{item,stopped}`                 |
+| workflow.presets  | `{operation:"status"                                 | "register"                       | "unregister"}` | `{item,owned,runtimeOnly:true,persistent:false}` |
+
+任务正文最多 32 KiB。父会话必须已绑定相同项目。模型工具把父会话限定为调用者：同项目内也不能读取或停止别的父会话所分派的执行者；页面按项目显示运行列表。
+
+收据完成或停止后，确认 `dispose` 成功才释放本项目槽位。清理失败保留占用和绑定，暴露 `cleanupError`，允许再次停止尝试清理。启动/停止部分失败使用 `WORKFLOW_START_FAILED / WORKFLOW_STOP_FAILED` 和 `partial.item` 披露已发生的结果。受本模块管理的活动会话不能经通用 `flow.assign / flow.release / workspaces.bind` 绕过收据生命周期。
+
+原创预设 `dsh-unlimit/local-evidence-worker` 只在本插件进程内注册，可精确撤销，不覆盖同 ID 的其他所有者；没有持久预设迁移。运行收据和槽位为进程内状态，真实会话由宿主持久化。本模块不包含自主任务拆解器，也不管理其他来源创建的全部官方子代理。
+
+## 页面编辑状态
+
+未保存表单按工作区、页面和对象保留在面板内存。关闭弹窗或切换页面后可恢复同一对象的草稿；保存、主动放弃和删除只清理对应草稿。刷新或卸载会丢失内存草稿并提示，不写入浏览器持久存储。这不是官方聊天输入框的草稿桥或崩溃恢复。

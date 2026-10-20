@@ -71,6 +71,12 @@ function fixture(t) {
     async whenIdle() {
       trace.push(["idle", id]);
     },
+    cancel(cause) {
+      trace.push(["cancel", id, cause]);
+      this.status = "idle";
+      this.inbox.nextTurn = [];
+      this.inbox.nextStep = [];
+    },
   });
   const agents = [
     agent("original"),
@@ -284,7 +290,7 @@ test("bad event streams, subagent origin, non-human input and attachments refuse
   assert.deepEqual(writes(trace), []);
 });
 
-test("archived originals and missing target quiescence capability are refused before fork", async (t) => {
+test("archived originals and missing cancellation or quiescence capability are refused before fork", async (t) => {
   const { adapter, registry, agents, trace } = fixture(t);
   registry.archivedSessionIds.push("original");
   await assert.rejects(
@@ -292,11 +298,15 @@ test("archived originals and missing target quiescence capability are refused be
     code("SESSION_ARCHIVED"),
   );
   registry.archivedSessionIds.length = 0;
-  delete agents[1].whenIdle;
-  await assert.rejects(
-    adapter.rewind({ sessionId: "original", draftBridgeReady: true }),
-    code("UNSUPPORTED_CAPABILITY"),
-  );
+  for (const method of ["whenIdle", "cancel"]) {
+    const original = agents[1][method];
+    delete agents[1][method];
+    await assert.rejects(
+      adapter.rewind({ sessionId: "original", draftBridgeReady: true }),
+      code("UNSUPPORTED_CAPABILITY"),
+    );
+    agents[1][method] = original;
+  }
   assert.deepEqual(writes(trace), []);
 });
 
@@ -340,10 +350,11 @@ test("official partial fork errors retain the disclosed new identity and never a
 });
 
 test("stop verification failure reports the archived source and pending agents", async (t) => {
-  const { adapter, registry } = fixture(t);
+  const { adapter, registry, agents } = fixture(t);
   registry.archiveSession = async function (id) {
     this.archivedSessionIds.push(id);
   };
+  for (const agent of agents) agent.cancel = () => {};
   await assert.rejects(
     adapter.rewind({ sessionId: "original", draftBridgeReady: true }),
     (error) => {

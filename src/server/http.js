@@ -7,6 +7,7 @@ const ASSETS = new Map([
   ["/dsh-unlimit/ui/", ["index.html", "text/html; charset=utf-8"]],
   ["/dsh-unlimit/ui/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/dsh-unlimit/ui/app.js", ["app.js", "text/javascript; charset=utf-8"]],
+  ["/dsh-unlimit/ui/drafts.js", ["drafts.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/styles.css", ["styles.css", "text/css; charset=utf-8"]],
 ]);
 
@@ -108,7 +109,15 @@ export function createHandler(controller, getOrigin, { rejectRequest } = {}) {
         error: {
           code: error.code ?? "OPERATION_FAILED",
           message: error.message,
-          ...(error.code === "REWIND_PARTIAL" && error.partial ? { partial: error.partial } : {}),
+          ...([
+            "REWIND_PARTIAL",
+            "RECOVERY_REQUIRED",
+            "WORKFLOW_START_FAILED",
+            "WORKFLOW_STOP_FAILED",
+            "SETTINGS_APPLIED_PARTIAL",
+          ].includes(error.code) && error.partial
+            ? { partial: error.partial }
+            : {}),
         },
       });
     }

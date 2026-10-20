@@ -28,8 +28,8 @@
   ],
   "scripts": {
     "check": "node scripts/check.mjs",
-    "format": "prettier --write src web scripts tests docs README.md NOTICE.md package.json .github",
-    "format:check": "prettier --check src web scripts tests docs README.md NOTICE.md package.json .github",
+    "format": "prettier --write src web scripts tests docs README.md NOTICE.md AGENTS.md package.json .github",
+    "format:check": "prettier --check src web scripts tests docs README.md NOTICE.md AGENTS.md package.json .github",
     "test": "node --test tests/*.test.mjs",
     "build": "node scripts/build.mjs",
     "pack:local": "node scripts/pack.mjs",

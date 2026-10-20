@@ -16,6 +16,12 @@ export class Controller {
     host,
     extensions,
     flow,
+    files,
+    retry,
+    templates,
+    catalog,
+    workflow,
+    continuation,
     onSkillsChanged,
   }) {
     Object.assign(this, {
@@ -27,8 +33,25 @@ export class Controller {
       host,
       extensions,
       flow,
+      files,
+      retry,
+      templates,
+      catalog,
+      workflow,
+      continuation,
       onSkillsChanged,
     });
+  }
+  async revertControls() {
+    const errors = [];
+    for (const service of [this.continuation, this.extensions, this.retry, this.runtime]) {
+      try {
+        await service?.revert();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length) throw new AggregateError(errors, "部分运行控制未能还原，请检查诊断状态");
   }
   async status() {
     const sessionCapabilities = this.sessions?.capabilities?.() ?? {
@@ -36,6 +59,7 @@ export class Controller {
       rewind: Boolean(this.sessions?.rewind),
     };
     const runtimeCapabilities = this.runtime.capabilities();
+    const workflowCapabilities = this.workflow?.capabilities() ?? {};
     const canApply =
       this.host.supported &&
       runtimeCapabilities
@@ -55,6 +79,20 @@ export class Controller {
         `toolkit.${operation}`,
         Boolean(this.toolkit),
       ]),
+      ...["list", "read", "write", "delete", "import", "preview", "restore", "backups"].map(
+        (operation) => [`files.${operation}`, Boolean(this.files)],
+      ),
+      ...["list", "read"].map((operation) => [`templates.${operation}`, Boolean(this.templates)]),
+      ...["list", "read", "preflight"].map((operation) => [
+        `catalog.${operation}`,
+        Boolean(this.catalog),
+      ]),
+      ["workflow.dispatch", this.host.supported && workflowCapabilities.dispatch],
+      ["workflow.stop", this.host.supported && workflowCapabilities.stop],
+      ["workflow.status", Boolean(this.workflow)],
+      ["workflow.presets", this.host.supported && workflowCapabilities.presets],
+      ["continuation.status", this.host.supported && Boolean(this.continuation)],
+      ["continuation.stop", this.host.supported && Boolean(this.continuation)],
       ["maintenance.install", false],
     ];
     return {
@@ -68,6 +106,12 @@ export class Controller {
       enabled: this.runtime.enabled,
       capabilities: [
         ...runtimeCapabilities,
+        ...(this.continuation?.capabilities() ?? []),
+        ...(this.retry?.capabilities() ?? []).map((item) =>
+          this.host.supported
+            ? item
+            : { ...item, state: "unsupported", detail: "此宿主版本尚未通过重试策略适配验证" },
+        ),
         ...(this.extensions?.capabilities() ?? []),
         ...actions.map(([id, available]) => ({
           id,
@@ -79,10 +123,19 @@ export class Controller {
       settings: this.store.dispatch("settings.get", {}),
       sessions: sessionCapabilities.list ? await this.sessions.list() : [],
       sessionCapabilities,
+      workflowCapabilities,
       updates: { mode: "offline" },
     };
   }
   async dispatch(action, payload = {}) {
+    if (
+      ["flow.assign", "flow.release", "workspaces.bind"].includes(action) &&
+      this.workflow?.controlsSession(payload.sessionId)
+    )
+      throw Object.assign(
+        new Error("该会话由演练执行者管理，请先通过执行者停止操作确认结束，再修改角色、绑定或槽位"),
+        { code: "CONFLICT" },
+      );
     switch (action) {
       case "status":
         return this.status();
@@ -90,6 +143,10 @@ export class Controller {
         const current = this.store.dispatch("settings.get", {});
         this.runtime.apply();
         try {
+          if (this.retry?.capabilities().some((item) => item.state !== "unsupported"))
+            this.retry.apply();
+          if (this.continuation?.capabilities().some((item) => item.state !== "unsupported"))
+            await this.continuation.apply();
           this.extensions?.apply();
           this.store.dispatch("settings.save", {
             revision: current.revision,
@@ -97,9 +154,9 @@ export class Controller {
           });
         } catch (error) {
           try {
-            this.extensions?.revert();
-          } finally {
-            this.runtime.revert();
+            await this.revertControls();
+          } catch (cleanup) {
+            throw new AggregateError([error, cleanup], "运行控制应用失败，部分撤销未完成");
           }
           throw error;
         }
@@ -111,11 +168,7 @@ export class Controller {
           revision: current.revision,
           value: { ...current.value, enabled: false },
         });
-        try {
-          this.extensions?.revert();
-        } finally {
-          this.runtime.revert();
-        }
+        await this.revertControls();
         return this.status();
       }
       case "settings.save": {
@@ -126,7 +179,19 @@ export class Controller {
         ) {
           throw new Error("启用状态请通过应用或还原操作更改");
         }
-        return this.store.dispatch(action, payload);
+        const result = this.store.dispatch(action, payload);
+        try {
+          await this.continuation?.changed();
+        } catch (error) {
+          throw Object.assign(
+            new Error(`配置已保存，但自动继续停止未确认：${error.message}。请刷新后检查当前会话。`),
+            {
+              code: "SETTINGS_APPLIED_PARTIAL",
+              partial: { savedRevision: result.revision },
+            },
+          );
+        }
+        return result;
       }
       case "rules.workspace":
         return { items: workspaceInstructions(payload.directory) };
@@ -173,6 +238,42 @@ export class Controller {
       case "maintenance.install":
         return unavailable("此版尚未验证桌面端的本地包安装接口，请使用宿主插件管理器");
       default:
+        if (action.startsWith("continuation.")) {
+          if (!this.host.supported || !this.continuation)
+            return unavailable("此宿主版本尚无可验证的继续服务");
+          const method = {
+            "continuation.status": "status",
+            "continuation.continue": "continue",
+            "continuation.stop": "stop",
+          }[action];
+          if (!method) return unavailable("未知继续操作");
+          return this.continuation[method](payload);
+        }
+        if (action.startsWith("workflow.")) {
+          if (!this.workflow) return unavailable("演练执行者服务未加载");
+          if (
+            !this.host.supported &&
+            !["workflow.status", "workflow.capabilities"].includes(action) &&
+            !(
+              action === "workflow.presets" &&
+              (!payload.operation || payload.operation === "status")
+            )
+          )
+            return unavailable("此宿主版本尚未通过执行者调度适配验证");
+          return this.workflow.dispatch(action, payload);
+        }
+        if (action.startsWith("catalog.")) {
+          if (!this.catalog) return unavailable("宿主技能与工具目录服务未加载");
+          return this.catalog.dispatch(action, payload);
+        }
+        if (action.startsWith("templates.")) {
+          if (!this.templates) return unavailable("本地模板目录服务未加载");
+          return this.templates.dispatch(action, payload);
+        }
+        if (action.startsWith("files.")) {
+          if (!this.files) return unavailable("工作区材料服务未加载");
+          return this.files.dispatch(action, payload);
+        }
         if (action.startsWith("flow.")) {
           if (!this.flow) return unavailable("本地演练流程服务未加载");
           return this.flow.dispatch(action, payload);

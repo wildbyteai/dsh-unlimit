@@ -6,8 +6,14 @@ import { parseArgs } from "node:util";
 import { WorkspaceStore } from "../src/core/store.js";
 import { SkillLibrary } from "../src/core/skills.js";
 import { Toolkit } from "../src/core/toolkit.js";
+import { Templates } from "../src/core/templates.js";
 import { Flow } from "../src/core/flow.js";
+import { WorkspaceFiles } from "../src/core/files.js";
 import { DesktopRuntime } from "../src/host/runtime.js";
+import { RetryPolicy } from "../src/host/retry-policy.js";
+import { HostCatalog } from "../src/host/catalog.js";
+import { DesktopWorkflow } from "../src/host/workflow.js";
+import { Continuation } from "../src/host/continuation.js";
 import { Controller } from "../src/server/controller.js";
 import { createHandler } from "../src/server/http.js";
 
@@ -123,7 +129,13 @@ try {
     store,
     runtime,
     skills,
+    files: new WorkspaceFiles(join(temporary, "materials"), store),
+    retry: new RetryPolicy({}, store),
     toolkit,
+    templates: new Templates(toolkit),
+    catalog: new HostCatalog({ get: () => undefined }, { library: skills, toolkit }),
+    workflow: new DesktopWorkflow({ get: () => undefined }, store, flow),
+    continuation: new Continuation({}, store, hostInfo),
     flow,
     sessions: { list: () => [] },
     host: hostInfo,

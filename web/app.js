@@ -1,3 +1,5 @@
+import { MemoryDrafts } from "./drafts.js";
+
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const esc = (value) =>
@@ -25,7 +27,181 @@ const state = {
   assetImportError: null,
   skillImport: null,
   flowFeedback: null,
+  environmentFeedback: null,
+  environmentDetail: "",
+  fileFeedback: new Map(),
+  fileBackups: new Map(),
+  graphPaths: new Map(),
 };
+const drafts = new MemoryDrafts();
+let mountedDrafts = [];
+let editorDraft = null;
+const draftScope = (objectId, context = state) => ({
+  workspaceId: context.workspaceId || "",
+  page: context.page,
+  objectId,
+});
+function formControls(form) {
+  return (form.elements ? [...form.elements] : [form]).filter(
+    (input) =>
+      input.name &&
+      ["INPUT", "SELECT", "TEXTAREA"].includes(input.tagName) &&
+      input.type !== "file",
+  );
+}
+function readDraftFields(form) {
+  return Object.fromEntries(
+    formControls(form).map((input) => [
+      input.name,
+      input.dataset.draftMissing ??
+        (input.type === "checkbox"
+          ? input.checked
+          : input.multiple
+            ? [...input.selectedOptions].map((option) => option.value)
+            : input.value),
+    ]),
+  );
+}
+function updateDraftNotice() {
+  const notice = $("#draft-notice");
+  if (!notice) return;
+  const count = drafts.countPage(state.workspaceId, state.page);
+  notice.innerHTML = drafts.size
+    ? `<div class="draft-notice"><span>${count ? `本页有 ${count} 份未保存编辑。` : `其他页面或项目有 ${drafts.size} 份未保存编辑。`}草稿仅保留在本面板内存；刷新或卸载会丢失。</span>${count ? '<button type="button" id="discard-page-drafts" class="small quiet danger">丢弃本页草稿</button>' : ""}</div>`
+    : "";
+  const discard = $("#discard-page-drafts");
+  if (discard)
+    discard.onclick = () => {
+      for (const binding of mountedDrafts) binding.discard();
+      if (editorDraft) {
+        editorDraft.binding.discard();
+        editorDraft = null;
+        $("#editor").close();
+      }
+      drafts.clearPage(state.workspaceId, state.page);
+      render();
+    };
+}
+function bindMemoryDraft(form, scope, { dependentSelects = [] } = {}) {
+  let baseline = readDraftFields(form);
+  const restored = drafts.read(scope);
+  if (restored) {
+    for (const input of formControls(form)) {
+      if (!Object.hasOwn(restored, input.name)) continue;
+      if (input.type === "checkbox") input.checked = restored[input.name];
+      else if (input.multiple)
+        for (const option of input.options)
+          option.selected = restored[input.name].includes(option.value);
+      else {
+        input.value = restored[input.name];
+        if (input.tagName === "SELECT" && String(restored[input.name]) !== input.value) {
+          input.dataset.draftMissing = restored[input.name];
+          input.setCustomValidity("草稿原选择已不可用，请重新选择；不会套用到其他记录。");
+        }
+      }
+      if (dependentSelects.includes(input.name))
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+  const binding = {
+    scope,
+    form,
+    capture() {
+      const patch = drafts.capture(scope, baseline, readDraftFields(form), {
+        anchors: [
+          "id",
+          "sessionId",
+          "assetId",
+          "pointId",
+          "serviceId",
+          "stageId",
+          "from",
+          "to",
+          "role",
+        ],
+      });
+      updateDraftNotice();
+      return patch;
+    },
+    commit() {
+      baseline = readDraftFields(form);
+      drafts.clear(scope);
+      updateDraftNotice();
+    },
+    commitFields(names) {
+      const current = readDraftFields(form);
+      for (const name of names) baseline[name] = current[name];
+      this.capture();
+    },
+    discard() {
+      baseline = readDraftFields(form);
+      drafts.clear(scope);
+      updateDraftNotice();
+    },
+  };
+  form.addEventListener("input", () => binding.capture());
+  form.addEventListener("change", (event) => {
+    if (event.target.dataset?.draftMissing !== undefined) {
+      delete event.target.dataset.draftMissing;
+      event.target.setCustomValidity("");
+    }
+    if (event.target.name === "assetId") {
+      const service = formControls(form).find((input) => input.name === "serviceId");
+      if (service?.dataset.draftMissing !== undefined) {
+        delete service.dataset.draftMissing;
+        service.setCustomValidity("");
+      }
+    }
+    binding.capture();
+  });
+  binding.capture();
+  return binding;
+}
+function captureMountedDrafts() {
+  for (const binding of mountedDrafts) if (binding.form.isConnected) binding.capture();
+}
+function commitInlineDraft(formId, fields) {
+  const binding = mountedDrafts.find((item) => item.form.id === formId);
+  if (binding) fields ? binding.commitFields(fields) : binding.commit();
+}
+function canLeaveEditor() {
+  if (
+    editorDraft?.saving ||
+    mountedDrafts.some(
+      (binding) => binding.form.querySelector?.('button[type="submit"]')?.textContent === "处理中…",
+    )
+  ) {
+    toast("正在保存，请稍候再切换");
+    return false;
+  }
+  if (editorDraft) {
+    const pending = editorDraft.binding.capture();
+    editorDraft = null;
+    $("#editor").close();
+    if (pending) toast("未保存编辑已保留，重新编辑同一记录可恢复");
+  }
+  captureMountedDrafts();
+  return true;
+}
+function clearObjectDraft(
+  page,
+  objectId,
+  { workspaceId = state.workspaceId, allWorkspaces = false } = {},
+) {
+  drafts.clearObject({ page, objectId, workspaceId, allWorkspaces });
+  updateDraftNotice();
+}
+window.addEventListener("beforeunload", (event) => {
+  captureMountedDrafts();
+  editorDraft?.binding.capture();
+  if (
+    drafts.size ||
+    (state.rewindOutcome?.draft && state.rewindOutcome.draftStatus !== "restored")
+  ) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
 const pages = [
   ["overview", "◈", "工作台概览", "OVERVIEW", "掌握运行状态与当前演练进展"],
   ["control", "⌘", "破甲控制", "RUNTIME CONTROL", "配置提示词与运行时策略，在明确操作后应用"],
@@ -35,16 +211,23 @@ const pages = [
   ["assets", "⊞", "资产台账", "ASSET INVENTORY", "梳理演练资产、关联与评估记录"],
   ["findings", "⚑", "漏洞发现", "FINDINGS", "跟踪发现的严重度、状态与证据"],
   ["evidence", "▤", "证据中心", "EVIDENCE CENTER", "保存本地证据记录，不会执行远程操作"],
+  ["files", "▣", "文件与证据", "LOCAL MATERIALS", "按项目保存本地材料并恢复备份版本"],
   ["graph", "⌁", "关系图谱", "RELATION GRAPH", "从资产关系理解当前演练范围"],
   ["progress", "◴", "阶段与评分", "PROGRESS & SCORE", "记录演练阶段、得分点与命中情况"],
   ["knowledge", "▥", "知识库", "KNOWLEDGE BASE", "积累可复用的知识与方法"],
-  ["roles", "♙", "角色提示词", "ROLE PROMPTS", "按当前项目管理角色与提示词"],
+  ["roles", "♙", "角色与执行", "ROLES & EXECUTION", "按当前项目管理角色、分派任务并核对执行结果"],
   ["reports", "↗", "报告导出", "REPORTS", "汇总当前项目并导出本地 Markdown 报告"],
   ["sessions", "◷", "会话管理", "SESSIONS", "查看宿主会话，保留原会话进行回退"],
-  ["environment", "⌖", "工具与环境", "TOOLKIT & ENVIRONMENT", "检查本地工具路径并管理受控进程"],
+  [
+    "environment",
+    "⌖",
+    "工具与环境",
+    "TOOLKIT & ENVIRONMENT",
+    "设置本地工具路径并检查版本与产品标识",
+  ],
   ["diagnostics", "⊙", "诊断与维护", "DIAGNOSTICS", "检查宿主能力与离线维护状态"],
 ];
-const groups = { 0: "工作空间", 1: "运行控制", 4: "演练管理", 10: "知识与交付", 13: "系统" };
+const groups = { 0: "工作空间", 1: "运行控制", 4: "演练管理", 11: "知识与交付", 14: "系统" };
 const descriptions = Object.fromEntries(pages.map((p) => [p[0], p]));
 const defaults = {
   enabled: false,
@@ -60,6 +243,7 @@ const defaults = {
   readLimit: 1048576,
   autoReapply: true,
   retryLimit: 0,
+  retryOverride: false,
   ownServers: [],
 };
 const kinds = {
@@ -475,6 +659,10 @@ function shell() {
   $("#workspace-select").addEventListener("change", (e) =>
     run(e.target, async () => {
       if (!e.target.value) return;
+      if (!canLeaveEditor()) {
+        e.target.value = state.workspaceId;
+        return;
+      }
       await api("workspaces.activate", { id: e.target.value });
       state.workspaceId = e.target.value;
       await refreshProjects();
@@ -502,6 +690,7 @@ async function refreshStatus() {
     `v${state.status.version || "—"} · ${state.status.host?.platform || "Desktop"}`;
 }
 function navigate(page) {
+  if (!canLeaveEditor()) return;
   state.page = page;
   state.query = "";
   $$(".navitem").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
@@ -509,6 +698,8 @@ function navigate(page) {
   render();
 }
 async function render() {
+  captureMountedDrafts();
+  mountedDrafts = [];
   const serial = ++state.request;
   const content = $("#content");
   content.innerHTML = skeleton();
@@ -522,6 +713,7 @@ async function render() {
         skills: skillsPage,
         evidence: evidencePage,
         graph: graphPage,
+        files: filesPage,
         progress: progressPage,
         roles: rolesPage,
         reports: reportsPage,
@@ -531,9 +723,15 @@ async function render() {
       }[state.page]();
     if (serial !== state.request) return;
     content.innerHTML =
+      `<div id="draft-notice"></div>` +
       result.html +
       `<div class="footerline"><span>DSH UNLIMIT · 本地工作台</span><span>数据保存在当前本地实例中</span></div>`;
     result.bind?.();
+    for (const form of $$("#content form"))
+      mountedDrafts.push(bindMemoryDraft(form, draftScope(`inline:${form.id}`)));
+    const search = $("#search");
+    if (search) mountedDrafts.push(bindMemoryDraft(search, draftScope("inline:search")));
+    updateDraftNotice();
   } catch (e) {
     if (serial !== state.request) return;
     content.innerHTML =
@@ -582,43 +780,90 @@ function renderField(f, value) {
       .join("")}</select>`;
   else if (f.type === "checkbox") input = `<input type="checkbox" ${attr} ${v ? "checked" : ""}>`;
   else
-    input = `<input type="${f.type}" ${attr} value="${esc(Array.isArray(v) ? v.join(", ") : v)}" ${f.type === "number" ? 'step="any"' : ""} autocomplete="off">`;
+    input = `<input type="${f.type}" ${attr} value="${esc(Array.isArray(v) ? v.join(", ") : v)}" ${f.type === "number" ? `step="${f.step ?? "any"}"` : ""} autocomplete="off">`;
   return `<div class="field ${f.type === "textarea" ? "wide" : ""}"><label for="f-${esc(f.name)}">${esc(f.label)}${f.required ? " *" : ""}</label>${input}${f.help ? `<small>${esc(f.help)}</small>` : ""}</div>`;
 }
 function openForm(title, fields, values, onSave, options = {}) {
+  if (!canLeaveEditor()) return;
+  const context = { workspaceId: state.workspaceId, page: state.page };
+  const identity =
+    options.draftId ||
+    (values.id
+      ? `record:${values.id}`
+      : values.sessionId
+        ? `session:${values.sessionId}:${title}`
+        : values.role
+          ? `role:${values.role}`
+          : `new:${title}`);
+  const scope = draftScope(identity, context);
   const dialog = $("#editor");
-  dialog.innerHTML = `<form id="edit-form"><div class="dialoghead"><h2>${esc(title)}</h2><button type="button" class="quiet small" id="close-dialog" aria-label="关闭">✕</button></div>${options.note ? `<div class="note">${esc(options.note)}</div>` : ""}<div class="fields">${fields.map((f) => renderField(f, values[f.name])).join("")}</div><p class="inlineerror" id="form-error" role="alert"></p><div class="dialogfoot"><button type="button" id="cancel-dialog">取消</button><button class="primary" type="submit">${esc(options.submit || "保存")}</button></div></form>`;
-  $("#close-dialog").onclick = () => dialog.close();
-  $("#cancel-dialog").onclick = () => dialog.close();
-  $("#edit-form").onsubmit = (e) => {
-    e.preventDefault();
-    const button = $("button[type=submit]", e.target);
+  dialog.innerHTML = `<form id="edit-form"><div class="dialoghead"><h2>${esc(title)}</h2><button type="button" class="quiet small" id="close-dialog" aria-label="关闭">✕</button></div>${options.note ? `<div class="note">${esc(options.note)}</div>` : ""}<p class="draft-help">未保存编辑仅保留在本面板内存；关闭后重新编辑同一对象可恢复，刷新会丢失。</p><div class="fields">${fields.map((f) => renderField(f, values[f.name])).join("")}</div><p class="inlineerror" id="form-error" role="alert"></p><div class="dialogfoot"><button type="button" id="cancel-dialog">放弃修改</button><button class="primary" type="submit">${esc(options.submit || "保存")}</button></div></form>`;
+  dialog.showModal();
+  options.afterOpen?.(dialog);
+  const form = $("#edit-form");
+  const binding = bindMemoryDraft(form, scope, {
+    dependentSelects: fields.some((field) => field.name === "serviceId")
+      ? ["assetId", "serviceId"]
+      : [],
+  });
+  const editor = { binding, saving: false };
+  editorDraft = editor;
+  const close = (discard) => {
+    if (editor.saving) return;
+    const pending = discard ? (binding.discard(), null) : binding.capture();
+    if (editorDraft === editor) editorDraft = null;
+    dialog.close();
+    if (pending) toast("未保存编辑已保留，重新编辑同一对象可恢复");
+    updateDraftNotice();
+  };
+  $("#close-dialog").onclick = () => close(false);
+  $("#cancel-dialog").onclick = () => close(true);
+  dialog.oncancel = (event) => {
+    event.preventDefault();
+    close(false);
+  };
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    const button = $("button[type=submit]", form);
     run(button, async () => {
-      const data = Object.fromEntries(new FormData(e.target));
-      fields.forEach((f) => {
-        if (f.type === "number") {
-          if (f.optional && data[f.name] === "") delete data[f.name];
-          else data[f.name] = data[f.name] === "" ? 0 : Number(data[f.name]);
+      editor.saving = true;
+      $("#close-dialog").disabled = true;
+      $("#cancel-dialog").disabled = true;
+      const data = Object.fromEntries(new FormData(form));
+      fields.forEach((field) => {
+        if (field.type === "number") {
+          if (field.optional && data[field.name] === "") delete data[field.name];
+          else data[field.name] = data[field.name] === "" ? 0 : Number(data[field.name]);
         }
-        if (f.type === "checkbox") data[f.name] = e.target.elements[f.name].checked;
+        if (field.type === "checkbox") data[field.name] = form.elements[field.name].checked;
       });
       try {
         await onSave(data);
+        binding.commit();
+        if (editorDraft === editor) editorDraft = null;
         dialog.close();
         toast(options.success || "已保存");
         if (!options.keepPage) await render();
+        else captureMountedDrafts();
       } catch (error) {
-        $("#form-error").textContent = error.message;
+        $("#form-error", form).textContent = error.message;
+        binding.capture();
         throw error;
+      } finally {
+        editor.saving = false;
+        if (form.isConnected) {
+          $("#close-dialog", form).disabled = false;
+          $("#cancel-dialog", form).disabled = false;
+        }
       }
     });
   };
-  dialog.showModal();
-  options.afterOpen?.(dialog);
 }
 function confirmAction(title, message, onConfirm) {
+  if (!canLeaveEditor()) return;
   const dialog = $("#editor");
   dialog.innerHTML = `<div class="dialoghead"><h2>${esc(title)}</h2></div><p class="info">${esc(message)}</p><p class="inlineerror" id="confirm-error" role="alert"></p><div class="dialogfoot"><button id="cancel-confirm">取消</button><button class="danger" id="accept-confirm">确认${esc(title)}</button></div>`;
+  dialog.oncancel = null;
   $("#cancel-confirm").onclick = () => dialog.close();
   $("#accept-confirm").onclick = (e) =>
     run(e.target, async () => {
@@ -739,7 +984,7 @@ async function collectionPage(name) {
       : "";
   const saved = name === "knowledge" ? state.knowledgeReadback : null;
   const readback = saved
-    ? `<div class="note">已从服务端读回“${esc(redactCell(saved.title))}”：验证状态为${saved.verified ? "已验证" : "未验证"}。${saved.contentChanged && !saved.verified ? "正文已变更，旧验证状态已撤回。" : ""}</div>`
+    ? `<div class="note">已从服务端读回“${esc(redactCell(saved.title))}”：验证状态为${saved.verified ? "已验证" : "未验证"}。${saved.verificationWithdrawn ? "原有验证标记已撤回。" : ""}</div>`
     : "";
   return {
     html:
@@ -753,9 +998,15 @@ async function collectionPage(name) {
       importError +
       panel(
         `${schema.label}列表`,
-        `<div class="toolbar"><input class="search" id="search" placeholder="搜索${schema.label}…" aria-label="搜索${schema.label}" value="${esc(state.query)}">${name === "rules" ? '<button id="reset-rules">清除激活规则</button>' : ""}<span class="meta">${items.length} 条记录</span></div>${filterForm}${filtered.length ? table(filtered, columns, actions) : empty(`暂无${schema.label}`, state.query || name === "knowledge" || (name === "assets" && Object.values(state.assetFilters).some(Boolean)) ? "当前条件下没有匹配的记录。" : "建立第一条记录，开始整理工作。")}`,
+        `<div class="toolbar"><input class="search" id="search" name="query" placeholder="搜索${schema.label}…" aria-label="搜索${schema.label}" value="${esc(state.query)}">${name === "rules" ? '<button id="reset-rules">清除激活规则</button>' : ""}<span class="meta">${items.length} 条记录</span></div>${filterForm}${filtered.length ? table(filtered, columns, actions) : empty(`暂无${schema.label}`, state.query || name === "knowledge" || (name === "assets" && Object.values(state.assetFilters).some(Boolean)) ? "当前条件下没有匹配的记录。" : "建立第一条记录，开始整理工作。")}`,
       ) +
-      importPanel,
+      importPanel +
+      (name === "knowledge"
+        ? panel(
+            "本地模板目录",
+            '<form id="template-search"><div class="field"><label for="template-query">按路径或正文检索</label><input id="template-query" name="query" placeholder="留空列出模板"></div><button type="submit">检索本地模板</button></form><p class="info">使用“工具与环境”中选择的目录，只读取文本，不执行模板。检索结果不代表已验证。</p><div id="template-results"></div><div id="template-readback"></div>',
+          )
+        : ""),
     bind() {
       const edit = (item) => {
         let fields =
@@ -800,7 +1051,7 @@ async function collectionPage(name) {
           };
         }
         openForm(
-          `${item ? "编辑" : "新建"}${schema.label}`,
+          `${item?.id ? "编辑" : "新建"}${schema.label}`,
           fields,
           values,
           async (data) => {
@@ -834,9 +1085,6 @@ async function collectionPage(name) {
                 .split(/[,，]/)
                 .map((value) => value.trim())
                 .filter(Boolean);
-            const contentChanged = Boolean(
-              item && (data.content !== item.content || data.title !== item.title),
-            );
             if (name === "knowledge") {
               const unchangedEvidence =
                 item && data.evidence === values.evidence && data.source === values.source;
@@ -862,7 +1110,7 @@ async function collectionPage(name) {
               state.knowledgeReadback = {
                 title: actual.title,
                 verified: actual.verified,
-                contentChanged,
+                verificationWithdrawn: Boolean(item?.verified && !actual.verified),
               };
             }
             if (name === "workspaces") await refreshProjects();
@@ -887,6 +1135,8 @@ async function collectionPage(name) {
       $("#create").onclick = () => edit();
       $("#search").onchange = (e) => {
         state.query = e.target.value;
+        const binding = mountedDrafts.find((item) => item.form.id === "search");
+        binding?.commit();
         render();
       };
       if (name === "rules")
@@ -896,12 +1146,62 @@ async function collectionPage(name) {
             await render();
           });
       if (name === "knowledge") {
+        $("#template-search").onsubmit = (event) => {
+          event.preventDefault();
+          const form = event.target;
+          run($('button[type="submit"]', form), async () => {
+            const result = await api("templates.list", { query: new FormData(form).get("query") });
+            if (state.page !== "knowledge" || !form.isConnected) return;
+            commitInlineDraft("template-search");
+            $("#template-results").innerHTML =
+              `<p class="info">${result.items.length} 个结果 · 检查 ${result.inspected} 项 · 跳过 ${result.skipped} 项${result.truncated ? " · 已达检索上限，请缩小目录或搜索范围" : ""}</p>${
+                result.items.length
+                  ? table(
+                      result.items,
+                      [
+                        ["path", "相对路径"],
+                        ["bytes", "字节数"],
+                        ["excerpt", "正文片段"],
+                      ],
+                      (_item, index) =>
+                        `<button class="small" data-template-read="${index}">读取全文</button>`,
+                    )
+                  : empty("没有匹配模板", "未读取到满足条件的 UTF-8 文本模板。")
+              }`;
+            $("#template-readback").innerHTML = "";
+            $$("[data-template-read]").forEach((button) => {
+              button.onclick = () =>
+                run(button, async () => {
+                  const { item } = await api("templates.read", {
+                    path: result.items[Number(button.dataset.templateRead)].path,
+                  });
+                  if (state.page !== "knowledge" || !form.isConnected) return;
+                  $("#template-readback").innerHTML = panel(
+                    "模板全文",
+                    `<p class="info">${esc(item.path)} · ${item.bytes} 字节 · SHA-256 ${esc(item.sha256)}</p><pre class="code">${esc(item.content)}</pre><button id="template-to-knowledge">整理为知识条目</button>`,
+                  );
+                  $("#template-to-knowledge").onclick = () =>
+                    edit({
+                      title: item.path,
+                      kind: "template",
+                      content: item.content,
+                      tags: ["本地模板"],
+                      verified: false,
+                      source: `local-template:${item.path}#sha256=${item.sha256}`,
+                    });
+                });
+            });
+          });
+        };
         $("#knowledge-filters").onsubmit = (e) => {
           e.preventDefault();
           state.knowledgeFilters = Object.fromEntries(new FormData(e.target));
+          commitInlineDraft("knowledge-filters");
           render();
         };
         $("#clear-knowledge-filters").onclick = () => {
+          commitInlineDraft("knowledge-filters");
+          commitInlineDraft("search");
           state.knowledgeFilters = { kind: "", tags: "", verified: "" };
           state.query = "";
           render();
@@ -911,9 +1211,12 @@ async function collectionPage(name) {
         $("#asset-filters").onsubmit = (e) => {
           e.preventDefault();
           state.assetFilters = Object.fromEntries(new FormData(e.target));
+          commitInlineDraft("asset-filters");
           render();
         };
         $("#clear-asset-filters").onclick = () => {
+          commitInlineDraft("asset-filters");
+          commitInlineDraft("search");
           state.assetFilters = { scope: "", status: "", type: "" };
           state.query = "";
           render();
@@ -979,6 +1282,7 @@ async function collectionPage(name) {
                   software: [service.product, service.version].filter(Boolean).join(" "),
                 }));
                 const dialog = $("#editor");
+                dialog.oncancel = null;
                 dialog.innerHTML = `<div class="dialoghead"><h2>${esc(actual.name)} · 服务详情</h2><button id="close-service-detail" class="quiet">关闭</button></div><p class="info">${esc(redactCell(actual.address))} · 已从当前项目台账读回。服务按协议与端口合并，不代表已执行探测。</p>${
                   services.length
                     ? table(services, [
@@ -1004,13 +1308,19 @@ async function collectionPage(name) {
                 ],
                 {},
                 (data) => api(`assets.${b.dataset.act}`, { ...payload, id: item.id, ...data }),
-                { note: "仅登记已发生的评估与测试结果，不会发起远程扫描或发送测试请求。" },
+                {
+                  draftId: `asset:${item.id}:${b.dataset.act}`,
+                  note: "仅登记已发生的评估与测试结果，不会发起远程扫描或发送测试请求。",
+                },
               );
             else if (b.dataset.act === "delete")
               confirmAction(
                 `删除${schema.label}`,
                 `将删除“${item.name || item.title}”。删除后无法从界面恢复。`,
-                () => api(`${name}.delete`, { id: item.id }),
+                async () => {
+                  await api(`${name}.delete`, { id: item.id });
+                  clearObjectDraft(name, `record:${item.id}`, { allWorkspaces: !schema.workspace });
+                },
               );
             else
               run(b, async () => {
@@ -1100,6 +1410,8 @@ async function controlPage() {
       autoApprove: "approval",
       hooksDeny: "hooks",
       autoReapply: "autoReapply",
+      retryOverride: "retryLimit",
+      autoContinue: "continuation.auto",
     };
     const available = can(ids[key]);
     return `<div class="switchrow"><div><strong>${title}</strong><p>${desc}${available ? "" : " · 当前宿主未提供此能力，保存值暂不生效。"}</p></div><input class="switch" type="checkbox" name="${key}" aria-label="${title}" ${v[key] ? "checked" : ""} ${available ? "" : "disabled"}></div>`;
@@ -1132,13 +1444,13 @@ async function controlPage() {
           }),
           v.workspacePolicy,
         )}<div class="field wide"><label for="workspace-files">规则文件路径 · 每行一个</label><textarea name="workspaceFiles" id="workspace-files" rows="4">${esc(v.workspaceFiles.join("\n"))}</textarea><small>此策略仅控制本插件主动选取的规则文件；宿主原生工作区指令的运行上下文会保留。</small></div></div><div class="toolbar" style="margin-bottom:0"><button type="button" id="scan-rules">扫描工作区规则</button><button type="button" id="select-rule-paths">设置选定文件</button></div>`,
-      )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>仅保存用户自有服务器范围名单；当前尚未强制执行该范围，保存不表示出口或目标访问控制已经生效。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "请求宿主支持的完整访问策略。")}${switchRow("autoApprove", "自动审批", "开启后可减少执行前的人工审批。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "设置变更后重新应用", "启用时按运行时生命周期重新注册控制。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${panel(
+      )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>可填写 IP、完整主机名或 user@host；不要填写密码、URL、网段、端口或通配符。此清单仍不是出口访问控制。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "请求宿主支持的完整访问策略。")}${switchRow("autoApprove", "自动审批", "开启后可减少执行前的人工审批。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "设置变更后重新应用", "启用时按运行时生命周期重新注册控制。")}${switchRow("retryOverride", "接管请求重试次数", "关闭时沿用提供方；开启且运行控制已启用后按 0—20 次设置，0 表示不重试。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${panel(
         "执行限额",
         `<div class="fields">${[
-          field("maxSubagents", "最大子代理数", "number", { min: 0 }),
+          field("maxSubagents", "最大子代理数", "number", { min: 1, max: 128 }),
           field("maxDepth", "最大递归深度", "number", { min: 0 }),
           field("readLimit", "读取上限（字节）", "number", { min: 0 }),
-          field("retryLimit", "重试次数", "number", { min: 0 }),
+          field("retryLimit", "重试次数", "number", { min: 0, max: 20, step: 1 }),
         ]
           .map((f) => {
             const id = {
@@ -1157,7 +1469,7 @@ async function controlPage() {
             );
           })
           .join("")}</div>`,
-      )}<div class="panel"><div class="panelheading"><h2>保存当前配置</h2><span class="meta" id="settings-revision">revision ${settings.revision}</span></div><p class="info">配置采用版本校验。若其他窗口已修改配置，请刷新后重新编辑。</p><p id="settings-error" class="inlineerror" role="alert"></p><button class="primary" type="submit" style="width:100%">保存配置</button></div></div></div></form>`,
+      )}${panel("截断后继续", `${switchRow("autoContinue", "自动继续截断输出", "仅处理根会话明确的输出长度截断；用户停止、传输错误和限流不会触发新轮次。")}<div class="fields">${renderField(field("continueLimit", "每次人工输入的自动继续上限", "number", { min: 0, max: 20, step: 1, disabled: !can("continuation.auto") }), v.continueLimit)}${renderField(field("continueText", "继续用语", "textarea", { disabled: !can("continuation.manual") }), v.continueText)}</div><p class="info">默认关闭。手动继续入口在会话管理中；消息保留本插件来源，停止只处理本模块所属的自动继续。</p>`)}<div class="panel"><div class="panelheading"><h2>保存当前配置</h2><span class="meta" id="settings-revision">revision ${settings.revision}</span></div><p class="info">配置采用版本校验。若其他窗口已修改配置，请刷新后重新编辑。</p><p id="settings-error" class="inlineerror" role="alert"></p><button class="primary" type="submit" style="width:100%">保存配置</button></div></div></div></form>`,
     bind() {
       const read = () => {
         const form = $("#settings-form");
@@ -1165,10 +1477,15 @@ async function controlPage() {
         new FormData(form).forEach((value, key) => {
           values[key] = value;
         });
-        ["fullAccess", "autoApprove", "hooksDeny", "autoReapply"].forEach(
-          (key) => (values[key] = form.elements[key].checked),
-        );
-        ["maxSubagents", "maxDepth", "readLimit", "retryLimit"].forEach(
+        [
+          "fullAccess",
+          "autoApprove",
+          "hooksDeny",
+          "autoReapply",
+          "retryOverride",
+          "autoContinue",
+        ].forEach((key) => (values[key] = form.elements[key].checked));
+        ["maxSubagents", "maxDepth", "readLimit", "retryLimit", "continueLimit"].forEach(
           (key) => (values[key] = Number(values[key])),
         );
         ["workspaceFiles", "ownServers"].forEach(
@@ -1187,6 +1504,7 @@ async function controlPage() {
             value: read(),
           });
           $("#settings-revision").textContent = `revision ${state.settings.revision}`;
+          commitInlineDraft("settings-form");
           toast("配置已保存");
           return state.settings;
         } catch (e) {
@@ -1237,6 +1555,7 @@ async function controlPage() {
         run(e.target, async () => {
           state.settings = await api("rules.select", { paths: read().workspaceFiles });
           $("#settings-revision").textContent = `revision ${state.settings.revision}`;
+          commitInlineDraft("settings-form", ["workspaceFiles"]);
           toast("已更新选定规则文件");
         });
     },
@@ -1250,7 +1569,136 @@ async function encodeSkillFile(file) {
   return btoa(binary);
 }
 async function skillsPage() {
+  await refreshStatus();
+  const workspaceId = state.workspaceId;
+  skillsPage.views ||= new Map();
+  const view = skillsPage.views.get(workspaceId) || {
+    sessionId: "",
+    origin: "",
+    read: null,
+    preflight: null,
+    error: "",
+  };
+  skillsPage.views.set(workspaceId, view);
+  const scopePayload = view.sessionId ? { sessionId: view.sessionId } : {};
   const data = await api("skills.list");
+  let catalog = null,
+    catalogError = "";
+  if (can("catalog.list")) {
+    try {
+      catalog = await api("catalog.list", scopePayload);
+    } catch (error) {
+      catalogError = error.message;
+    }
+  }
+  const sessions = state.status?.sessions || [];
+  const choices = sessions.map((session) => [session.id, session.name || session.id]);
+  if (view.sessionId && !choices.some(([id]) => id === view.sessionId))
+    choices.push([view.sessionId, `${view.sessionId} · 当前未列出，请重新选择`]);
+  const catalogItems = (catalog?.skills || []).filter(
+    (item) => !view.origin || item.origin === view.origin,
+  );
+  const originLabel = (origin) => (origin === "host" ? "宿主注册表" : "项目技能库");
+  const checkState = (value) =>
+    ({ available: "已检测到", missing: "缺失", unknown: "未知", invalid: "声明无效" })[value] ||
+    value;
+  const preflightHTML = (value) => {
+    if (!value) return "";
+    const labels = { ready: "声明范围内通过", unknown: "仍有未知项", blocked: "存在依赖缺口" };
+    const rows = value.checks.map((check) => ({
+      ...check,
+      subject: check.skill ? `${originLabel(check.skill.origin)} · ${check.skill.id}` : "本次声明",
+      target: check.name || check.path || check.id || "依赖声明",
+      kindLabel:
+        {
+          tool: "宿主工具",
+          toolkit: "本机工具",
+          directory: "本地目录",
+          skill: "注册表技能",
+          declaration: "声明完整性",
+          catalog: "目录来源",
+          "skill-body": "技能正文",
+        }[check.kind] || check.kind,
+      result: checkState(check.state),
+    }));
+    return panel(
+      "依赖预检结果",
+      `<div class="note">${esc(labels[value.status] || value.status)}。仅检查明确声明与本地目录；不代表目标授权，也不启动任务、下载或执行工具。</div>${
+        rows.length
+          ? table(rows, [
+              ["subject", "技能 / 范围"],
+              ["kindLabel", "检查项"],
+              ["target", "依赖"],
+              ["result", "结果"],
+              ["detail", "说明"],
+            ])
+          : '<p class="info">本次显式声明为空，未列出额外依赖。</p>'
+      }`,
+    );
+  };
+  const readHTML = (value) =>
+    value
+      ? panel(
+          "已读取技能正文",
+          `<div class="toolbar"><strong>${esc(value.item.name)}</strong><span class="tag gray">${originLabel(value.item.origin)}</span><span class="tag">正文可读</span><span class="tag orange">${value.item.dependency.state === "declared" ? "已有依赖声明 · 尚需预检" : value.item.dependency.state === "invalid" ? "依赖声明无效" : "依赖可用性未知"}</span></div><p class="info">${esc(value.item.provider || "dsh-unlimit")} · ${esc(value.item.source || "本地库")}。以下是上次明确读取的正文；读取不等于执行技能。</p><pre class="report">${esc(value.item.content)}</pre>`,
+        )
+      : "";
+  const sourcesHTML = catalog
+    ? `<details><summary>目录来源状态</summary>${table(
+        Object.entries(catalog.sources).map(([name, source]) => ({
+          name:
+            {
+              skills: "宿主技能注册表",
+              project: "项目技能库",
+              tools: "宿主工具注册表",
+              toolkit: "本机工具目录",
+            }[name] || name,
+          result:
+            {
+              available: source.complete === false ? "部分结果" : "已读取",
+              unsupported: "未提供",
+              error: "读取失败",
+            }[source.state] || source.state,
+          detail:
+            source.detail ||
+            (source.complete === false ? "目录不完整，不能据此证明依赖不存在。" : ""),
+        })),
+        [
+          ["name", "来源"],
+          ["result", "状态"],
+          ["detail", "说明"],
+        ],
+      )}</details>`
+    : "";
+  const catalogHTML = panel(
+    "会话技能目录",
+    `<form id="skill-catalog-filters" class="toolbar"><div class="field"><label for="skill-catalog-session">会话作用域</label><select id="skill-catalog-session" name="sessionId"><option value="">宿主全局 · 无会话</option>${choices.map(([id, label]) => `<option value="${esc(id)}" ${view.sessionId === id ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></div><div class="field"><label for="skill-catalog-origin">技能来源</label><select id="skill-catalog-origin" name="origin"><option value="">全部来源</option><option value="host" ${view.origin === "host" ? "selected" : ""}>宿主注册表（含官方）</option><option value="project" ${view.origin === "project" ? "selected" : ""}>本项目技能库</option></select></div><button type="submit" ${can("catalog.list") ? "" : "disabled"}>读取目录</button></form><p class="info">目录范围：${esc(view.sessionId || "宿主全局")}。宿主来源保留真实 provider；项目库条目不保证在该会话中胜出。正文可读与依赖可用分别显示。</p>${catalogError ? `<div class="error" role="alert">目录读取失败：${esc(catalogError)}</div>` : !can("catalog.list") ? '<div class="note">当前未提供会话目录聚合接口，本地技能管理仍可使用。</div>' : ""}<div id="skill-catalog-error" class="inlineerror" role="alert">${esc(view.error)}</div>${
+      catalogItems.length
+        ? table(
+            catalogItems.map((item) => ({
+              ...item,
+              originLabel: originLabel(item.origin),
+              dependencyLabel: "需单独预检",
+            })),
+            [
+              ["name", "技能"],
+              ["originLabel", "来源"],
+              ["provider", "提供方"],
+              ["source", "注册来源"],
+              ["description", "用途"],
+              ["dependencyLabel", "依赖状态"],
+            ],
+            (item, index) =>
+              `<button class="small" data-catalog-read="${index}" ${can("catalog.read") ? "" : "disabled"}>读取正文</button><button class="small" data-catalog-preflight="${index}" ${can("catalog.preflight") ? "" : "disabled"}>预检依赖</button>`,
+          )
+        : empty(
+            "当前目录无匹配技能",
+            catalogError
+              ? "请重新读取目录；失败不会被视为完整空目录。"
+              : "可切换来源或会话；宿主注册表未提供的项目技能仍可在下方管理。",
+          )
+    }${sourcesHTML}`,
+  );
   const items = data.items;
   const result = state.skillImport;
   const feedback = result
@@ -1277,6 +1725,8 @@ async function skillsPage() {
       ) +
       `<input type="file" id="skill-file" accept=".zip,.md" hidden><input type="file" id="skill-folder" webkitdirectory directory multiple hidden>` +
       feedback +
+      catalogHTML +
+      `<div id="skill-catalog-read-result">${readHTML(view.read)}</div><div id="skill-catalog-preflight-result">${preflightHTML(view.preflight)}</div>` +
       panel(
         "本地技能",
         `<div class="note">可导入技能文件夹、ZIP 或 Markdown。文件夹最多 512 个文件 / 50 MiB，SKILL.md 最大 256 KiB，ZIP 最大 12 MiB。名称与说明以 SKILL.md 的 YAML 元信息为准。</div>${
@@ -1295,6 +1745,83 @@ async function skillsPage() {
         }`,
       ),
     bind() {
+      const inContext = () =>
+        state.page === "skills" &&
+        state.workspaceId === workspaceId &&
+        view.sessionId === (scopePayload.sessionId || "");
+      $("#skill-catalog-filters").onsubmit = (event) => {
+        event.preventDefault();
+        if (!canLeaveEditor()) return;
+        const values = Object.fromEntries(new FormData(event.target));
+        const scopeChanged = view.sessionId !== values.sessionId;
+        view.sessionId = values.sessionId;
+        view.origin = values.origin;
+        view.error = "";
+        if (scopeChanged) {
+          view.read = null;
+          view.preflight = null;
+        }
+        commitInlineDraft("skill-catalog-filters");
+        render();
+      };
+      const reportCatalogError = (error) => {
+        if (view.sessionId !== (scopePayload.sessionId || "")) return;
+        view.error = error.message;
+        if (inContext()) $("#skill-catalog-error").textContent = error.message;
+      };
+      $$("[data-catalog-read]").forEach(
+        (button) =>
+          (button.onclick = () =>
+            run(button, async () => {
+              const item = catalogItems[Number(button.dataset.catalogRead)];
+              try {
+                if ($("#skill-catalog-session").value !== (scopePayload.sessionId || ""))
+                  throw new Error("请先点击“读取目录”应用所选会话范围");
+                const result = await api("catalog.read", {
+                  ...scopePayload,
+                  origin: item.origin,
+                  id: item.id,
+                });
+                if (view.sessionId !== (scopePayload.sessionId || "")) return;
+                view.read = result;
+                view.error = "";
+                if (inContext()) {
+                  $("#skill-catalog-read-result").innerHTML = readHTML(result);
+                  $("#skill-catalog-error").textContent = "";
+                }
+                toast("正文已读取；依赖需单独预检");
+              } catch (error) {
+                reportCatalogError(error);
+                throw error;
+              }
+            })),
+      );
+      $$("[data-catalog-preflight]").forEach(
+        (button) =>
+          (button.onclick = () =>
+            run(button, async () => {
+              const item = catalogItems[Number(button.dataset.catalogPreflight)];
+              try {
+                if ($("#skill-catalog-session").value !== (scopePayload.sessionId || ""))
+                  throw new Error("请先点击“读取目录”应用所选会话范围");
+                const result = await api("catalog.preflight", {
+                  ...scopePayload,
+                  skills: [{ origin: item.origin, id: item.id }],
+                });
+                if (view.sessionId !== (scopePayload.sessionId || "")) return;
+                view.preflight = result;
+                view.error = "";
+                if (inContext()) {
+                  $("#skill-catalog-preflight-result").innerHTML = preflightHTML(result);
+                  $("#skill-catalog-error").textContent = "";
+                }
+                toast("依赖预检已完成，未启动任务");
+              } catch (error) {
+                reportCatalogError(error);
+                throw error;
+              }
+            })),
+      );
       const edit = async (item) => {
         if (item) item = (await api("skills.read", { id: item.id })).item;
         const fields = item
@@ -1334,7 +1861,10 @@ async function skillsPage() {
             confirmAction(
               "删除技能",
               `将“${item.name}”移入本地备份目录，技能列表中不再显示。`,
-              () => api("skills.delete", { id: item.id }),
+              async () => {
+                await api("skills.delete", { id: item.id });
+                clearObjectDraft("skills", `record:${item.id}`, { allWorkspaces: true });
+              },
             );
           }),
       );
@@ -1623,6 +2153,7 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
       $$("[data-kind]").forEach(
         (b) =>
           (b.onclick = () => {
+            if (!canLeaveEditor()) return;
             state.recordKind = b.dataset.kind;
             render();
           }),
@@ -1633,9 +2164,328 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
       $$("[data-record-delete]").forEach(
         (b) =>
           (b.onclick = () =>
-            confirmAction("删除证据", `将永久删除此${kinds[kind]}记录。`, () =>
-              api("records.delete", { ...payload, id: items[Number(b.dataset.recordDelete)].id }),
-            )),
+            confirmAction("删除证据", `将永久删除此${kinds[kind]}记录。`, async () => {
+              const id = items[Number(b.dataset.recordDelete)].id;
+              await api("records.delete", { ...payload, id });
+              clearObjectDraft(state.page, `record:${id}`, { workspaceId: payload.workspaceId });
+            })),
+      );
+    },
+  };
+}
+function fileErrorMessage(error) {
+  if (error.code !== "RECOVERY_REQUIRED" || !error.partial) return error.message;
+  const partial = error.partial;
+  return `${error.message}\n需人工恢复；请保留暂存目录：${partial.stagingPath || "未返回"}\n项目：${partial.workspaceId || "未返回"}\n备份：${(partial.backups || []).map((item) => (typeof item === "string" ? item : `${item.backupId || "未知编号"} · ${item.path || ""}`)).join("；") || "未返回"}\n请勿重复写入以尝试修复。`;
+}
+function rememberFileResult(workspaceId, result, message) {
+  const items = result.items || (result.item ? [result.item] : []);
+  const backups = state.fileBackups.get(workspaceId) || new Map();
+  for (const item of items)
+    if (item.backupId)
+      backups.set(item.backupId, {
+        backupId: item.backupId,
+        path: item.path,
+        bytes: null,
+        operation: "变更前版本",
+      });
+  state.fileBackups.set(workspaceId, backups);
+  state.fileFeedback.set(workspaceId, {
+    message,
+    paths: items.map((item) => item.path),
+    backupIds: items.map((item) => item.backupId).filter(Boolean),
+  });
+}
+function rememberFileError(workspaceId, error) {
+  const backups = state.fileBackups.get(workspaceId) || new Map();
+  for (const item of error.partial?.backups || []) {
+    const value = typeof item === "string" ? { backupId: item, path: "待人工确认" } : item;
+    if (value.backupId) backups.set(value.backupId, value);
+  }
+  state.fileBackups.set(workspaceId, backups);
+  state.fileFeedback.set(workspaceId, { error: true, message: fileErrorMessage(error) });
+}
+function checkedBitmapSource(item) {
+  if (
+    !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(item.mediaType) ||
+    item.imageValidation !== "structure-only"
+  )
+    throw new Error("仅预览已通过结构检查的 PNG、JPEG、GIF 或 WebP；不打开 HTML 或 SVG。");
+  if (
+    !Number.isInteger(item.width) ||
+    !Number.isInteger(item.height) ||
+    item.width < 1 ||
+    item.height < 1 ||
+    item.width > 16384 ||
+    item.height > 16384 ||
+    item.width * item.height > 40000000
+  )
+    throw new Error("图片尺寸无效或超过预览限制");
+  const value = item.contentBase64;
+  if (
+    typeof value !== "string" ||
+    value.length > Math.ceil((10 * 1024 * 1024) / 3) * 4 ||
+    value.length % 4 ||
+    !/^[A-Za-z0-9+/]*={0,2}$/.test(value)
+  )
+    throw new Error("图片数据无效");
+  const binary = atob(value);
+  const code = (index) => binary.charCodeAt(index);
+  const magic =
+    item.mediaType === "image/png"
+      ? [137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => code(i) === v)
+      : item.mediaType === "image/jpeg"
+        ? code(0) === 255 && code(1) === 216
+        : item.mediaType === "image/gif"
+          ? ["GIF87a", "GIF89a"].includes(binary.slice(0, 6))
+          : binary.slice(0, 4) === "RIFF" && binary.slice(8, 12) === "WEBP";
+  if (!magic || binary.length !== item.bytes) throw new Error("图片类型或长度不匹配，未生成预览");
+  return `data:${item.mediaType};base64,${value}`;
+}
+async function filesPage() {
+  const payload = workspacePayload();
+  const outcomes = await Promise.allSettled([
+    api("files.list", payload),
+    api("files.backups", payload),
+  ]);
+  const items = outcomes[0].status === "fulfilled" ? outcomes[0].value.items : [];
+  const backups = state.fileBackups.get(payload.workspaceId) || new Map();
+  if (outcomes[1].status === "fulfilled")
+    for (const item of outcomes[1].value.items) backups.set(item.backupId, item);
+  state.fileBackups.set(payload.workspaceId, backups);
+  const versions = [...backups.values()];
+  const feedback = state.fileFeedback.get(payload.workspaceId);
+  const failures = outcomes.filter((result) => result.status === "rejected");
+  const feedbackHTML = feedback
+    ? `<div class="${feedback.error ? "error" : "note"}" role="status" style="white-space:pre-wrap">${esc(feedback.message)}${feedback.paths?.length ? `\n${esc(feedback.paths.join(" · "))}` : ""}${feedback.backupIds?.length ? `\n已保留 ${feedback.backupIds.length} 个变更前版本，见下方“备份版本”。` : ""}</div>`
+    : "";
+  return {
+    html:
+      heading(
+        `${capabilityButton("files.import", "导入本地文件", 'id="import-files"')}${capabilityButton("files.write", "＋ 新建文本文件", 'id="create-file" class="primary"')}`,
+      ) +
+      `<div class="note">文件保存在当前项目的本机材料库，不会上传远程。文本编辑上限 1 MiB；单个导入文件 10 MiB，每批最多 128 项、合计 20 MiB。同路径写入会覆盖并保留备份。</div><input type="file" id="material-file-input" multiple hidden><div id="file-feedback">${feedbackHTML}</div>` +
+      failures
+        .map(
+          (result) =>
+            `<div class="error" role="alert">读取未完成：${esc(result.reason.message)}</div>`,
+        )
+        .join("") +
+      panel(
+        "项目文件",
+        `<div class="toolbar"><span class="meta">${items.length} 个文件 · 相对路径区分现有拼写</span><button id="refresh-files" class="small">↻ 刷新文件与备份</button></div>${
+          items.length
+            ? table(
+                items,
+                [
+                  ["path", "文件路径"],
+                  ["bytes", "字节数"],
+                  ["mediaType", "类型"],
+                  ["sha256", "SHA-256"],
+                ],
+                (item, index) =>
+                  `<button class="small" data-file-read="${index}" ${item.bytes <= 1048576 && can("files.read") ? "" : 'disabled title="文本读取限 1 MiB"'}>查看 / 编辑文本</button><button class="small" data-file-preview="${index}" ${item.previewable && can("files.preview") ? "" : 'disabled title="仅已检查结构的位图可预览"'}>图片预览</button><button class="small danger" data-file-delete="${index}" ${can("files.delete") ? "" : "disabled"}>删除</button>`,
+              )
+            : empty(
+                "尚无本地文件",
+                outcomes[0].status === "rejected"
+                  ? "读取失败，请刷新；不会将失败视为空库。"
+                  : "新建文本或选择本机材料导入当前项目。",
+              )
+        }`,
+      ) +
+      panel(
+        "备份版本",
+        `<details ${versions.length ? "open" : ""}><summary>${versions.length} 个可恢复版本</summary><p class="info">恢复会写回原路径；若当前路径已有文件，也会先保留当前版本。备份列表可从本机重新读取。</p>${
+          versions.length
+            ? table(
+                versions,
+                [
+                  ["path", "原文件路径"],
+                  ["bytes", "字节数"],
+                  ["backupId", "备份编号"],
+                ],
+                (item, index) =>
+                  `<button class="small" data-file-restore="${index}" ${can("files.restore") ? "" : "disabled"}>恢复此版本</button>`,
+              )
+            : empty("暂无备份版本", "覆盖或删除文件后可在此恢复旧版本。")
+        }</details>`,
+      ) +
+      '<div id="file-preview"></div>',
+    bind() {
+      const inContext = () => state.page === "files" && state.workspaceId === payload.workspaceId;
+      const showError = (error) => {
+        rememberFileError(payload.workspaceId, error);
+        if (inContext())
+          $("#file-feedback").innerHTML =
+            `<div class="error" role="alert" style="white-space:pre-wrap">${esc(fileErrorMessage(error))}</div>`;
+      };
+      const edit = (item) =>
+        openForm(
+          item ? "编辑本地文本文件" : "新建本地文本文件",
+          [
+            field("path", "项目内相对路径", "text", {
+              required: true,
+              readonly: Boolean(item),
+              help: "例如 evidence/notes.md；不接受绝对路径或父目录跳转。",
+            }),
+            field("content", "UTF-8 文本正文", "textarea"),
+          ],
+          item || {},
+          async (values) => {
+            try {
+              if (new TextEncoder().encode(values.content).length > 1048576)
+                throw new Error("文本正文超过 1 MiB，未写入");
+              const result = await api("files.write", { ...payload, ...values });
+              rememberFileResult(
+                payload.workspaceId,
+                result,
+                "文本已保存。已有同路径文件时，变更前版本已备份。",
+              );
+            } catch (error) {
+              showError(error);
+              throw error;
+            }
+          },
+          {
+            draftId: item ? `file:${item.path}` : "file:new",
+            note: "保存会覆盖同路径文件；旧版本可在“备份版本”恢复。此编辑器只保存文字，不执行内容。",
+          },
+        );
+      $("#create-file").onclick = () => edit();
+      $("#refresh-files").onclick = render;
+      $("#import-files").onclick = () => $("#material-file-input").click();
+      $("#material-file-input").onchange = (event) => {
+        const selected = [...event.target.files];
+        event.target.value = "";
+        if (!selected.length) return;
+        run($("#import-files"), async () => {
+          try {
+            if (
+              selected.length > 128 ||
+              selected.some((file) => file.size > 10 * 1024 * 1024) ||
+              selected.reduce((sum, file) => sum + file.size, 0) > 20 * 1024 * 1024
+            )
+              throw new Error("超出导入限制：最多 128 项，每项 10 MiB，每批合计 20 MiB");
+            const imports = await Promise.all(
+              selected.map(async (file) => ({
+                path: file.name,
+                contentBase64: await encodeSkillFile(file),
+                ...(file.type ? { mediaType: file.type } : {}),
+              })),
+            );
+            if (!inContext()) return;
+            confirmAction(
+              "导入本地文件",
+              `将 ${imports.length} 个文件导入当前项目。同路径文件将覆盖并保留备份；不会执行导入内容。`,
+              async () => {
+                try {
+                  const result = await api("files.import", { ...payload, items: imports });
+                  rememberFileResult(
+                    payload.workspaceId,
+                    result,
+                    `已导入 ${result.items.length} 个文件。`,
+                  );
+                } catch (error) {
+                  showError(error);
+                  throw error;
+                }
+              },
+            );
+          } catch (error) {
+            showError(error);
+            throw error;
+          }
+        });
+      };
+      $$("[data-file-read]").forEach(
+        (button) =>
+          (button.onclick = () =>
+            run(button, async () => {
+              try {
+                const result = await api("files.read", {
+                  ...payload,
+                  path: items[Number(button.dataset.fileRead)].path,
+                  encoding: "utf8",
+                });
+                if (inContext()) edit(result.item);
+              } catch (error) {
+                showError(error);
+                throw error;
+              }
+            })),
+      );
+      $$("[data-file-preview]").forEach(
+        (button) =>
+          (button.onclick = () =>
+            run(button, async () => {
+              try {
+                const result = await api("files.preview", {
+                  ...payload,
+                  path: items[Number(button.dataset.filePreview)].path,
+                });
+                const source = checkedBitmapSource(result.item);
+                if (!inContext()) return;
+                $("#file-preview").innerHTML = panel(
+                  "图片预览",
+                  `<p class="info">${esc(result.item.path)} · ${result.item.width} × ${result.item.height}。已检查文件结构，浏览器仍需解码图片；不代表完整内容或可信性验证。</p><img id="material-preview-image" class="material-image" alt="${esc(result.item.path)}"><p id="material-preview-error" class="inlineerror" role="alert"></p>`,
+                );
+                const image = $("#material-preview-image");
+                image.onerror = () => {
+                  image.removeAttribute("src");
+                  $("#material-preview-error").textContent =
+                    "浏览器无法解码此图片，未显示预览。原文件保留。";
+                };
+                image.src = source;
+              } catch (error) {
+                showError(error);
+                throw error;
+              }
+            })),
+      );
+      $$("[data-file-delete]").forEach(
+        (button) =>
+          (button.onclick = () => {
+            const item = items[Number(button.dataset.fileDelete)];
+            confirmAction("删除文件", `将删除 ${item.path}。删除前会保留可恢复版本。`, async () => {
+              try {
+                const result = await api("files.delete", { ...payload, path: item.path });
+                rememberFileResult(payload.workspaceId, result, "文件已删除，删除前版本已保留。");
+                clearObjectDraft("files", `file:${item.path}`, {
+                  workspaceId: payload.workspaceId,
+                });
+              } catch (error) {
+                showError(error);
+                throw error;
+              }
+            });
+          }),
+      );
+      $$("[data-file-restore]").forEach(
+        (button) =>
+          (button.onclick = () => {
+            const backup = versions[Number(button.dataset.fileRestore)];
+            confirmAction(
+              "恢复备份",
+              `将恢复 ${backup.path || "该备份的原路径"}。当前同路径文件会先备份，未保存的编辑仍保留为草稿。`,
+              async () => {
+                try {
+                  const result = await api("files.restore", {
+                    ...payload,
+                    backupId: backup.backupId,
+                  });
+                  rememberFileResult(
+                    payload.workspaceId,
+                    result,
+                    `备份版本已恢复：${backup.backupId}`,
+                  );
+                } catch (error) {
+                  showError(error);
+                  throw error;
+                }
+              },
+            );
+          }),
       );
     },
   };
@@ -1644,6 +2494,15 @@ async function graphPage() {
   const payload = workspacePayload();
   const data = await api("assets.graph", payload);
   const timeline = await api("assets.timeline", payload);
+  const pathState = state.graphPaths.get(payload.workspaceId);
+  const pathResult = (value) =>
+    !value
+      ? '<p class="info">选择起点与终点，查询已保存关系中的最短路径。</p>'
+      : value.error
+        ? `<div class="error" role="alert">${esc(value.error)}</div>`
+        : !value.data.found
+          ? empty("未找到关系路径", "在所选方向下，起点与终点之间没有已保存的连接。")
+          : `<p class="info">${value.data.direction === "undirected" ? "忽略方向" : "按关系方向"} · ${value.data.edges.length} 条关系</p><ol class="path-steps">${value.data.nodes.map((node, index) => `<li><strong>${esc(redactCell(node.name || node.address || node.id))}</strong>${index < value.data.edges.length ? `<p>${esc(redactCell(value.data.edges[index].relation || "已登记关系"))}${value.data.edges[index].from !== node.id ? " · 反向经过" : ""}</p>` : ""}</li>`).join("")}</ol>`;
   const nodes = data.nodes || [],
     edges = data.edges || [];
   const width = 950,
@@ -1687,6 +2546,10 @@ async function graphPage() {
       heading('<button id="link-assets" class="primary">＋ 添加关系</button>') +
       panel("资产关系", svg, `${nodes.length} 个节点 · ${edges.length} 条关系`) +
       panel(
+        "最短关系路径",
+        `<form id="graph-path-form" class="graph-path-form"><div class="field"><label for="graph-path-from">起点资产</label><select id="graph-path-from" name="from" required>${nodes.map((node) => `<option value="${esc(node.id)}" ${pathState?.query?.from === node.id ? "selected" : ""}>${esc(node.name || node.address || node.id)}</option>`).join("")}</select></div><div class="field"><label for="graph-path-to">终点资产</label><select id="graph-path-to" name="to" required>${nodes.map((node) => `<option value="${esc(node.id)}" ${pathState?.query?.to === node.id ? "selected" : ""}>${esc(node.name || node.address || node.id)}</option>`).join("")}</select></div><div class="field"><label for="graph-path-direction">关系方向</label><select id="graph-path-direction" name="direction"><option value="directed">按关系方向</option><option value="undirected" ${pathState?.query?.direction === "undirected" ? "selected" : ""}>忽略方向</option></select></div><button type="submit" ${nodes.length ? "" : "disabled"}>查询路径</button></form><div id="graph-path-result">${pathResult(pathState)}</div>`,
+      ) +
+      panel(
         "资产时间线",
         (timeline.items || []).length
           ? timeline.items
@@ -1700,6 +2563,29 @@ async function graphPage() {
           : empty("尚无资产事件", "资产与关系变更后，时间线会显示对应记录。"),
       ),
     bind() {
+      $("#graph-path-form").onsubmit = (event) => {
+        event.preventDefault();
+        const form = event.target;
+        const query = Object.fromEntries(new FormData(form));
+        run($('button[type="submit"]', form), async () => {
+          try {
+            const data = await api("assets.path", { ...payload, ...query });
+            const value = { query, data };
+            state.graphPaths.set(payload.workspaceId, value);
+            if (state.page === "graph" && state.workspaceId === payload.workspaceId) {
+              commitInlineDraft("graph-path-form");
+              $("#graph-path-result").innerHTML = pathResult(value);
+            }
+            toast(data.found ? "已找到最短关系路径" : "未找到关系路径");
+          } catch (error) {
+            const value = { query, error: error.message };
+            state.graphPaths.set(payload.workspaceId, value);
+            if (state.page === "graph" && state.workspaceId === payload.workspaceId)
+              $("#graph-path-result").innerHTML = pathResult(value);
+            throw error;
+          }
+        });
+      };
       $("#link-assets").disabled = nodes.length < 2;
       $("#link-assets").onclick = () =>
         openForm(
@@ -1748,6 +2634,7 @@ async function progressPage() {
       $$("[data-progress-kind]").forEach(
         (b) =>
           (b.onclick = () => {
+            if (!canLeaveEditor()) return;
             state.recordKind = b.dataset.progressKind;
             render();
           }),
@@ -1758,9 +2645,11 @@ async function progressPage() {
 async function rolesPage() {
   const payload = workspacePayload();
   await refreshStatus();
-  const [rolesResult, flowResult] = await Promise.allSettled([
+  const [rolesResult, flowResult, workflowResult, presetResult] = await Promise.allSettled([
     api("roles.list", payload),
     api("flow.status", payload),
+    api("workflow.status", payload),
+    api("workflow.presets", { operation: "status" }),
   ]);
   if (rolesResult.status === "rejected") throw rolesResult.reason;
   const items = rolesResult.value.items;
@@ -1777,6 +2666,32 @@ async function rolesPage() {
   const sessions = state.status.sessions;
   const bound = sessions.filter((item) => item.workspaceId === state.workspaceId);
   const flow = flowResult.status === "fulfilled" ? flowResult.value : null;
+  const runs = workflowResult.status === "fulfilled" ? workflowResult.value.items : [];
+  const preset = presetResult.status === "fulfilled" ? presetResult.value : null;
+  const ownedSessions = new Set(
+    runs.filter((run) => !run.slotReleased).map((run) => run.sessionId),
+  );
+  const workflowBody = `<div class="toolbar"><button class="primary" id="dispatch-workflow" ${can("workflow.dispatch") && bound.length ? "" : 'disabled title="需要官方执行者服务及已绑定当前项目的父会话"'}>分派执行任务</button><button id="refresh-workflow">刷新执行结果</button><button id="register-workflow-preset" ${can("workflow.presets") ? "" : "disabled"}>${preset?.owned ? "撤销本项目预设" : "注册本项目预设"}</button></div><p class="info">分派会真正创建官方子代理，先占用本项目执行槽，再开始任务。完成或确认停止后释放；停止未确认时保留占用。预设和运行列表只在当前插件进程有效，真实会话由宿主留存。</p>${
+    workflowResult.status === "rejected"
+      ? `<div class="error">${esc(workflowResult.reason.message)}</div>`
+      : runs.length
+        ? table(
+            runs.map((run) => ({
+              ...run,
+              roleLabel: roleNames[run.role] || run.role,
+              slot: run.slotReleased ? "已释放" : "仍占用",
+            })),
+            [
+              ["id", "运行编号"],
+              ["roleLabel", "角色"],
+              ["status", "执行状态"],
+              ["slot", "槽位"],
+            ],
+            (run, index) =>
+              `<button class="small" data-workflow-result="${index}">详情与结果</button><button class="small danger" data-workflow-stop="${index}" ${!run.slotReleased && can("workflow.stop") ? "" : "disabled"}>停止执行者</button>`,
+          )
+        : empty("尚无执行任务", "先绑定父会话，再明确角色和本次任务。")
+  }<div id="workflow-outcome"></div>`;
   const rows = flow
     ? flow.assignments.map((item) => ({
         ...item,
@@ -1802,7 +2717,9 @@ async function rolesPage() {
                 ["slotState", "本地槽位"],
               ],
               (item, index) =>
-                `<button class="small quiet" data-flow-edit="${index}">调整角色</button>${item.slotState === "已占用" ? `<button class="small" data-flow-release="${index}">释放槽位</button>` : `<button class="small" data-flow-acquire="${index}" ${flow.available > 0 ? "" : 'disabled title="槽位已满，请先释放"'}>占用本地槽位</button>`}<button class="small quiet danger" data-flow-unassign="${index}">撤销分配</button>`,
+                ownedSessions.has(item.sessionId)
+                  ? '<span class="meta">由执行任务管理</span>'
+                  : `<button class="small quiet" data-flow-edit="${index}">调整角色</button>${item.slotState === "已占用" ? `<button class="small" data-flow-release="${index}">释放槽位</button>` : `<button class="small" data-flow-acquire="${index}" ${flow.available > 0 ? "" : 'disabled title="槽位已满，请先释放"'}>占用本地槽位</button>`}<button class="small quiet danger" data-flow-unassign="${index}">撤销分配</button>`,
             )
           : empty(
               "尚未明确分配角色",
@@ -1815,9 +2732,91 @@ async function rolesPage() {
   return {
     html:
       heading('<button id="reset-roles" class="danger">重置角色提示词</button>') +
+      panel("执行任务", workflowBody) +
       panel("本地槽位管理", flowBody) +
       `<div class="grid2 equal">${items.map((item) => panel(roleNames[item.role] || item.role, `<div class="eyebrow">${esc(item.role.toUpperCase())}${["analyst", "reviewer"].includes(item.role) ? " · COMPATIBILITY" : ""}</div><p class="info" style="white-space:pre-wrap;max-height:210px;overflow:auto;min-height:100px">${esc(redactCell(item.content || "尚未配置提示词。", "content"))}</p><button data-role="${esc(item.role)}" class="small">编辑提示词</button>`)).join("")}</div>`,
     bind() {
+      $("#refresh-workflow").onclick = render;
+      $("#register-workflow-preset").onclick = () =>
+        confirmAction(
+          preset?.owned ? "撤销运行期预设" : "注册运行期预设",
+          "仅注册或撤销本项目拥有的预设。保留用户同名定义和角色自定义内容，不写宿主 profile。",
+          async () => {
+            await api("workflow.presets", { operation: preset?.owned ? "unregister" : "register" });
+          },
+        );
+      $("#dispatch-workflow").onclick = () =>
+        openForm(
+          "分派执行任务",
+          [
+            field("parentSessionId", "已绑定本项目的父会话", "select", {
+              required: true,
+              options: bound
+                .filter((session) => !ownedSessions.has(session.id))
+                .map((session) => [session.id, session.name || session.id]),
+            }),
+            field("role", "执行角色", "select", {
+              required: true,
+              options: items.map((role) => [role.role, roleNames[role.role] || role.role]),
+            }),
+            field("task", "本次明确任务", "textarea", { required: true }),
+            field("usePreset", "采用本项目运行期预设", "checkbox", { disabled: !preset?.owned }),
+          ],
+          {},
+          async (values) => {
+            try {
+              const result = await api("workflow.dispatch", { ...payload, ...values });
+              state.flowFeedback = {
+                workspaceId: payload.workspaceId,
+                message: `执行任务已读回：${result.item.id} · ${result.item.status}。请在执行结果中核对实际完成内容。`,
+              };
+            } catch (error) {
+              if (error.partial?.item)
+                state.flowFeedback = {
+                  workspaceId: payload.workspaceId,
+                  failed: true,
+                  message: `分派未完成：${error.partial.item.id}，槽位${error.partial.item.slotReleased ? "已释放" : "仍占用"}。${error.message}`,
+                };
+              throw error;
+            }
+          },
+          {
+            draftId: "workflow:new-task",
+            submit: "启动执行者",
+            note: "会创建实际子代理并提交上述任务，可能产生模型调用费用。任务须处于当前项目和宿主已经允许的范围内。",
+          },
+        );
+      $$("[data-workflow-result]").forEach((button) => {
+        button.onclick = () =>
+          run(button, async () => {
+            const result = await api("workflow.status", {
+              ...payload,
+              id: runs[Number(button.dataset.workflowResult)].id,
+            });
+            if (state.page !== "roles" || state.workspaceId !== payload.workspaceId) return;
+            $("#workflow-outcome").innerHTML = panel(
+              "执行结果读回",
+              `<pre class="code">${esc(JSON.stringify(redactCell(result.item), null, 2))}</pre>`,
+            );
+          });
+      });
+      $$("[data-workflow-stop]").forEach((button) => {
+        button.onclick = () =>
+          confirmAction(
+            "停止执行者",
+            "仅停止本项目创建的这一执行者。确认停止后才会释放其执行槽。",
+            async () => {
+              const result = await api("workflow.stop", {
+                ...payload,
+                id: runs[Number(button.dataset.workflowStop)].id,
+              });
+              state.flowFeedback = {
+                workspaceId: payload.workspaceId,
+                message: `停止结果：${result.item.status}；槽位${result.item.slotReleased ? "已释放" : "仍占用"}。`,
+              };
+            },
+          );
+      });
       $$("[data-role]").forEach(
         (b) =>
           (b.onclick = () => {
@@ -1827,13 +2826,16 @@ async function rolesPage() {
               [field("content", "提示词内容", "textarea")],
               item,
               (data) => api("roles.save", { ...payload, role: b.dataset.role, ...data }),
+              { draftId: `role:${b.dataset.role}` },
             );
           }),
       );
       $("#reset-roles").onclick = () =>
-        confirmAction("重置角色提示词", "当前项目的角色提示词将恢复为默认内容。", () =>
-          api("roles.reset", payload),
-        );
+        confirmAction("重置角色提示词", "当前项目的角色提示词将恢复为默认内容。", async () => {
+          await api("roles.reset", payload);
+          for (const item of items)
+            clearObjectDraft("roles", `role:${item.role}`, { workspaceId: payload.workspaceId });
+        });
       $("#refresh-flow").onclick = render;
       if (!flow) return;
       const setFeedback = (message, failed = false) => {
@@ -1876,6 +2878,7 @@ async function rolesPage() {
             );
           },
           {
+            draftId: item ? `flow:assignment:${item.sessionId}` : "flow:new-assignment",
             note: "先明确会话与角色，再占用本地槽位。此操作不会自动绑定其他项目，也不会启动执行。",
           },
         );
@@ -1921,6 +2924,20 @@ async function rolesPage() {
               "仅删除此会话的本地角色分配，并释放其本地槽位。不会停止宿主会话。",
               async () => {
                 await api("flow.assign", { ...payload, sessionId: row.sessionId, role: null });
+                clearObjectDraft("roles", `flow:assignment:${row.sessionId}`, {
+                  workspaceId: payload.workspaceId,
+                });
+                const pendingAssignment = drafts.read(
+                  draftScope("flow:new-assignment", {
+                    ...state,
+                    workspaceId: payload.workspaceId,
+                    page: "roles",
+                  }),
+                );
+                if (pendingAssignment?.sessionId === row.sessionId)
+                  clearObjectDraft("roles", "flow:new-assignment", {
+                    workspaceId: payload.workspaceId,
+                  });
                 setFeedback("已撤销本地角色分配；该会话不再占用槽位。");
               },
             );
@@ -1977,6 +2994,7 @@ function rewindSummary(outcome) {
   return `<div class="${restored ? "note" : "error"}"><strong>${title}</strong><br>${archived}${outcome.newSessionId ? `新会话：<span class="mono">${esc(outcome.newSessionId)}</span>` : ""}<br>${restored ? "草稿已放入输入框，没有自动发送。" : ""}${outcome.error ? esc(outcome.error) : restored ? "" : "等待宿主恢复草稿。"}</div>`;
 }
 function openRewind(item) {
+  if (!canLeaveEditor()) return;
   const dialog = $("#editor");
   let fork = null;
   dialog.innerHTML = `<form id="rewind-form"><div class="dialoghead"><h2>会话回退</h2><button class="quiet small" type="button" id="close-rewind">关闭</button></div><div class="note">将通过官方 fork 路径创建新会话，保留并归档原记录，再把被移除的用户输入恢复到新会话草稿。不会自动发送。</div>${renderField(
@@ -1988,9 +3006,19 @@ function openRewind(item) {
     }),
     "turn",
   )}<div id="rewind-result"></div><p id="rewind-error" class="inlineerror" role="alert"></p><div class="dialogfoot"><button type="button" id="cancel-rewind">取消</button><button class="primary" type="submit" id="submit-rewind">创建回退分支</button></div></form>`;
+  const binding = bindMemoryDraft($("#rewind-form"), draftScope(`rewind:${item.id}`));
+  const editor = { binding, saving: false };
+  editorDraft = editor;
   const close = () => {
+    if (editor.saving) return;
+    binding.capture();
+    editorDraft = null;
     dialog.close();
     render();
+  };
+  dialog.oncancel = (event) => {
+    event.preventDefault();
+    close();
   };
   $("#close-rewind").onclick = close;
   $("#cancel-rewind").onclick = close;
@@ -1998,6 +3026,7 @@ function openRewind(item) {
     e.preventDefault();
     const button = $("#submit-rewind");
     run(button, async () => {
+      editor.saving = true;
       $("#rewind-error").textContent = "";
       try {
         if (!(await probeBridge())) throw new Error("当前宿主草稿桥不可用；未创建新的回退分支");
@@ -2007,6 +3036,7 @@ function openRewind(item) {
             mode: new FormData(e.target).get("mode"),
             draftBridgeReady: true,
           });
+          binding.commit();
           state.rewindOutcome = { ...fork, draftStatus: "pending-client" };
           $("#f-mode").disabled = true;
         }
@@ -2045,6 +3075,8 @@ function openRewind(item) {
           }, 0);
         } else $("#rewind-error").textContent = error.message;
         throw error;
+      } finally {
+        editor.saving = false;
       }
     });
   };
@@ -2074,13 +3106,41 @@ async function sessionsPage() {
                   ["workspaceName", "演练项目"],
                 ],
                 (item, index) =>
-                  `<button class="small" data-bind-session="${index}" ${state.workspaceId ? "" : 'disabled title="请先激活演练项目"'}>绑定项目</button><button class="small" data-rewind="${index}" ${can("sessions.rewind") && state.bridgeReady ? "" : 'disabled title="宿主回退能力与草稿桥都就绪后方可使用"'}>回退 / 分支</button>`,
+                  `<button class="small" data-bind-session="${index}" ${state.workspaceId ? "" : 'disabled title="请先激活演练项目"'}>绑定项目</button><button class="small" data-rewind="${index}" ${can("sessions.rewind") && state.bridgeReady ? "" : 'disabled title="宿主回退能力与草稿桥都就绪后方可使用"'}>回退 / 分支</button><button class="small" data-continuation="${index}" ${can("continuation.status") ? "" : "disabled"}>继续状态</button>`,
               )
             : empty("没有可读取的宿主会话", "会话由当前宿主提供，独立预览不包含真实宿主会话。")
         }`,
-      ),
+      ) +
+      '<div id="continuation-detail"></div>',
     bind() {
       $("#refresh-sessions").onclick = render;
+      const showContinuation = async (sessionId) => {
+        const result = await api("continuation.status", { sessionId });
+        if (state.page !== "sessions") return;
+        $("#continuation-detail").innerHTML = panel(
+          "截断后继续",
+          `<p class="info">仅根会话的明确输出长度截断可继续。传输、限流、用户停止及子代理结束不在此处自动补发。</p><div class="twocoltext"><span>最近结束原因</span><span>${esc(result.eligibleReason || "无可用结束记录")}</span></div><div class="twocoltext"><span>本次人工输入已自动继续</span><span>${result.automaticCount} / ${result.limit}</span></div>${result.unsupportedReason ? `<div class="note">${esc(result.unsupportedReason)}</div>` : ""}${result.lastError ? `<div class="error">${esc(result.lastError.message)}</div>` : ""}<div class="toolbar"><button id="manual-continue" ${result.manualAvailable ? "" : "disabled"}>手动继续截断内容</button><button id="stop-continuation" class="danger">停止本模块自动继续</button><button id="reload-continuation">刷新状态</button></div><p class="info">${result.autoEnabled ? "自动继续已开启" : "自动继续已关闭"}${result.pending ? " · 等待提交" : ""}${result.stopped ? " · 本次链已停止" : ""}</p>`,
+        );
+        $("#reload-continuation").onclick = (event) =>
+          run(event.target, () => showContinuation(sessionId));
+        $("#manual-continue").onclick = () =>
+          confirmAction(
+            "继续截断内容",
+            "将采用当前继续用语和系统提示词提交新一轮，消息保留本插件来源，可能产生模型调用费用。",
+            async () => {
+              await api("continuation.continue", { sessionId });
+            },
+          );
+        $("#stop-continuation").onclick = (event) =>
+          run(event.target, async () => {
+            await api("continuation.stop", { sessionId });
+            await showContinuation(sessionId);
+          });
+      };
+      $$("[data-continuation]").forEach((button) => {
+        button.onclick = () =>
+          run(button, () => showContinuation(items[Number(button.dataset.continuation)].id));
+      });
       $$("[data-bind-session]").forEach(
         (b) =>
           (b.onclick = () =>
@@ -2101,63 +3161,339 @@ async function sessionsPage() {
   };
 }
 async function environmentPage() {
+  await refreshStatus();
+  const workspaceId = state.workspaceId;
+  environmentPage.views ||= new Map();
+  const view = environmentPage.views.get(workspaceId) || {
+    sessionId: "",
+    preflight: null,
+    error: "",
+  };
+  environmentPage.views.set(workspaceId, view);
+  const scopePayload = view.sessionId ? { sessionId: view.sessionId } : {};
+  const requirementsFormId = `environment-requirements-${[...view.sessionId].map((character) => character.codePointAt(0).toString(16)).join("-") || "host"}`;
+  let catalog = null,
+    catalogError = "";
+  if (can("catalog.list")) {
+    try {
+      catalog = await api("catalog.list", scopePayload);
+    } catch (error) {
+      catalogError = error.message;
+    }
+  }
+  const choices = (state.status?.sessions || []).map((session) => [
+    session.id,
+    session.name || session.id,
+  ]);
+  if (view.sessionId && !choices.some(([id]) => id === view.sessionId))
+    choices.push([view.sessionId, `${view.sessionId} · 当前未列出，请重新选择`]);
+  const preflightHTML = (value) =>
+    !value
+      ? ""
+      : panel(
+          "环境依赖预检",
+          `<div class="note">${esc({ ready: "声明范围内通过", unknown: "仍有未知项", blocked: "存在依赖缺口" }[value.status] || value.status)}。预检只检查明确声明、注册表可见性和本地目录存在性；不代表授权、连接健康或任务执行成功。</div>${
+            value.checks.length
+              ? table(
+                  value.checks.map((check) => ({
+                    ...check,
+                    target: check.name || check.path || "声明完整性",
+                    result:
+                      {
+                        available: "已检测到",
+                        missing: "缺失",
+                        unknown: "未知",
+                        invalid: "声明无效",
+                      }[check.state] || check.state,
+                    kindLabel:
+                      {
+                        tool: "宿主工具",
+                        toolkit: "本机工具",
+                        directory: "本地目录",
+                        skill: "技能",
+                        catalog: "目录来源",
+                        declaration: "声明完整性",
+                      }[check.kind] || check.kind,
+                  })),
+                  [
+                    ["kindLabel", "检查项"],
+                    ["target", "依赖"],
+                    ["result", "结果"],
+                    ["detail", "说明"],
+                  ],
+                )
+              : '<p class="info">本次明确声明为空，未列出额外依赖。</p>'
+          }`,
+        );
+  const registered = catalog?.tools || [];
+  const catalogHTML = panel(
+    "会话工具目录与预检",
+    `<form id="environment-catalog-scope" class="toolbar"><div class="field"><label for="environment-catalog-session">会话作用域</label><select id="environment-catalog-session" name="sessionId"><option value="">宿主全局 · 无会话</option>${choices.map(([id, label]) => `<option value="${esc(id)}" ${view.sessionId === id ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></div><button type="submit" ${can("catalog.list") ? "" : "disabled"}>读取工具目录</button></form><p class="info">当前目录范围：${esc(view.sessionId || "宿主全局")}。下表来自官方公开工具注册表；MCP 来源仅保留公开名称，不探测连接或执行工具。</p>${catalogError ? `<div class="error" role="alert">工具目录读取失败：${esc(catalogError)}</div>` : !can("catalog.list") ? '<div class="note">当前未提供聚合目录接口，本机路径设置仍可使用。</div>' : ""}<p id="environment-catalog-error" class="inlineerror" role="alert">${esc(view.error)}</p>${
+      registered.length
+        ? table(
+            registered.map((tool) => ({
+              ...tool,
+              sourceLabel:
+                tool.source.namespace === "mcp"
+                  ? "MCP 公开名称 · 未验证连接"
+                  : "ToolRuntime 注册表",
+              modeLabel:
+                { native: "原生工具", code: "原生与代码", ptc: "通过代码调用", unknown: "未知" }[
+                  tool.mode
+                ] || tool.mode,
+              directLabel:
+                tool.modelDirect === null
+                  ? "未知"
+                  : tool.modelDirect
+                    ? "模型可直接调用"
+                    : "通过代码工具调用",
+            })),
+            [
+              ["name", "公开工具名称"],
+              ["description", "用途"],
+              ["sourceLabel", "来源"],
+              ["modeLabel", "呈现模式"],
+              ["directLabel", "调用方式"],
+            ],
+            (tool, index) =>
+              `<button class="small" data-environment-tool-check="${index}" ${can("catalog.preflight") ? "" : "disabled"}>预检此工具声明</button>`,
+          )
+        : empty(
+            "当前会话目录没有已登记工具",
+            catalogError ? "请重新读取；失败不代表工具目录为空。" : "检查会话选择及目录来源状态。",
+          )
+    }${
+      catalog
+        ? `<details><summary>目录来源状态</summary>${table(
+            Object.entries(catalog.sources).map(([name, source]) => ({
+              name:
+                {
+                  skills: "宿主技能",
+                  project: "项目技能库",
+                  tools: "宿主工具",
+                  toolkit: "本机工具目录",
+                }[name] || name,
+              result:
+                source.state === "available"
+                  ? source.complete === false
+                    ? "部分结果"
+                    : "已读取"
+                  : source.state === "unsupported"
+                    ? "未提供"
+                    : "读取失败",
+              detail: source.detail || "",
+            })),
+            [
+              ["name", "来源"],
+              ["result", "状态"],
+              ["detail", "说明"],
+            ],
+          )}</details>`
+        : ""
+    }<form id="${requirementsFormId}"><details><summary>明确声明本次所需依赖</summary><div class="fields" style="margin-top:16px"><div class="field"><label for="required-host-tools">所需宿主工具 · 每行公开名称</label><textarea id="required-host-tools" name="hostTools" rows="3" placeholder="例如已登记的工具名称"></textarea></div><div class="field"><label for="required-local-tools">所需本机工具 · 每行标识</label><textarea id="required-local-tools" name="localTools" rows="3" placeholder="例如 nmap"></textarea></div><div class="field wide"><label for="required-directories">所需本地目录 · 每行一个</label><textarea id="required-directories" name="directories" rows="3" placeholder="绝对路径，或相对于当前会话工作目录的路径"></textarea></div></div></details><p class="info">留空表示本次未声明额外依赖；仍检查已配置的工具目录。未声明的技能依赖不会被猜测或自动安装。</p><button type="submit" ${can("catalog.preflight") ? "" : "disabled"}>预检声明与本地目录</button></form>`,
+  );
   const data = await api("toolkit.status");
   const tools = data.tools || [];
+  const feedback = state.environmentFeedback;
+  const identityLabel = (value) =>
+    ({
+      verified: "产品标识已匹配",
+      unverified: "待检查产品标识",
+      "name-only": "仅按路径登记",
+      missing: "未找到",
+      mismatch: "产品不匹配",
+      unknown: "身份未确认",
+    })[value] || value;
   return {
     html:
-      heading(`${capabilityButton("toolkit.adapt", "离线适配建议", 'id="adapt-tools"')}`) +
+      heading(capabilityButton("toolkit.adapt", "离线适配建议", 'id="adapt-tools"')) +
+      (feedback
+        ? `<div class="${feedback.error ? "error" : "note"}" role="status">${esc(feedback.message)}</div>`
+        : "") +
       `<div class="grid2"><div>${panel(
         "工具可用性",
-        `<div class="note">此页仅登记本地工具目录与检查版本。版本检查固定执行所选工具的 --version，不提供扫描参数或常驻进程入口。</div>${
+        `<div class="note">仅检查本地版本与帮助信息，不启动扫描。HTTPX 需检查产品标识；同名的 Python 客户端不能标为可用。</div>${
           tools.length
             ? table(
-                tools,
+                tools.map((tool) => ({
+                  ...tool,
+                  identityLabel: identityLabel(tool.identity),
+                  sourceLabel:
+                    { explicit: "逐工具路径", root: "根目录", search: "搜索目录" }[tool.source] ||
+                    "—",
+                })),
                 [
                   ["name", "工具"],
                   ["path", "实际路径"],
+                  ["sourceLabel", "来源"],
+                  ["identityLabel", "产品标识"],
+                  ["detail", "说明"],
                 ],
                 (item, index) =>
-                  `${badge(item.available ? "available" : "unsupported")}<button class="small" data-tool-probe="${index}" ${item.available && can("toolkit.probe") ? "" : "disabled"}>检查版本</button>`,
+                  `${badge(item.available ? "available" : "unsupported")}<button class="small" data-tool-probe="${index}" ${item.path && can("toolkit.probe") ? "" : "disabled"}>检查版本</button>`,
               )
-            : empty("尚未检测到工具", "设置工具目录后刷新检测。")
+            : empty("尚未检测到工具", "设置工具路径后刷新检测。")
         }`,
-      )}<div id="tool-detail"></div></div><div>${panel("工具目录", `<form id="tool-root-form"><div class="field"><label for="tool-root">本地工具根目录</label><input id="tool-root" name="root" value="${esc(data.root || "")}" placeholder="/本地/工具目录" required><small>使用已存在的绝对路径；检测工具目录及其一级子目录内的可执行文件。</small></div><button class="primary" type="submit" ${can("toolkit.save") ? "" : 'disabled title="宿主未提供工具目录设置能力"'}>保存目录</button></form>`)}${panel("环境信息", `<div class="twocoltext"><span>平台</span><span>${esc(state.status?.host?.platform || "未知")}</span></div><div class="twocoltext"><span>宿主版本</span><span>${esc(state.status?.host?.version || "未知")}</span></div><div class="twocoltext"><span>本地服务</span><span>${badge("available")}</span></div><button id="refresh-tools" class="small">↻ 刷新检测</button>`)}</div></div>`,
+      )}<div id="tool-detail">${state.environmentDetail}</div></div><div>${panel("工具目录", `<form id="tool-root-form"><div class="field"><label for="tool-root">本地工具根目录</label><input id="tool-root" name="root" value="${esc(data.root || "")}" placeholder="/本地/工具目录"><small>留空清除根目录。目录及其一级子目录参与检测。</small></div><div class="field"><label for="tool-search-dirs">额外搜索目录 · 每行一个</label><textarea id="tool-search-dirs" name="searchDirs" rows="3">${esc((data.searchDirs || []).join("\n"))}</textarea></div><div class="field"><label for="tool-template-dir">模板目录</label><input id="tool-template-dir" name="templateDir" value="${esc(data.templateDir || "")}" placeholder="/本地/模板目录"></div><details><summary>逐工具可执行文件路径</summary><div class="tool-path-fields">${tools.map((tool) => `<div class="field"><label for="tool-path-${esc(tool.id)}">${esc(tool.name)}</label><input id="tool-path-${esc(tool.id)}" name="path:${esc(tool.id)}" value="${esc(data.toolPaths?.[tool.id] || "")}" placeholder="留空移除此工具的单独路径"></div>`).join("")}</div></details><p class="info">优先级：逐工具路径 → 根目录 → 按顺序的搜索目录。仅使用已配置的本地绝对路径，不搜索系统 PATH。所有字段均可清空。</p><p id="tool-config-error" class="inlineerror" role="alert"></p><button class="primary" type="submit" ${can("toolkit.save") ? "" : 'disabled title="当前未提供工具目录设置能力"'}>保存目录</button></form>`)}${panel("环境信息", `<div class="twocoltext"><span>平台</span><span>${esc(state.status?.host?.platform || "未知")}</span></div><div class="twocoltext"><span>宿主版本</span><span>${esc(state.status?.host?.version || "未知")}</span></div><button id="refresh-tools" class="small">↻ 刷新检测</button>`)}</div></div>` +
+      catalogHTML +
+      `<div id="environment-preflight-result">${preflightHTML(view.preflight)}</div>`,
     bind() {
+      const inContext = () =>
+        state.page === "environment" &&
+        state.workspaceId === workspaceId &&
+        view.sessionId === (scopePayload.sessionId || "");
+      $("#environment-catalog-scope").onsubmit = (event) => {
+        event.preventDefault();
+        if (!canLeaveEditor()) return;
+        const values = Object.fromEntries(new FormData(event.target));
+        if (view.sessionId !== values.sessionId) {
+          view.preflight = null;
+          view.error = "";
+        }
+        view.sessionId = values.sessionId;
+        commitInlineDraft("environment-catalog-scope");
+        render();
+      };
+      const preflight = async (requirements) => {
+        try {
+          if ($("#environment-catalog-session").value !== (scopePayload.sessionId || ""))
+            throw new Error("请先点击“读取工具目录”应用所选会话范围");
+          const result = await api("catalog.preflight", { ...scopePayload, requirements });
+          if (view.sessionId !== (scopePayload.sessionId || "")) return;
+          view.preflight = result;
+          view.error = "";
+          if (inContext()) {
+            $("#environment-preflight-result").innerHTML = preflightHTML(result);
+            $("#environment-catalog-error").textContent = "";
+          }
+          toast("依赖预检完成，未执行工具或授予操作权限");
+        } catch (error) {
+          if (view.sessionId === (scopePayload.sessionId || "")) {
+            view.error = error.message;
+            if (inContext()) $("#environment-catalog-error").textContent = error.message;
+          }
+          throw error;
+        }
+      };
+      $(`#${requirementsFormId}`).onsubmit = (event) => {
+        event.preventDefault();
+        const form = event.target;
+        const values = Object.fromEntries(new FormData(form));
+        const lines = (name) =>
+          values[name]
+            .split("\n")
+            .map((value) => value.trim())
+            .filter(Boolean);
+        const requirements = [
+          ...lines("hostTools").map((name) => ({ kind: "tool", name })),
+          ...lines("localTools").map((name) => ({ kind: "toolkit", name })),
+          ...lines("directories").map((path) => ({ kind: "directory", path })),
+        ];
+        run($('button[type="submit"]', form), () => preflight(requirements));
+      };
+      $$("[data-environment-tool-check]").forEach(
+        (button) =>
+          (button.onclick = () =>
+            run(button, () =>
+              preflight([
+                {
+                  kind: "tool",
+                  name: registered[Number(button.dataset.environmentToolCheck)].name,
+                },
+              ]),
+            )),
+      );
       $("#refresh-tools").onclick = render;
-      $("#tool-root-form").onsubmit = (e) => {
-        e.preventDefault();
-        run($("button", e.target), async () => {
-          await api("toolkit.save", { root: $("#tool-root").value.trim() });
-          toast("工具目录已保存");
-          await render();
+      $("#tool-root-form").onsubmit = (event) => {
+        event.preventDefault();
+        const form = event.target;
+        run($('button[type="submit"]', form), async () => {
+          try {
+            const values = Object.fromEntries(new FormData(form));
+            const next = {
+              root: values.root.trim(),
+              templateDir: values.templateDir.trim(),
+              searchDirs: values.searchDirs
+                .split("\n")
+                .map((value) => value.trim())
+                .filter(Boolean),
+              toolPaths: Object.fromEntries(
+                tools
+                  .map((tool) => [tool.id, values[`path:${tool.id}`].trim()])
+                  .filter(([, path]) => path),
+              ),
+            };
+            const payload = Object.fromEntries(
+              Object.entries(next).filter(
+                ([key, value]) => JSON.stringify(value) !== JSON.stringify(data[key]),
+              ),
+            );
+            if (Object.keys(payload).length) await api("toolkit.save", payload);
+            commitInlineDraft("tool-root-form");
+            state.environmentFeedback = { message: "工具路径已保存并重新检测。" };
+            state.environmentDetail = "";
+            toast("工具目录已保存");
+            await render();
+          } catch (error) {
+            $("#tool-config-error", form).textContent = error.message;
+            throw error;
+          }
         });
       };
-      $("#adapt-tools").onclick = (e) =>
-        run(e.target, async () => {
-          const result = await api("toolkit.adapt");
-          $("#tool-detail").innerHTML = panel(
-            "离线适配建议",
-            result.missing.length
-              ? result.missing
-                  .map(
-                    (item) =>
-                      `<div class="listrow"><div class="grow"><strong>${esc(item.name)}</strong><p>${esc(item.advice)}</p></div>${badge("unsupported")}</div>`,
-                  )
-                  .join("")
-              : empty("目录内的工具均已检测到", "可逐个检查版本，确认本机启动结果。"),
-          );
+      $("#adapt-tools").onclick = (event) =>
+        run(event.target, async () => {
+          try {
+            const result = await api("toolkit.adapt");
+            state.environmentDetail = panel(
+              "离线适配建议",
+              result.missing.length
+                ? result.missing
+                    .map(
+                      (item) =>
+                        `<div class="listrow"><div class="grow"><strong>${esc(item.name)}</strong><p>${esc(item.advice)}</p></div>${badge("unsupported")}</div>`,
+                    )
+                    .join("")
+                : empty("已配置的工具均可用", "仍可逐个检查版本，查看本机返回结果。"),
+            );
+            $("#tool-detail").innerHTML = state.environmentDetail;
+          } catch (error) {
+            state.environmentFeedback = { error: true, message: error.message };
+            $("#tool-detail").innerHTML =
+              `<div class="error" role="alert">${esc(error.message)}</div>`;
+            throw error;
+          }
         });
       $$("[data-tool-probe]").forEach(
-        (b) =>
-          (b.onclick = () =>
-            run(b, async () => {
-              const tool = tools[Number(b.dataset.toolProbe)];
-              const result = await api("toolkit.probe", { tool: tool.id, timeoutMs: 5000 });
-              $("#tool-detail").innerHTML = panel(
-                `${tool.name} · 版本检查`,
-                `<div class="twocoltext"><span>执行参数</span><span class="mono">--version</span></div><div class="twocoltext"><span>退出码</span><span>${esc(result.exitCode)}</span></div><div class="field"><label>标准输出</label><pre class="report">${esc(result.stdout || "（无输出）")}</pre></div><div class="field"><label>标准错误</label><pre class="report">${esc(result.stderr || "（无输出）")}</pre></div>`,
-              );
-              toast("版本检查完成");
+        (button) =>
+          (button.onclick = () =>
+            run(button, async () => {
+              const tool = tools[Number(button.dataset.toolProbe)];
+              try {
+                const result = await api("toolkit.probe", { tool: tool.id, timeoutMs: 5000 });
+                const args =
+                  (result.attempts || []).map((attempt) => attempt.args.join(" ")).join(" / ") ||
+                  "--version";
+                state.environmentDetail = panel(
+                  `${tool.name} · 版本与产品检查`,
+                  `<div class="twocoltext"><span>固定检查参数</span><span class="mono">${esc(args)}</span></div><div class="twocoltext"><span>产品标识</span><span>${esc(identityLabel(result.identity))}</span></div><p class="info">${esc(result.detail)}</p><div class="twocoltext"><span>退出码</span><span>${esc(result.exitCode)}</span></div><div class="field"><label>标准输出</label><pre class="report">${esc(result.stdout || "（无输出）")}</pre></div><div class="field"><label>标准错误</label><pre class="report">${esc(result.stderr || "（无输出）")}</pre></div>`,
+                );
+                state.environmentFeedback = {
+                  error: !result.available,
+                  message: result.available
+                    ? `${tool.name} 版本检查完成。`
+                    : `${tool.name} 检查完成，但产品身份尚未确认可用。`,
+                };
+                toast(state.environmentFeedback.message);
+                await render();
+              } catch (error) {
+                state.environmentFeedback = {
+                  error: true,
+                  message: `${tool.name} 检查失败：${error.message}`,
+                };
+                $("#tool-detail").innerHTML =
+                  `<div class="error" role="alert">${esc(state.environmentFeedback.message)}</div>`;
+                throw error;
+              }
             })),
       );
     },

@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { WorkspaceStore } from "../core/store.js";
 import { SkillLibrary } from "../core/skills.js";
 import { Toolkit } from "../core/toolkit.js";
+import { Templates } from "../core/templates.js";
 import { Flow } from "../core/flow.js";
+import { WorkspaceFiles } from "../core/files.js";
 import { Controller } from "../server/controller.js";
 import { createHandler } from "../server/http.js";
 import { desktopContext } from "./desktop.js";
@@ -12,6 +14,10 @@ import { connectSkills } from "./skills.js";
 import { installTools } from "./tools.js";
 import { DesktopSessions } from "./sessions.js";
 import { HostExtensions } from "./extensions.js";
+import { RetryPolicy } from "./retry-policy.js";
+import { HostCatalog } from "./catalog.js";
+import { DesktopWorkflow } from "./workflow.js";
+import { Continuation } from "./continuation.js";
 
 export const name = "dsh-unlimit";
 export const inject = ["webServer", "connection"];
@@ -25,27 +31,37 @@ export function mount(ctx, host) {
   const skills = new SkillLibrary(join(host.dataRoot, "skills"));
   const toolkit = new Toolkit(store);
   const flow = new Flow(store);
+  const files = new WorkspaceFiles(join(host.dataRoot, "materials"), store);
   const runtime = new DesktopRuntime(ctx, store, host);
   runtime.rolePrompt = (sessionId) => flow.rolePrompt(sessionId);
   const extensions = new HostExtensions(ctx, store);
+  const retry = new RetryPolicy(ctx, store);
+  const workflow = new DesktopWorkflow(ctx, store, flow);
+  const continuation = new Continuation(ctx, store, host);
   const sessions = new DesktopSessions(ctx, store);
   let skillConnection;
   const controller = new Controller({
     store,
     skills,
     toolkit,
+    templates: new Templates(toolkit),
+    catalog: new HostCatalog(ctx, { library: skills, toolkit }),
     runtime,
     sessions,
     extensions,
     flow,
+    files,
+    retry,
+    workflow,
+    continuation,
     host,
     onSkillsChanged: () => skillConnection?.changed(),
   });
   ctx.effect(() => async () => {
     const errors = [];
     for (const cleanup of [
-      () => extensions.revert(),
-      () => runtime.revert(),
+      () => controller.revertControls(),
+      () => workflow.close(),
       () => toolkit.close(),
       () => flow.close(),
       () => store.close(),
@@ -77,6 +93,7 @@ export function mount(ctx, host) {
       store.dispatch("workspaces.bind", { id: parent.id, sessionId: agent.session.id });
   });
   const releaseSlot = (sessionId) => {
+    if (workflow.controlsSession(sessionId)) return;
     const workspace = store.dispatch("workspaces.forSession", { sessionId }).item;
     if (workspace) flow.dispatch("flow.release", { workspaceId: workspace.id, sessionId });
   };
@@ -122,19 +139,12 @@ export function mount(ctx, host) {
       },
     });
   });
-  ctx.inject(["systemPrompt", "approval", "sandboxPolicy"], (scope) => {
+  ctx.inject(["systemPrompt", "approval", "sandboxPolicy"], async (scope) => {
     runtime.ctx = scope;
-    scope.effect(() => () => {
-      try {
-        extensions.revert();
-      } finally {
-        runtime.revert();
-      }
-    });
+    scope.effect(() => () => controller.revertControls());
     const settings = store.dispatch("settings.get").value;
     if (settings.enabled && settings.autoReapply && host.supported) {
-      runtime.apply();
-      extensions.apply();
+      await controller.dispatch("control.apply");
     }
   });
   return controller;

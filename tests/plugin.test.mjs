@@ -1,7 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -241,6 +249,157 @@ async function fixture(t, { optional = true } = {}) {
     originalApproval,
   };
 }
+
+test(
+  "catalog scope and local templates share real model-tool and HTTP entry points",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const agent = f.agent("synthetic-catalog-agent");
+    const other = f.agent("synthetic-other-catalog-agent");
+    const directory = join(f.directory, "templates");
+    mkdirSync(directory);
+    writeFileSync(join(directory, "sample.yaml"), "id: synthetic-local\ninfo: example only\n");
+    await f.request({ action: "toolkit.save", payload: { templateDir: directory } });
+    const read = await f.execute(agent, "templates.read", { path: "sample.yaml" });
+    assert.equal(read.isError, false, JSON.stringify(read));
+    const listing = await f.request({ action: "templates.list", payload: { query: "example" } });
+    assert.equal(listing.json.data.items[0].sha256, read.value.item.sha256);
+    const catalog = await f.execute(agent, "catalog.list", {});
+    assert.equal(catalog.isError, false, JSON.stringify(catalog));
+    assert.equal(catalog.value.context.sessionId, agent.session.id);
+    assert.ok(catalog.value.tools.some((tool) => tool.name === "unlimit_workspace"));
+    assert.equal(
+      (await f.execute(agent, "catalog.list", { sessionId: other.session.id })).isError,
+      true,
+    );
+    const preflight = await f.request({
+      action: "catalog.preflight",
+      payload: {
+        sessionId: agent.session.id,
+        requirements: [{ kind: "tool", name: "unlimit_workspace" }],
+      },
+      headers: { origin: undefined },
+    });
+    assert.equal(preflight.json.data.status, "ready");
+    assert.equal(preflight.json.data.executionAuthorized, false);
+    const drafts = await f.request({ method: "GET", url: "/dsh-unlimit/ui/drafts.js" });
+    assert.equal(drafts.status, 200);
+    assert.match(drafts.body, /export class MemoryDrafts/);
+  },
+);
+
+test(
+  "official model tools and HTTP share workspace material files and reversible backups",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const agent = f.agent("synthetic-material-agent");
+    const workspace = f.controller.store.dispatch("workspaces.save", {
+      name: "Synthetic material workspace",
+    }).item;
+    const foreign = f.controller.store.dispatch("workspaces.save", {
+      name: "Other synthetic material workspace",
+    }).item;
+    await f.execute(agent, "workspaces.bind", { id: workspace.id });
+    const write = await f.execute(agent, "files.write", {
+      path: "evidence/response.http",
+      content: "HTTP/1.1 200 OK\n\nSynthetic offline response.",
+    });
+    assert.equal(write.isError, false, JSON.stringify(write));
+    const read = await f.request({
+      action: "files.read",
+      payload: { workspaceId: workspace.id, path: "evidence/response.http", encoding: "utf8" },
+    });
+    assert.equal(read.json.data.item.sha256, write.value.item.sha256);
+    assert.equal(read.json.data.item.content, "HTTP/1.1 200 OK\n\nSynthetic offline response.");
+    assert.equal((await f.execute(agent, "files.list", { workspaceId: foreign.id })).isError, true);
+    const removed = await f.execute(agent, "files.delete", { path: "evidence/response.http" });
+    assert.equal(removed.isError, false);
+    const restored = await f.request({
+      action: "files.restore",
+      payload: { workspaceId: workspace.id, backupId: removed.value.item.backupId },
+    });
+    assert.equal(restored.json.data.item.sha256, write.value.item.sha256);
+    assert.deepEqual(
+      (await f.request({ action: "files.list", payload: { workspaceId: foreign.id } })).json.data
+        .items,
+      [],
+    );
+  },
+);
+
+test(
+  "workflow model-tool calls stay with the current parent even when another parent shares the workspace",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const parent = f.agent("synthetic-workflow-parent");
+    const other = f.agent("synthetic-workflow-other");
+    const workspace = f.controller.store.dispatch("workspaces.save", {
+      name: "Shared synthetic workflow workspace",
+    }).item;
+    for (const agent of [parent, other]) {
+      const binding = await f.execute(agent, "workspaces.bind", { id: workspace.id });
+      assert.equal(binding.isError, false);
+    }
+    const rows = [
+      { id: "own-run", workspaceId: workspace.id, parentSessionId: parent.session.id },
+      { id: "other-run", workspaceId: workspace.id, parentSessionId: other.session.id },
+    ];
+    const mutations = [];
+    // Only the executor is synthetic here; ToolRuntime/schema and HTTP/controller are real.
+    f.controller.workflow.dispatch = async (action, payload) => {
+      assert.equal(payload.workspaceId, workspace.id);
+      if (action === "workflow.status")
+        return payload.id ? { item: rows.find((item) => item.id === payload.id) } : { items: rows };
+      mutations.push({ action, payload });
+      return { item: { ...payload, id: payload.id ?? "new-run" } };
+    };
+    const visible = await f.execute(parent, "workflow.status");
+    assert.equal(visible.isError, false);
+    assert.deepEqual(
+      visible.value.items.map((item) => item.id),
+      ["own-run"],
+    );
+    for (const action of ["workflow.status", "workflow.stop"]) {
+      assert.equal((await f.execute(parent, action, { id: "other-run" })).isError, true);
+    }
+    assert.equal(
+      (
+        await f.execute(parent, "workflow.dispatch", {
+          parentSessionId: other.session.id,
+          role: "analyst",
+          task: "Summarize only synthetic evidence.",
+        })
+      ).isError,
+      true,
+    );
+    assert.equal((await f.execute(parent, "workflow.stop")).isError, true);
+    assert.deepEqual(mutations, []);
+    const started = await f.execute(parent, "workflow.dispatch", {
+      role: "analyst",
+      task: "Summarize only synthetic evidence.",
+    });
+    assert.equal(started.isError, false);
+    assert.equal(started.value.item.parentSessionId, parent.session.id);
+    assert.equal((await f.execute(parent, "workflow.stop", { id: "own-run" })).isError, false);
+    assert.deepEqual(
+      mutations.map((entry) => entry.action),
+      ["workflow.dispatch", "workflow.stop"],
+    );
+    const fromUI = await f.request({
+      action: "workflow.status",
+      payload: { workspaceId: workspace.id },
+    });
+    assert.equal(fromUI.status, 200);
+    assert.equal(
+      fromUI.json.data.items.length,
+      2,
+      "the authorized workspace UI keeps both parents",
+    );
+  },
+);
 
 test(
   "full mount uses official services, protects HTTP routes, and restores all runtime registrations on dispose",

@@ -14,6 +14,7 @@ const DATA_ACTIONS = [
   "assets.assess",
   "assets.test",
   "assets.graph",
+  "assets.path",
   "assets.timeline",
   "findings.list",
   "findings.save",
@@ -24,6 +25,11 @@ const DATA_ACTIONS = [
   "knowledge.save",
   "knowledge.delete",
   "knowledge.use",
+  "templates.list",
+  "templates.read",
+  "catalog.list",
+  "catalog.read",
+  "catalog.preflight",
   "roles.list",
   "roles.save",
   "roles.reset",
@@ -33,8 +39,19 @@ const DATA_ACTIONS = [
   "flow.assign",
   "flow.acquire",
   "flow.release",
+  "workflow.dispatch",
+  "workflow.status",
+  "workflow.stop",
+  "files.list",
+  "files.read",
+  "files.write",
+  "files.delete",
+  "files.import",
+  "files.preview",
+  "files.restore",
+  "files.backups",
 ];
-const WORKSPACE_ACTION = /^(assets|findings|records|roles|report|flow)\./;
+const WORKSPACE_ACTION = /^(assets|findings|records|roles|report|flow|files|workflow)\./;
 
 export function boundWorkspace(store, agent, agents) {
   let current = agent;
@@ -65,14 +82,14 @@ export async function installTools(ctx, controller, host) {
         defineTool({
           name: "unlimit_workspace",
           description:
-            "读写本会话绑定的本地演练工作区。先 workspaces.list，再按用户选择 workspaces.bind。payload 为对象。登记事实不会执行扫描、远程登录或命令。失败会抛出错误，不代表操作成功。",
+            "读写本会话绑定的本地演练工作区。先 workspaces.list，再按用户选择 workspaces.bind。台账登记不执行扫描或登录；workflow.dispatch 会真正创建执行者，只分派用户明确授权的任务。catalog 可先检查当前会话可见能力。失败不代表操作成功。",
           parameters: {
             action: { type: "string", required: true, enum: DATA_ACTIONS },
             payload: {
               type: "json",
               required: true,
               description:
-                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。",
+                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id，父会话限定为调用者。templates.read 使用相对 path。",
             },
           },
           output,
@@ -82,6 +99,11 @@ export async function installTools(ctx, controller, host) {
             const agent = execution.agent;
             if (!agent?.session) throw new Error("调用缺少会话上下文");
             const data = { ...payload };
+            if (action.startsWith("catalog.")) {
+              if (data.sessionId && data.sessionId !== agent.session.id)
+                throw new Error("只能检查当前会话可见的技能与工具目录");
+              data.sessionId = agent.session.id;
+            }
             if (["flow.acquire", "flow.release"].includes(action)) {
               if (data.sessionId && data.sessionId !== agent.session.id)
                 throw new Error("只能领取或释放当前会话的执行槽");
@@ -98,6 +120,25 @@ export async function installTools(ctx, controller, host) {
               if (data.workspaceId && data.workspaceId !== workspace.id)
                 throw new Error("请求工作区与本会话绑定不一致");
               data.workspaceId = workspace.id;
+            }
+            if (action === "workflow.dispatch") {
+              if (data.parentSessionId && data.parentSessionId !== agent.session.id)
+                throw new Error("只能从当前会话分派执行者");
+              data.parentSessionId = agent.session.id;
+            }
+            if (["workflow.stop", "workflow.status"].includes(action)) {
+              const result = await controller.dispatch("workflow.status", data);
+              if (data.id) {
+                if (result.item.parentSessionId !== agent.session.id)
+                  throw new Error("只能查看或停止当前会话分派的执行者");
+                if (action === "workflow.status") return result;
+              } else if (action === "workflow.status") {
+                return {
+                  items: result.items.filter((item) => item.parentSessionId === agent.session.id),
+                };
+              } else {
+                throw new Error("停止执行者必须指定运行编号");
+              }
             }
             return controller.dispatch(action, data);
           },

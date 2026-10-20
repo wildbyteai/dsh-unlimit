@@ -670,6 +670,46 @@ export class WorkspaceStore {
         const workspace = this.workspace(payload);
         return { nodes: this.list("assets", workspace), edges: this.list("links", workspace) };
       }
+      case "assets.path": {
+        const workspace = this.workspace(payload);
+        this.get("assets", payload.from, workspace);
+        this.get("assets", payload.to, workspace);
+        const direction = enumValue(payload.direction ?? "directed", "direction", [
+          "directed",
+          "undirected",
+        ]);
+        const nodes = new Map(this.list("assets", workspace).map((item) => [item.id, item]));
+        const adjacent = new Map([...nodes.keys()].map((id) => [id, []]));
+        for (const edge of this.list("links", workspace)) {
+          adjacent.get(edge.from).push({ next: edge.to, edge });
+          if (direction === "undirected") adjacent.get(edge.to).push({ next: edge.from, edge });
+        }
+        const queue = [payload.from];
+        const previous = new Map([[payload.from, null]]);
+        for (let index = 0; index < queue.length && !previous.has(payload.to); index++) {
+          for (const { next, edge } of adjacent.get(queue[index])) {
+            if (previous.has(next)) continue;
+            previous.set(next, { id: queue[index], edge });
+            queue.push(next);
+          }
+        }
+        if (!previous.has(payload.to)) return { found: false, direction, nodes: [], edges: [] };
+        const pathNodes = [];
+        const pathEdges = [];
+        let cursor = payload.to;
+        while (cursor !== null) {
+          pathNodes.push(nodes.get(cursor));
+          const parent = previous.get(cursor);
+          if (parent) pathEdges.push(parent.edge);
+          cursor = parent?.id ?? null;
+        }
+        return {
+          found: true,
+          direction,
+          nodes: pathNodes.reverse(),
+          edges: pathEdges.reverse(),
+        };
+      }
       case "assets.timeline":
         return this.timeline(this.workspace(payload));
       case "findings.list":

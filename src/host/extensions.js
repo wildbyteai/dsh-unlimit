@@ -61,13 +61,6 @@ export class HostExtensions {
           "官方tool-fs在挂载时捕获静态读取上限，没有动态服务。read工具仅可逐调用传offset/limit（行数），没有max_bytes；本项目readLimit不能冒充已生效的字节配置。",
       },
       {
-        id: "retryLimit",
-        label: "模型请求重试次数",
-        state: "unsupported",
-        detail:
-          "官方重试执行器无全局次数配置；retryPolicy由各提供方路由注册时拥有。未替换提供方、未叠加第二套自动重试。",
-      },
-      {
         id: "hooks",
         label: "Hook处理策略",
         state: "unsupported",

@@ -24,3 +24,63 @@ test("unverified desktop versions cannot prepare or perform a destructive sessio
   assert.deepEqual(await controller.dispatch("sessions.prepare"), { ready: true });
   assert.equal(calls, 1);
 });
+
+test("owned active workflow sessions cannot bypass their execution slots via generic actions", async () => {
+  const calls = [];
+  const controller = new Controller({
+    host: { supported: true },
+    workflow: { controlsSession: (sessionId) => sessionId === "owned-executor" },
+    store: {
+      dispatch: (...args) => {
+        calls.push(args);
+        return { ok: true };
+      },
+    },
+    flow: {
+      dispatch: (...args) => {
+        calls.push(args);
+        return { ok: true };
+      },
+    },
+  });
+  for (const action of ["workspaces.bind", "flow.assign", "flow.release"]) {
+    await assert.rejects(controller.dispatch(action, { sessionId: "owned-executor" }), {
+      code: "CONFLICT",
+    });
+  }
+  assert.equal(calls.length, 0);
+  await controller.dispatch("flow.release", { sessionId: "ordinary-session" });
+  assert.equal(calls.length, 1);
+});
+
+test("unknown versions cannot start workflow or continuation mutations", async () => {
+  let calls = 0;
+  const controller = new Controller({
+    host: { supported: false },
+    workflow: {
+      dispatch: () => {
+        calls++;
+      },
+    },
+    continuation: {
+      continue: () => {
+        calls++;
+      },
+      stop: () => {
+        calls++;
+      },
+    },
+  });
+  for (const action of [
+    "workflow.dispatch",
+    "workflow.stop",
+    "workflow.presets",
+    "continuation.continue",
+    "continuation.stop",
+  ]) {
+    await assert.rejects(controller.dispatch(action, { operation: "register" }), {
+      code: "UNSUPPORTED",
+    });
+  }
+  assert.equal(calls, 0);
+});

@@ -191,8 +191,11 @@ export class DesktopSessions {
         "Rewinding the first input requires official sessionController.create",
       );
     for (const agent of this.descendants(sessionId)) {
-      if (typeof agent.whenIdle !== "function")
-        fail("UNSUPPORTED_CAPABILITY", "A target agent exposes no official quiescence observation");
+      if (typeof agent.whenIdle !== "function" || typeof agent.cancel !== "function")
+        fail(
+          "UNSUPPORTED_CAPABILITY",
+          "A target agent exposes no official cancellation or quiescence observation",
+        );
     }
     const workspace = this.store.dispatch("workspaces.forSession", { sessionId }).item;
     return {
@@ -276,6 +279,10 @@ export class DesktopSessions {
       stage = "stop";
       const targets = this.descendants(sessionId);
       progress.stop.pendingIds = targets.map((agent) => agent.id);
+      // The official archive listener only cancels running agents. Idle agents
+      // may still hold queued input, so use the public cancel path to clear it
+      // (including its journal event) before observing quiescence.
+      for (const agent of targets) agent.cancel({ kind: "user" });
       let timer;
       try {
         await Promise.race([

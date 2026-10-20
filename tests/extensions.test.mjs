@@ -51,13 +51,12 @@ function fixture() {
 test("capabilities report exact missing global APIs even when related saved booleans exist", () => {
   const f = fixture();
   const capabilities = f.extensions.capabilities();
-  for (const id of ["readLimit", "retryLimit", "hooks", "memory"]) {
+  for (const id of ["readLimit", "hooks", "memory"]) {
     const item = capabilities.find((item) => item.id === id);
     assert.equal(item.state, "unsupported");
     assert.ok(item.detail.length > 15);
   }
   assert.match(capabilities.find((item) => item.id === "readLimit").detail, /行数/);
-  assert.match(capabilities.find((item) => item.id === "retryLimit").detail, /提供方/);
   assert.equal(capabilities.find((item) => item.id === "sessionLogUpload").state, "available");
   const absent = new HostExtensions({}, f.store);
   assert.equal(
