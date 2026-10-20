@@ -1,14 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+  realpathSync,
+  readFileSync,
+  unlinkSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { HostCatalog } from "../src/host/catalog.js";
+import { HostCatalog, normalizeRequirements } from "../src/host/catalog.js";
 import { SkillLibrary } from "../src/core/skills.js";
+import { LocalEnvironment } from "../src/core/environment.js";
 
 const policy = { userInvocable: true, modelInvocable: true };
 function fixture(t) {
-  const root = mkdtempSync(join(tmpdir(), "dsh-unlimit-catalog-"));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "dsh-unlimit-catalog-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "templates"));
   writeFileSync(join(root, "not-directory"), "synthetic");
@@ -308,4 +317,210 @@ test("caller cancellation propagates and unsupported services are labelled inste
   assert.equal(list.sources.tools.state, "unsupported");
   assert.equal((await missing.preflight({ requirements: [] })).status, "unknown");
   assert.throws(() => missing.dispatch("catalog.execute"), code("UNKNOWN_ACTION"));
+});
+
+test("environment dependency preflight uses one masked snapshot, preserves bytes/revision and never resolves secrets", async (t) => {
+  const f = fixture(t);
+  const environment = new LocalEnvironment(f.root);
+  const fakeSecret = "synthetic-preflight-secret-not-for-results";
+  let revision = 0;
+  for (const [name, value, secret] of [
+    ["TOKEN", fakeSecret, true],
+    ["EMPTY", "", true],
+    ["MODE", "synthetic-ordinary-value", false],
+  ])
+    revision = environment.dispatch("environment.variables.save", {
+      revision,
+      name,
+      value,
+      secret,
+    }).revision;
+  revision = environment.dispatch("environment.hosts.save", {
+    revision,
+    items: ["operator@example.invalid", "other.example.invalid"],
+  }).revision;
+  const path = join(f.root, "synthetic-private-key");
+  writeFileSync(path, "synthetic key bytes must not be read", { mode: 0o600 });
+  const registered = environment.dispatch("environment.keys.save", {
+    revision,
+    label: "Synthetic key",
+    path,
+  });
+  const keyId = registered.privateKeys[0].id;
+  const before = readFileSync(join(f.root, ".environment", "config.json"));
+  let reads = 0;
+  f.catalog.environment = {
+    dispatch(action) {
+      assert.equal(action, "environment.status");
+      reads++;
+      return environment.dispatch(action);
+    },
+    resolve() {
+      assert.fail("must not resolve secret values");
+    },
+    exportEnvironment() {
+      assert.fail("must not export an execution environment");
+    },
+  };
+  const result = await f.catalog.preflight({
+    sessionId: "first",
+    requirements: [
+      { kind: "environment-variable", name: "TOKEN" },
+      { kind: "environment-variable", name: "EMPTY", nonEmpty: false },
+      { kind: "environment-variable", name: "MODE" },
+      { kind: "environment-host", name: "operator@EXAMPLE.INVALID." },
+      { kind: "environment-key", name: keyId },
+    ],
+  });
+  assert.equal(result.status, "ready");
+  assert.ok(
+    result.checks
+      .filter((item) => item.kind.startsWith("environment-"))
+      .every((item) => item.state === "ready"),
+  );
+  assert.equal(result.environment.revision, registered.revision);
+  assert.equal(reads, 1);
+  const json = JSON.stringify(result);
+  for (const hidden of [
+    fakeSecret,
+    "synthetic-ordinary-value",
+    "other.example.invalid",
+    path,
+    "synthetic key bytes must not be read",
+  ])
+    assert.equal(json.includes(hidden), false);
+  assert.equal(result.executionAuthorized, false);
+  assert.deepEqual(readFileSync(join(f.root, ".environment", "config.json")), before);
+  assert.equal(environment.dispatch("environment.status").revision, registered.revision);
+});
+
+test("missing/empty variables, exact host identity and stale registered keys block without inspecting arbitrary paths", async (t) => {
+  const f = fixture(t);
+  const environment = new LocalEnvironment(f.root);
+  let revision = environment.dispatch("environment.variables.save", {
+    revision: 0,
+    name: "EMPTY",
+    secret: true,
+    value: "",
+  }).revision;
+  revision = environment.dispatch("environment.hosts.save", {
+    revision,
+    items: ["operator@example.invalid"],
+  }).revision;
+  const path = join(f.root, "synthetic-key");
+  writeFileSync(path, "synthetic", { mode: 0o600 });
+  const saved = environment.dispatch("environment.keys.save", {
+    revision,
+    label: "Synthetic",
+    path,
+  });
+  unlinkSync(path);
+  f.catalog.environment = environment;
+  const result = await f.catalog.preflight({
+    requirements: [
+      { kind: "environment-variable", name: "ABSENT" },
+      { kind: "environment-variable", name: "EMPTY" },
+      { kind: "environment-host", name: "example.invalid" },
+      { kind: "environment-key", name: saved.privateKeys[0].id },
+      { kind: "environment-key", name: "00000000-0000-0000-0000-000000000000" },
+    ],
+  });
+  assert.equal(result.status, "blocked");
+  assert.ok(result.checks.slice(0, 5).every((item) => item.state === "missing"));
+  assert.match(result.checks[1].detail, /empty/);
+  assert.equal(JSON.stringify(result).includes(path), false);
+  await assert.rejects(
+    f.catalog.preflight({ requirements: [{ kind: "environment-key", path }] }),
+    code("INVALID_INPUT"),
+  );
+});
+
+test("environment inspection failures stay unknown and cannot echo provider diagnostics or silently use another root", async (t) => {
+  const f = fixture(t);
+  const requirements = [{ kind: "environment-variable", name: "TOKEN" }];
+  assert.equal((await f.catalog.preflight({ requirements })).checks[0].state, "unknown");
+  f.catalog.environment = {
+    dispatch() {
+      throw new Error("synthetic-provider-secret");
+    },
+  };
+  const failed = await f.catalog.preflight({ requirements });
+  assert.equal(failed.status, "unknown");
+  assert.equal(failed.environment.state, "error");
+  assert.equal(JSON.stringify(failed).includes("synthetic-provider-secret"), false);
+  const other = join(f.root, "other-install");
+  mkdirSync(other);
+  f.catalog.environment = new LocalEnvironment(other);
+  const missing = await f.catalog.preflight({ requirements });
+  assert.equal(missing.checks[0].state, "missing");
+  assert.equal(missing.environment.revision, 0);
+});
+
+test("skill declarations reuse environment schema and undeclared/explicit empty dependencies remain distinct", async (t) => {
+  const f = fixture(t);
+  const environment = new LocalEnvironment(f.root);
+  environment.dispatch("environment.variables.save", {
+    revision: 0,
+    name: "TOKEN",
+    secret: true,
+    value: "synthetic",
+  });
+  f.catalog.environment = environment;
+  f.setMetadata({
+    "dsh-unlimit": { requirements: [{ kind: "environment-variable", name: "TOKEN" }] },
+  });
+  const checked = await f.catalog.preflight({ skills: [{ origin: "host", id: "same-name" }] });
+  assert.equal(checked.status, "ready");
+  assert.equal(checked.skills[0].checks[0].state, "ready");
+  f.catalog.environment = {
+    dispatch() {
+      assert.fail("Do not read environment for absent declarations or explicit empty list");
+    },
+  };
+  assert.equal((await f.catalog.preflight()).status, "unknown");
+  const explicit = await f.catalog.preflight({ requirements: [] });
+  assert.equal(explicit.status, "ready");
+  assert.equal(explicit.environment, undefined);
+  assert.equal(
+    (await f.catalog.preflight({ skills: [{ origin: "host", id: "same-name", requirements: [] }] }))
+      .status,
+    "ready",
+  );
+});
+
+test("normalized environmental declarations reject guessed options and unavailable key inspection is unknown", async (t) => {
+  assert.deepEqual(normalizeRequirements([{ kind: "environment-variable", name: "TOKEN" }]), [
+    { kind: "environment-variable", name: "TOKEN", nonEmpty: true },
+  ]);
+  assert.deepEqual(
+    normalizeRequirements([{ kind: "environment-host", name: "operator@EXAMPLE.INVALID." }]),
+    [{ kind: "environment-host", name: "operator@example.invalid" }],
+  );
+  for (const requirement of [
+    { kind: "environment-variable", name: "TOKEN", nonEmpty: "false" },
+    { kind: "environment-variable", name: "INVALID-NAME" },
+    { kind: "environment-host", name: "https://user:synthetic-secret@example.invalid" },
+    { kind: "environment-key", name: "not-a-registered-id" },
+    { kind: "environment-key", name: "00000000-0000-0000-0000-000000000000", nonEmpty: false },
+  ])
+    assert.throws(() => normalizeRequirements([requirement]), code("INVALID_INPUT"));
+  const f = fixture(t);
+  f.catalog.environment = {
+    dispatch: () => ({
+      revision: 2,
+      variables: [],
+      hosts: [],
+      privateKeys: [
+        {
+          id: "00000000-0000-0000-0000-000000000000",
+          metadata: { available: false, validation: "metadata-only", reason: "PERMISSION_DENIED" },
+        },
+      ],
+    }),
+  };
+  const result = await f.catalog.preflight({
+    requirements: [{ kind: "environment-key", name: "00000000-0000-0000-0000-000000000000" }],
+  });
+  assert.equal(result.status, "unknown");
+  assert.equal(result.checks[0].state, "unknown");
 });

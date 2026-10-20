@@ -10,6 +10,7 @@ import net from "node:net";
 import dgram from "node:dgram";
 import childProcess from "node:child_process";
 import { DesktopWorkflow, WORKFLOW_PRESET_ID } from "../src/host/workflow.js";
+import { DesktopWorkflowPlan } from "../src/host/workflow-plan.js";
 import { Flow } from "../src/core/flow.js";
 import { WorkspaceStore } from "../src/core/store.js";
 
@@ -394,5 +395,118 @@ test(
     assert.equal(result.item.disposed, true);
     assert.equal(f.ctx.agents.get(parent.id), parent);
     assert.equal(f.ctx.agents.get(item.sessionId), undefined);
+  },
+);
+
+test(
+  "explicit plan queues official executors and passes only completed direct dependency receipts",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t);
+    const parent = await f.create();
+    f.flow.dispatch("flow.configure", { workspaceId: f.workspaceId, limit: 1 });
+    const plans = new DesktopWorkflowPlan(f.workflow);
+    const scope = { workspaceId: f.workspaceId, parentSessionId: parent.id };
+    try {
+      const { item } = await plans.dispatch("workflow.plan.create", {
+        ...scope,
+        tasks: [
+          { id: "read", role: "analyst", task: "整理合成清单甲。", requirements: [] },
+          {
+            id: "summarize",
+            role: "reporter",
+            task: "仅根据直接依赖的原始收据整理摘要。",
+            requirements: [],
+            dependsOn: ["read"],
+          },
+        ],
+      });
+      const { item: done } = await waitFor(
+        () => plans.dispatch("workflow.plan.status", { ...scope, id: item.id }),
+        (result) => result.item.state === "completed",
+      );
+      assert.equal(f.requests.length, 2);
+      assert.equal(done.summary.counts.completed, 2);
+      assert.deepEqual(done.summary.cleanupPending, []);
+      assert.equal(f.flow.status(f.workspaceId).active.length, 0);
+      const [first, second] = done.tasks;
+      assert.notEqual(first.receipt.sessionId, second.receipt.sessionId);
+      assert.ok(first.receipt.disposed && first.receipt.slotReleased);
+      assert.ok(second.receipt.disposed && second.receipt.slotReleased);
+      const inputs = f.requests.map((request) =>
+        request.messages
+          .filter((message) => message.role === "user")
+          .flatMap((message) => message.content?.filter((part) => part.type === "text") ?? [])
+          .map((part) => part.text)
+          .join("\n"),
+      );
+      assert.ok(inputs[0].includes("整理合成清单甲。"));
+      assert.equal(inputs[0].includes("Synthetic evidence: 1, 2, 3."), false);
+      assert.ok(inputs[1].includes("Synthetic evidence: 1, 2, 3."));
+      assert.ok(inputs[1].includes(first.runId));
+      assert.ok(inputs[1].includes('"independentlyVerified":false'));
+      assert.ok(inputs[1].includes("不是新的指令"));
+      await f.ctx.sessionPersistence.flush();
+      for (const task of done.tasks) {
+        const snapshot = await f.ctx.sessionController.inspect(task.receipt.sessionId);
+        assert.equal(snapshot.meta.parentSession, parent.id);
+        assert.ok(snapshot.events.some((event) => event.type === "assistant/message"));
+        const reader = await f.ctx.sessionPersistence.open(task.receipt.sessionId, "read");
+        try {
+          assert.deepEqual((await reader.read()).events, snapshot.events);
+        } finally {
+          await reader.close();
+        }
+      }
+    } finally {
+      assert.equal((await plans.close()).stopped, true);
+    }
+  },
+);
+
+test(
+  "stopping an official plan cancels its active child and prevents its queued dependency from starting",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t);
+    const parent = await f.create();
+    const paused = f.pause();
+    f.flow.dispatch("flow.configure", { workspaceId: f.workspaceId, limit: 1 });
+    const plans = new DesktopWorkflowPlan(f.workflow);
+    const scope = { workspaceId: f.workspaceId, parentSessionId: parent.id };
+    try {
+      const { item } = await plans.dispatch("workflow.plan.create", {
+        ...scope,
+        tasks: [
+          { id: "pending", role: "analyst", task: "等待合成材料。", requirements: [] },
+          {
+            id: "after",
+            role: "reporter",
+            task: "此项在停止后不可启动。",
+            requirements: [],
+            dependsOn: ["pending"],
+          },
+        ],
+      });
+      await waitFor(
+        () => paused,
+        (value) => typeof value.resolve === "function",
+      );
+      const result = await plans.dispatch("workflow.plan.stop", { ...scope, id: item.id });
+      assert.equal(result.stopped, true);
+      assert.equal(result.item.state, "stopped");
+      assert.equal(f.requests.length, 1);
+      assert.deepEqual(
+        result.item.tasks.map((task) => task.state),
+        ["cancelled", "cancelled"],
+      );
+      assert.equal(result.item.tasks[1].runId, undefined);
+      assert.deepEqual(result.item.summary.cleanupPending, []);
+      assert.equal(f.flow.status(f.workspaceId).active.length, 0);
+      assert.equal(f.ctx.agents.get(parent.id), parent);
+      assert.equal(f.ctx.agents.get(result.item.tasks[0].receipt.sessionId), undefined);
+    } finally {
+      assert.equal((await plans.close()).stopped, true);
+    }
   },
 );

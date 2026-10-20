@@ -128,6 +128,7 @@ function fixture(t) {
     agents: { list: () => agents },
   };
   const adapter = new DesktopSessions({ get: (name) => services[name] }, store);
+  t.after(() => adapter.close());
   return { adapter, store, workspace, trace, original, agents, registry, controller, services };
 }
 const writes = (trace) => trace.filter(([name]) => ["fork", "create", "archive"].includes(name));
@@ -251,7 +252,7 @@ test("missing official interfaces or client handshake refuse before any write", 
   assert.deepEqual(writes(trace), []);
 });
 
-test("bad event streams, subagent origin, non-human input and attachments refuse before writes", async (t) => {
+test("bad event streams, subagent origin, non-human input and unacknowledged attachments refuse before writes", async (t) => {
   const { adapter, original, trace } = fixture(t);
   const valid = structuredClone(original);
   original.events[1].seq = 999;
@@ -285,7 +286,7 @@ test("bad event streams, subagent origin, non-human input and attachments refuse
   ]);
   await assert.rejects(
     adapter.rewind({ sessionId: "original", draftBridgeReady: true }),
-    code("UNSUPPORTED_CAPABILITY"),
+    code("CLIENT_ATTACHMENTS_REQUIRED"),
   );
   assert.deepEqual(writes(trace), []);
 });
@@ -386,4 +387,161 @@ test("concurrent rewinds of one source are serialized by rejection and cannot do
   resume();
   await first;
   assert.equal(trace.filter(([name]) => name === "fork").length, 1);
+});
+
+function withAttachments(f) {
+  const image = {
+    attachmentId: `sha256:${"a".repeat(64)}`,
+    name: "synthetic.png",
+    bytes: 3,
+    mediaType: "image/png",
+    width: 1,
+    height: 1,
+  };
+  const file = { attachmentId: `sha256:${"b".repeat(64)}`, name: "synthetic.txt", bytes: 4 };
+  f.original.events[9].data.content = [
+    { type: "text", text: "before" },
+    { type: "image", attachment: image },
+    { type: "file", attachment: file },
+    { type: "text", text: "after" },
+  ];
+  f.services.attachments = {
+    imageLimits: {
+      maxImagesPerMessage: 20,
+      maxMessageImageBytes: 100,
+      maxImageBytes: 100,
+      mediaTypes: ["image/png"],
+    },
+    async readImage(ref, signal) {
+      signal.throwIfAborted();
+      return { ref, data: Uint8Array.from([1, 2, 3]) };
+    },
+    async *readFileStream(ref, signal) {
+      signal.throwIfAborted();
+      yield Uint8Array.from([4, 5]);
+      yield Uint8Array.from([6, 7]);
+    },
+  };
+  return { image, file };
+}
+const attachmentsHandshake = {
+  sessionId: "original",
+  draftBridgeReady: true,
+  draftBridgeSupports: { attachments: true },
+};
+
+test("attachment batch is immutable, ordered, unreadable before completion and restricted to the bound target", async (t) => {
+  const f = fixture(t);
+  withAttachments(f);
+  const plan = await f.adapter.prepare(attachmentsHandshake);
+  assert.equal(plan.draft, "beforeafter");
+  assert.deepEqual(
+    plan.attachmentBatch.items.map(({ type, partIndex }) => [type, partIndex]),
+    [
+      ["image", 1],
+      ["file", 2],
+    ],
+  );
+  assert.equal(
+    JSON.stringify(plan).includes("sha256:"),
+    false,
+    "No ref can be supplied back to the byte reader",
+  );
+  await assert.rejects(
+    f.adapter.attachment({ token: plan.attachmentBatch.token, index: 0, newSessionId: "new-fork" }),
+    code("ATTACHMENT_BATCH_UNBOUND"),
+  );
+  const result = await f.adapter.rewind(attachmentsHandshake);
+  const request = {
+    token: result.attachmentBatch.token,
+    index: 0,
+    newSessionId: result.newSessionId,
+  };
+  await assert.rejects(
+    f.adapter.attachment({ ...request, newSessionId: "unrelated" }),
+    code("ATTACHMENT_BATCH_UNBOUND"),
+  );
+  await assert.rejects(
+    f.adapter.attachment({ ...request, sourceSession: "unrelated", ref: {} }),
+    code("INVALID_INPUT"),
+  );
+  assert.equal((await f.adapter.attachment(request)).item.contentBase64, "AQID");
+  assert.equal(
+    (await f.adapter.attachment({ ...request, index: 1 })).item.contentBase64,
+    "BAUGBw==",
+  );
+  f.original.events[9].data.content[1].attachment.bytes = 2;
+  await assert.rejects(f.adapter.attachment(request), code("ATTACHMENT_AUTHORIZATION_CHANGED"));
+});
+
+test("missing attachment APIs and current official image limits refuse before any fork/archive", async (t) => {
+  const f = fixture(t);
+  withAttachments(f);
+  delete f.services.attachments.readFileStream;
+  await assert.rejects(f.adapter.rewind(attachmentsHandshake), code("UNSUPPORTED_CAPABILITY"));
+  assert.deepEqual(writes(f.trace), []);
+  withAttachments(f);
+  f.services.attachments.imageLimits.maxImageBytes = 2;
+  await assert.rejects(f.adapter.rewind(attachmentsHandshake), code("UNSUPPORTED_CAPABILITY"));
+  assert.deepEqual(writes(f.trace), []);
+});
+
+test("attachment release, deadline and close cancel reads; reader rejects byte/ref mismatch", async (t) => {
+  for (const mode of ["release", "deadline", "close", "short", "overrun", "different-ref"]) {
+    const f = fixture(t);
+    withAttachments(f);
+    const result = await f.adapter.rewind(attachmentsHandshake);
+    const token = result.attachmentBatch.token;
+    const request = {
+      token,
+      index: mode === "different-ref" ? 0 : 1,
+      newSessionId: result.newSessionId,
+    };
+    if (["release", "deadline", "close"].includes(mode)) {
+      const gate = Promise.withResolvers();
+      let signal;
+      f.services.attachments.readFileStream = async function* (ref, observed) {
+        signal = observed;
+        await gate.promise;
+        yield Uint8Array.from([4, 5, 6, 7]);
+      };
+      const reading = f.adapter.attachment(request);
+      await new Promise((resolve) => setImmediate(resolve));
+      if (mode === "release") {
+        assert.deepEqual(f.adapter.releaseAttachments({ token }), { released: true });
+        assert.deepEqual(f.adapter.releaseAttachments({ token }), { released: false });
+      }
+      if (mode === "deadline")
+        f.adapter.attachmentBatches.now = () => result.attachmentBatch.expiresAt;
+      if (mode === "close") f.adapter.close();
+      gate.resolve();
+      await assert.rejects(reading, code("ATTACHMENT_BATCH_EXPIRED"));
+      assert.equal(signal.aborted, true);
+    } else {
+      if (mode === "different-ref")
+        f.services.attachments.readImage = async (ref) => ({
+          ref: { ...ref, name: "other.png" },
+          data: new Uint8Array(3),
+        });
+      else
+        f.services.attachments.readFileStream = async function* () {
+          yield new Uint8Array(mode === "short" ? 3 : 5);
+        };
+      await assert.rejects(f.adapter.attachment(request), code("INVALID_HOST_RESULT"));
+    }
+  }
+});
+
+test("failed rewind releases its attachment authorization and never exposes a token in partial results", async (t) => {
+  const f = fixture(t);
+  withAttachments(f);
+  f.registry.archiveSession = async () => {
+    throw new Error("synthetic archive failure");
+  };
+  await assert.rejects(f.adapter.rewind(attachmentsHandshake), (error) => {
+    assert.equal(error.code, "REWIND_PARTIAL");
+    assert.equal(error.partial.attachmentBatch, undefined);
+    assert.equal(f.adapter.attachmentBatches.batches.size, 0);
+    return true;
+  });
 });

@@ -56,7 +56,7 @@ await plans.dispatch("workflow.plan.stop", {
 
 每计划 1–32 个任务，运行期最多保留 128 份计划；到达历史上限明确报错，卸载实例后清空。任务形状为 `{id,role,task,requirements,dependsOn?,usePreset?}`；ID 唯一且不超过 128 字符，角色必须已存在，正文与本模块追加的依赖声明合计不超过工作流的 32 KiB 限制。`usePreset` 沿用工作流的显式预设选择要求，不自动注册预设。
 
-`requirements` 必填，最多 32 条；`[]` 只表示提交者声明无依赖。条目与目录预检合同一致：`{kind:"tool"|"toolkit"|"skill",name}` 或 `{kind:"directory",path}`。非空声明在父会话上下文预检；只有 `status:"ready"` 才分派，missing、unknown、无目录服务或预检错误均标为 `blocked` 并保留诊断。目录结果只说明可见登记或目录存在，不证明子代理连接健康、能力执行成功或拥有新的授权。能力名称、路径声明会以明确的数据段附在执行任务中，不静默选择替代工具。
+`requirements` 必填，最多 32 条；`[]` 只表示提交者声明无依赖。条目与目录预检共用 `normalizeRequirements`：`{kind:"tool"|"toolkit"|"skill",name}`、`{kind:"directory",path}`，以及 [环境依赖](environment-preflight-contract.md) 的 `environment-variable/environment-host/environment-key`；变量可显式声明 `nonEmpty:false`。非空声明在父会话上下文预检；只有 `status:"ready"` 才分派，missing、unknown、无目录服务或预检错误均标为 `blocked` 并保留诊断。目录结果只说明可见登记或配置状态，不证明子代理连接健康、能力执行成功或拥有新的授权。能力名称、路径声明会以明确的数据段附在执行任务中，不静默选择替代工具；秘密值不传入任务。
 
 `dependsOn` 控制任务的先后条件，并把同一计划中这些直接依赖的原始 `receipt.result` 附给执行者，携带 `taskId/runId/source/independentlyVerified:false`。数据段明确要求按任务复核、不得当作新指令或额外授权；不自动混入其他任务、其他计划或其他项目的结果，不改写成已核实结论。完整任务、依赖声明和结果超过工作流 32 KiB 限额时标为 `blocked/DEPENDENCY_CONTEXT_LIMIT`，保留完整原始结果供读取，不静默截断或启动。无法 JSON 表示的结果明确阻断。循环依赖拒绝创建；缺失的任务 ID 明确记录为 `missing-dependency`，不启动该任务。前置任务失败、被阻断或取消时，后续依赖任务同样不启动。只有前置收据的完成、处置和槽位释放均确认后，依赖才就绪。
 
@@ -74,7 +74,9 @@ await plans.dispatch("workflow.plan.stop", {
 
 ## 本轮验证边界
 
-测试使用临时 SQLite、真实项目 `WorkspaceStore/Flow/DesktopWorkflow`，官方 activation 工厂和结果为原创合成收据。覆盖单槽两个任务、等待处置、原样结果传给直接依赖、无关结果隔离、上下文超限不截断、失败及缺失依赖、未知能力、输入边界、父/项目隔离、停止及清理失败、停止所有计划后再创建、启动中停止、预检期间改绑、排队任务仍经过工作流入场准入门。没有连接真实模型、网络、正在运行的桌面或 profile；没有新增官方模块隔离或桌面 UI 执行证据。
+单元测试使用临时 SQLite、真实项目 `WorkspaceStore/Flow/DesktopWorkflow`，activation 工厂和结果为原创合成收据。覆盖单槽两个任务、等待处置、原样结果只传直接依赖、上下文超限不截断、失败及缺失依赖、环境声明与阻断、输入边界、父/项目隔离、停止及清理失败、停止所有计划后再创建、启动中停止、预检期间改绑、排队任务仍经过工作流入场准入门。
+
+`workflow-host.test.mjs` 另从未改写的官方 spawn/SubagentRuntime/AgentLoop 运行两任务计划，核对原始收据在后继 user 输入中出现、结果未被自动标为验证、两个执行者处置后释放槽位并从 JSONL 读回。停止用例确认运行中子任务取消、排队依赖不启动且父会话保留。LLM 仍为合成传输，没有连接真实模型、网络、正在运行的桌面或 profile，也没有桌面 UI 执行证据。
 
 ```sh
 DSH_NODE='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node'

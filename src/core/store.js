@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { isIP } from "node:net";
+import { credentialUpdate, credentialView } from "./credentials.js";
 import {
   DEFAULT_SETTINGS,
   RECORD_KINDS,
@@ -216,9 +217,16 @@ export class WorkspaceStore {
         "SELECT value FROM entries WHERE domain = ? AND workspace = ? AND kind = ? ORDER BY created_at, rowid",
       )
       .all(domain, workspace, kind)
-      .map((row) => JSON.parse(row.value));
+      .map((row) => {
+        const item = JSON.parse(row.value);
+        return domain === "records" && kind === "credential" ? credentialView(item) : item;
+      });
   }
   get(domain, id, workspace = "", kind = "") {
+    const item = this.#entry(domain, id, workspace, kind);
+    return domain === "records" && kind === "credential" ? credentialView(item) : item;
+  }
+  #entry(domain, id, workspace = "", kind = "") {
     string(id, "id");
     const row = this.db
       .prepare(
@@ -230,7 +238,7 @@ export class WorkspaceStore {
   }
   save(domain, payload, fields, workspace = "", kind = "") {
     const previous =
-      payload.id === undefined ? null : this.get(domain, payload.id, workspace, kind);
+      payload.id === undefined ? null : this.#entry(domain, payload.id, workspace, kind);
     const now = new Date().toISOString();
     const item = {
       ...previous,
@@ -246,7 +254,7 @@ export class WorkspaceStore {
         "INSERT INTO entries(id, domain, workspace, kind, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
       )
       .run(item.id, domain, workspace, kind, JSON.stringify(item), item.createdAt, now);
-    return item;
+    return domain === "records" && kind === "credential" ? credentialView(item) : item;
   }
   remove(domain, id, workspace = "", kind = "") {
     this.get(domain, id, workspace, kind);
@@ -754,8 +762,26 @@ export class WorkspaceStore {
       case "records.save": {
         const workspace = this.workspace(payload);
         const kind = enumValue(payload.kind, "kind", RECORD_KINDS);
-        const data = json(payload.data);
-        this.references(data, workspace);
+        let data = json(payload.data);
+        if (kind === "credential") {
+          const previous =
+            payload.id === undefined ? null : this.#entry("records", payload.id, workspace, kind);
+          data = credentialUpdate(previous?.data, data, {
+            clearLegacyFields:
+              payload.clearLegacyFields === undefined ? false : payload.clearLegacyFields,
+          });
+          if (typeof data.assetId === "string") this.get("assets", data.assetId, workspace);
+          if (typeof data.serviceId === "string") {
+            if (typeof data.assetId !== "string")
+              fail("INVALID_INPUT", "Credential serviceId requires assetId");
+            const asset = this.get("assets", data.assetId, workspace);
+            if (!asset.services?.some((service) => service.id === data.serviceId))
+              fail("NOT_FOUND", "Credential service does not belong to the selected asset");
+          }
+        } else if (payload.clearLegacyFields !== undefined) {
+          fail("INVALID_INPUT", "clearLegacyFields is only valid for credential records");
+        }
+        if (kind !== "credential") this.references(data, workspace);
         if (kind === "score-hit" && data.pointId === undefined)
           fail("INVALID_INPUT", "score-hit requires data.pointId");
         if (kind === "score-hit") {

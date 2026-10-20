@@ -81,6 +81,8 @@ async function loadOfficial() {
       typert: "@deepseek-ai/dsh-typert-registry",
       controller: "@deepseek-ai/dsh-api-session-controller",
       llm: "@deepseek-ai/dsh-llm",
+      attachmentLocal: "@deepseek-ai/dsh-attachment-local",
+      todo: "@deepseek-ai/dsh-tool-todo",
     };
     return Object.fromEntries(
       await Promise.all(Object.entries(names).map(async ([key, name]) => [key, await load(name)])),
@@ -89,7 +91,7 @@ async function loadOfficial() {
   return official;
 }
 
-async function fixture(t) {
+async function fixture(t, { attachments: useAttachments = false, todo: useTodo = false } = {}) {
   denyExternalExecution(t);
   const api = await loadOfficial();
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "dsh-unlimit-real-controller-")));
@@ -149,15 +151,17 @@ async function fixture(t) {
       llm.resolveCallConfig = unused("llm.resolveCallConfig");
       const fs = new api.cordis.Service(scope, "fs");
       fs.resolve = unused("fs.resolve");
-      const attachments = new api.cordis.Service(scope, "attachments");
-      attachments.imageLimits = {
-        maxImageBytes: 1024,
-        maxImagesPerMessage: 1,
-        maxMessageImageBytes: 1024,
-        maxImagePixels: 1024,
-        maxImageDimension: 32,
-        mediaTypes: ["image/png"],
-      };
+      if (!useAttachments) {
+        const attachments = new api.cordis.Service(scope, "attachments");
+        attachments.imageLimits = {
+          maxImageBytes: 1024,
+          maxImagesPerMessage: 1,
+          maxMessageImageBytes: 1024,
+          maxImagePixels: 1024,
+          maxImageDimension: 32,
+          mediaTypes: ["image/png"],
+        };
+      }
       const uploads = new api.cordis.Service(scope, "fileUploads");
       uploads.registerAgentResolver = () => () => {};
       const access = new api.cordis.Service(scope, "remoteAccess");
@@ -165,6 +169,8 @@ async function fixture(t) {
         resource.kind === "session" && ctx.sessions.get(resource.id) !== undefined;
     },
   });
+  if (useAttachments) await mount(api.attachmentLocal.LocalAttachmentStore, { dshHome: directory });
+  if (useTodo) await mount(api.todo, { allowParallelInProgress: false });
   await mount(api.jsonStorage, { root: join(directory, "domains") });
   await mount(api.domain, { backend: "json", routes: {} });
   await mount(api.persistence, {
@@ -179,6 +185,7 @@ async function fixture(t) {
   await mount(api.loop.AgentLoop, { agents: [], maxParallelToolCalls: 1 });
   await mount(api.controller.SessionController, { nativeOpen: false, listWorkSliceMs: 16 });
   const adapter = new DesktopSessions(ctx, store);
+  t.after(() => adapter.close());
   const create = async () => {
     const created = await ctx.sessionController.create({ cwd: join(directory, "project") });
     store.dispatch("workspaces.bind", { id: workspaceId, sessionId: created.sessionId });
@@ -302,5 +309,145 @@ test(
     assert.equal(original.inbox.nextStep.length, 0);
     assert.equal(original.status, "idle");
     assert.ok(result.stop.settledIds.includes(original.id));
+  },
+);
+
+test(
+  "official LocalAttachmentStore restores only original human refs after a completed synthetic fork",
+  optionalHost,
+  async (t) => {
+    const { api, ctx, adapter, create, appendTurn } = await fixture(t, { attachments: true });
+    const original = await create();
+    appendTurn(original, 1, "First input");
+    const png = Uint8Array.from(
+      Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWNgYGBgAAAABQABh6FO1AAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+    );
+    const image = await ctx.attachments.saveImage({
+      data: png,
+      mediaType: "image/png",
+      name: "synthetic.png",
+    });
+    const file = await ctx.attachments.saveFile({
+      data: Uint8Array.from(Buffer.from("Synthetic local attachment bytes")),
+      name: "synthetic.txt",
+    });
+    original.session.append("turn/start", { turn: 2 });
+    original.session.append("step/start", { turn: 2, step: 1 });
+    original.session.append(
+      "user/message",
+      api.llm.createUserMessage({
+        source: { kind: "user" },
+        content: [
+          { type: "text", text: "Human input" },
+          { type: "image", attachment: image },
+          { type: "file", attachment: file },
+        ],
+      }),
+      { surfaceOp: "append" },
+    );
+    original.session.append("step/end", { turn: 2, step: 1, reason: { kind: "completed" } });
+    original.session.append("turn/end", { turn: 2, reason: { kind: "completed" } });
+    const result = await adapter.rewind({
+      sessionId: original.id,
+      draftBridgeReady: true,
+      draftBridgeSupports: { attachments: true },
+    });
+    assert.equal(result.archived, true);
+    assert.deepEqual(
+      result.attachmentBatch.items.map((item) => item.type),
+      ["image", "file"],
+    );
+    const restoredImage = await adapter.attachment({
+      token: result.attachmentBatch.token,
+      index: 0,
+      newSessionId: result.newSessionId,
+    });
+    const expectedImage = await ctx.attachments.readImage(image);
+    assert.deepEqual(
+      Buffer.from(restoredImage.item.contentBase64, "base64"),
+      Buffer.from(expectedImage.data),
+    );
+    const restoredFile = await adapter.attachment({
+      token: result.attachmentBatch.token,
+      index: 1,
+      newSessionId: result.newSessionId,
+    });
+    assert.equal(
+      Buffer.from(restoredFile.item.contentBase64, "base64").toString(),
+      "Synthetic local attachment bytes",
+    );
+    const child = await ctx.sessionController.inspect(result.newSessionId);
+    assert.equal(
+      child.events.some((event) =>
+        event.data?.content?.some((part) => part.attachment?.attachmentId === file.attachmentId),
+      ),
+      false,
+      "The removed human input is not smuggled into the child's log",
+    );
+    assert.deepEqual(adapter.releaseAttachments({ token: result.attachmentBatch.token }), {
+      released: true,
+    });
+  },
+);
+
+test(
+  "official todo projection follows the native fork prefix and turn reset without plugin state rewriting",
+  optionalHost,
+  async (t) => {
+    const { api, ctx, adapter, create } = await fixture(t, { todo: true });
+    for (const mode of ["turn", "step"]) {
+      const original = await create();
+      const first = [{ content: "First synthetic task", status: "completed" }];
+      const second = [{ content: "Second synthetic task", status: "in_progress" }];
+      const final = [{ content: "Later synthetic task", status: "pending" }];
+      const start = (turn) => {
+        original.session.append("turn/start", { turn });
+        original.session.append("step/start", { turn, step: 1 });
+        original.session.append(
+          "user/message",
+          api.llm.createUserMessage({
+            source: { kind: "user" },
+            content: [{ type: "text", text: `Synthetic turn ${turn}` }],
+          }),
+          { surfaceOp: "append" },
+        );
+      };
+      const end = (turn) => {
+        original.session.append("step/end", { turn, step: 1, reason: { kind: "completed" } });
+        original.session.append("turn/end", { turn, reason: { kind: "completed" } });
+      };
+      const todos = (agent) =>
+        ctx.sessionProjections.snapshot(agent.session, ["todos"]).values.todos;
+      start(1);
+      original.session.append("todo/write", { todos: first });
+      end(1);
+      assert.deepEqual(todos(original), first);
+      start(2);
+      assert.equal(todos(original), null, "Native turn/start resets the task projection");
+      original.session.append("todo/write", { todos: second });
+      original.session.append("step/end", { turn: 2, step: 1, reason: { kind: "completed" } });
+      original.session.append("step/start", { turn: 2, step: 2 });
+      original.session.append("todo/write", { todos: final });
+      original.session.append("step/end", { turn: 2, step: 2, reason: { kind: "completed" } });
+      original.session.append("turn/end", { turn: 2, reason: { kind: "completed" } });
+      assert.deepEqual(todos(original), final);
+      const result = await adapter.rewind({ sessionId: original.id, mode, draftBridgeReady: true });
+      const child = ctx.agents.get(result.newSessionId);
+      assert.deepEqual(todos(child), mode === "turn" ? first : second);
+      assert.deepEqual(
+        todos(original),
+        final,
+        "Archiving leaves the original history and projection intact",
+      );
+      assert.equal(
+        (await ctx.sessionController.inspect(child.id)).events.filter(
+          (event) => event.type === "todo/write",
+        ).length,
+        mode === "turn" ? 1 : 2,
+      );
+    }
   },
 );

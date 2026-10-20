@@ -42,7 +42,54 @@ async function officialClient() {
     networkCalls.push("forbidden");
     throw new Error("Network is forbidden in isolated client tests");
   };
+  const uploads = [];
+  const uploadControl = { fail: false, gate: undefined };
   const globals = {
+    Blob,
+    File,
+    atob,
+    btoa,
+    URLSearchParams,
+    ReadableStream,
+    __DSH_FILE_UPLOAD__: {
+      fetch: async (path, init) => {
+        const target = new URL(path, "http://synthetic.invalid/");
+        assert.equal(target.pathname, "/api/session/uploadFileBinary");
+        const row = {
+          sessionId: target.searchParams.get("sessionId"),
+          name: target.searchParams.get("name"),
+          bytes: Buffer.from(await init.body.arrayBuffer()),
+          signal: init.signal,
+        };
+        uploads.push(row);
+        if (uploadControl.gate)
+          await Promise.race([
+            uploadControl.gate.promise,
+            new Promise((_, reject) => {
+              if (init.signal.aborted) reject(init.signal.reason);
+              else
+                init.signal.addEventListener("abort", () => reject(init.signal.reason), {
+                  once: true,
+                });
+            }),
+          ]);
+        return {
+          status: uploadControl.fail ? 500 : 200,
+          text: async () =>
+            JSON.stringify({
+              ok: true,
+              value: {
+                receiptId: `new-receipt-${uploads.length}`,
+                file: {
+                  attachmentId: `sha256:${createHash("sha256").update(row.bytes).digest("hex")}`,
+                  name: row.name,
+                  bytes: row.bytes.length,
+                },
+              },
+            }),
+        };
+      },
+    },
     AbortController,
     AbortSignal,
     URL,
@@ -187,6 +234,9 @@ async function officialClient() {
     conversationApi: load("@deepseek-ai/dsh-client-ui-conversation"),
     workspaceApi: load("@deepseek-ai/dsh-client-ui-workspace"),
     gateway: load("@deepseek-ai/dsh-api-gateway/client"),
+    uploadApi: load("@deepseek-ai/dsh-client-file-upload"),
+    uploads,
+    uploadControl,
     staticModules,
     networkCalls,
     evidence,
@@ -255,7 +305,7 @@ async function fixture(t) {
       provide(inner, "remote", remote);
       for (const name of ["session", "commands", "subagents", "directoryPicker"])
         inner.reflect.provide(`remote.${name}`, remote[name]);
-      provide(inner, "fileUpload", {});
+
       provide(inner, "typert", { contexts: { registerClient: stop } });
       // These are inert presentation/peripheral services. Session objects, projections,
       // input shells, lexical draft editor, references and workspace navigation are official.
@@ -304,6 +354,7 @@ async function fixture(t) {
   });
   await foundation.await();
   for (const [name, api, config] of [
+    ["upload", official.uploadApi],
     ["sessions", official.sessionsApi],
     ["workspace", official.workspaceApi],
     ["conversation", official.conversationApi, { maxConcurrentFileUploads: 2 }],
@@ -330,7 +381,30 @@ async function fixture(t) {
     });
   const replies = [];
   const frame = { contentWindow: { postMessage: (value) => replies.push(value) } };
-  const bridge = createDraftBridge(ctx, { origin: "http://127.0.0.1:4177", getFrame: () => frame });
+  const attachmentItems = [],
+    apiCalls = [];
+  const bridge = createDraftBridge(ctx, {
+    origin: "http://127.0.0.1:4177",
+    getFrame: () => frame,
+    timeoutMs: 500,
+    fetchImpl: async (path, init) => {
+      assert.equal(path, "/dsh-unlimit/api");
+      assert.deepEqual(init.headers, { "Content-Type": "application/json", "X-DSH-Unlimit": "1" });
+      const body = JSON.parse(init.body);
+      apiCalls.push(body);
+      assert.ok(["sessions.attachment", "sessions.releaseAttachments"].includes(body.action));
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          data:
+            body.action === "sessions.attachment"
+              ? { item: attachmentItems[body.payload.index] }
+              : { released: true },
+        }),
+      };
+    },
+  });
   t.after(() => bridge.dispose());
   const event = (id, draft = "Synthetic restored text") => ({
     origin: "http://127.0.0.1:4177",
@@ -354,6 +428,8 @@ async function fixture(t) {
     announce,
     gates,
     panels,
+    attachmentItems,
+    apiCalls,
     failNavigation() {
       navigationFailure = true;
     },
@@ -367,8 +443,8 @@ test(
     const f = await fixture(t);
     assert.equal(
       f.official.evidence.length,
-      6,
-      "Frontend/vendor, Session Controller, gateway browser, Conversation and Workspace client entries are hashed",
+      7,
+      "Frontend/vendor, Session Controller, gateway browser, Conversation, Workspace and FileUpload client entries are hashed",
     );
     f.announce("synthetic-restored");
     await f.bridge.handleMessage(f.event("synthetic-restored"));
@@ -461,5 +537,133 @@ test(
       f.conversation.input.for(binding.ctx).state.getSnapshot().draft,
       "Synthetic restored text",
     );
+  },
+);
+
+const syntheticPng =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWNgYGBgAAAABQABh6FO1AAAAABJRU5ErkJggg==";
+function attachmentRequest(f, id) {
+  const values = [
+    { type: "image", name: "synthetic.png", mediaType: "image/png", contentBase64: syntheticPng },
+    {
+      type: "file",
+      name: "synthetic.txt",
+      mediaType: "application/octet-stream",
+      contentBase64: Buffer.from("SYNTHETIC_BYTES").toString("base64"),
+    },
+  ];
+  f.attachmentItems.push(
+    ...values.map((item, index) => ({
+      ...item,
+      index,
+      bytes: Buffer.from(item.contentBase64, "base64").length,
+    })),
+  );
+  const request = f.event(id);
+  request.data.payload.attachmentBatch = {
+    token: "synthetic-authorized-token",
+    expiresAt: Date.now() + 5000,
+    items: f.attachmentItems.map(({ contentBase64, ...item }) => item),
+  };
+  return request;
+}
+
+test(
+  "official createDrafts preserves image/file order and real FileUpload creates a new target-scoped receipt without submission",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const id = "synthetic-attachment-restore";
+    f.announce(id);
+    await f.bridge.handleMessage(attachmentRequest(f, id));
+    assert.equal(f.replies[0].ok, true);
+    assert.equal(f.replies[0].draftStatus, "restored");
+    assert.equal(f.replies[0].textStatus, "restored");
+    assert.equal(f.replies[0].attachmentStatus, "restored");
+    assert.equal(f.replies[0].uploadStatus, "ready");
+    const binding = f.sessions.binding(id);
+    const state = f.conversation.input.for(binding.ctx).state.getSnapshot();
+    assert.equal(state.draft, "Synthetic restored text");
+    const attachments = f.conversation.resolveDraftAttachments(state.attachmentIds);
+    assert.deepEqual(
+      Array.from(attachments, (item) => item.kind),
+      ["image", "file"],
+    );
+    assert.deepEqual(
+      Array.from(attachments, (item) => item.file.name),
+      ["synthetic.png", "synthetic.txt"],
+    );
+    assert.equal(f.official.uploads.length, 1);
+    assert.equal(f.official.uploads[0].sessionId, id);
+    assert.equal(f.official.uploads[0].bytes.toString(), "SYNTHETIC_BYTES");
+    assert.equal(
+      f.conversation.fileUploads.getSnapshot()[attachments[1].id].receiptId,
+      "new-receipt-1",
+    );
+    assert.equal(f.apiCalls.at(-1).action, "sessions.releaseAttachments");
+  },
+);
+
+test(
+  "official attachment upload failure or cancellation cleans only owned drafts and never initializes text",
+  hostOnly,
+  async (t) => {
+    for (const mode of ["failure", "cancel"]) {
+      const f = await fixture(t);
+      const id = `synthetic-upload-${mode}`;
+      f.announce(id);
+      const reference = f.sessions.retain(id, { source: "syntheticTest" });
+      t.after(() => reference.release());
+      const binding = await reference.ready;
+      const existing = f.conversation.createDrafts(id, [
+        new File([Buffer.from(syntheticPng, "base64")], "unrelated.png", { type: "image/png" }),
+      ])[0];
+      const request = attachmentRequest(f, id);
+      f.official.uploadControl.fail = mode === "failure";
+      if (mode === "cancel") f.official.uploadControl.gate = Promise.withResolvers();
+      const pending = f.bridge.handleMessage(request);
+      if (mode === "cancel") {
+        while (!f.official.uploads.length) await new Promise((resolve) => setImmediate(resolve));
+        f.bridge.cancelAll();
+      }
+      await pending;
+      assert.equal(f.replies[0].ok, false);
+      assert.equal(f.replies[0].attachmentStatus, mode === "cancel" ? "cancelled" : "failed");
+      assert.equal(f.replies[0].uploadStatus, mode === "cancel" ? "cancelled" : "failed");
+      const state = f.conversation.input.for(binding.ctx).state.getSnapshot();
+      assert.equal(state.draft, "");
+      assert.equal(state.attachmentIds.length, 0);
+      assert.equal(
+        f.conversation.resolveDraftAttachments([existing.id])[0],
+        existing,
+        "Unrelated draft remains owned by its original caller",
+      );
+      assert.equal(Object.keys(f.conversation.fileUploads.getSnapshot()).length, 0);
+      assert.equal(f.panels.length, 0);
+    }
+  },
+);
+
+test(
+  "official input preserves edits made while a new attachment is uploading",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t),
+      id = "synthetic-edited-during-upload";
+    f.announce(id);
+    const reference = f.sessions.retain(id, { source: "syntheticTest" });
+    t.after(() => reference.release());
+    const binding = await reference.ready;
+    f.official.uploadControl.gate = Promise.withResolvers();
+    const pending = f.bridge.handleMessage(attachmentRequest(f, id));
+    while (!f.official.uploads.length) await new Promise((resolve) => setImmediate(resolve));
+    const shell = f.conversation.input.for(binding.ctx);
+    shell.actions.setDraft("Preserve edit during upload");
+    f.official.uploadControl.gate.resolve();
+    await pending;
+    assert.equal(f.replies[0].draftStatus, "preserved");
+    assert.equal(shell.state.getSnapshot().draft, "Preserve edit during upload");
+    assert.equal(shell.state.getSnapshot().attachmentIds.length, 0);
+    assert.equal(Object.keys(f.conversation.fileUploads.getSnapshot()).length, 0);
   },
 );

@@ -306,7 +306,11 @@ test("every record kind supports local CRUD and rejects unknown kinds and scopes
     const item = call("records.save", {
       workspaceId: first.id,
       kind,
-      data: { assetId: a.id, label: kind, ...(kind === "score-hit" ? { pointId: point.id } : {}) },
+      data: {
+        assetId: a.id,
+        ...(kind === "credential" ? { name: kind } : { label: kind }),
+        ...(kind === "score-hit" ? { pointId: point.id } : {}),
+      },
     }).item;
     assert.equal(call("records.list", { workspaceId: first.id, kind }).items[0].id, item.id);
     assert.equal(call("records.list", { workspaceId: second.id, kind }).items.length, 0);
@@ -320,7 +324,7 @@ test("every record kind supports local CRUD and rejects unknown kinds and scopes
       kind,
       data: {
         assetId: a.id,
-        changed: true,
+        ...(kind === "credential" ? { name: "Changed credential metadata" } : { changed: true }),
         ...(kind === "score-hit" ? { pointId: point.id } : {}),
       },
     });
@@ -416,7 +420,7 @@ test("scoring links cannot cross workspaces; reports deduplicate earned score an
     kind: "credential",
     data: {
       username: "synthetic-user",
-      password: "SYNTHETIC_SECRET",
+      secret: "SYNTHETIC_SECRET",
       notes: "SYNTHETIC_PRIVATE_NOTE",
     },
   });

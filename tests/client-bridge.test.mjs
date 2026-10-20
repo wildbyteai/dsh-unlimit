@@ -299,3 +299,146 @@ test("actual apply hides its frame from the bridge while closed and reuses it wh
     "reopening keeps panel form state",
   );
 });
+
+function attachmentFixture(t, { add = true, existing = false } = {}) {
+  const f = fixture(t);
+  const owned = [],
+    released = [],
+    apiCalls = [];
+  let text = existing ? "Existing user draft" : "";
+  let ids = existing ? ["existing-id"] : [];
+  const shell = {
+    state: { getSnapshot: () => ({ draft: text, attachmentIds: ids, phase: "editing" }) },
+    actions: {
+      addAttachments(value) {
+        if (add) ids.push(...value);
+        return add;
+      },
+    },
+  };
+  Object.assign(f.services.conversation, {
+    createDrafts(sessionId, files) {
+      const item = { kind: "file", id: `owned-${owned.length}`, file: files[0] };
+      owned.push(item);
+      return [item];
+    },
+    resolveDraftAttachments: (value) => value.map((id) => owned.find((item) => item.id === id)),
+    releaseDraftAttachment: (id) => released.push(id),
+    fileUploads: {
+      getSnapshot: () =>
+        Object.fromEntries(
+          owned.map((item) => [item.id, { status: "ready", receiptId: "new-synthetic-receipt" }]),
+        ),
+      subscribe: () => () => {},
+    },
+  });
+  f.services.conversation.input.for = () => shell;
+  f.services.conversation.input.requestDraftInitialization = (_, options) => {
+    if (text || ids.length) return "preserved";
+    text = options.prompt;
+    f.writes.push(options);
+    return "applied";
+  };
+  f.services.fileUpload = { upload() {} };
+  const bytes = "U1lOVEhFVElD";
+  const item = {
+    index: 0,
+    type: "file",
+    name: "synthetic.txt",
+    bytes: 9,
+    mediaType: "application/octet-stream",
+    contentBase64: bytes,
+  };
+  const readGate = Promise.withResolvers();
+  let gate = false;
+  const bridge = createDraftBridge(
+    { get: (name) => f.services[name] },
+    {
+      origin,
+      getFrame: () => f.frame,
+      timeoutMs: 30,
+      fetchImpl: async (_, init) => {
+        const body = JSON.parse(init.body);
+        apiCalls.push(body);
+        if (gate && body.action === "sessions.attachment") await readGate.promise;
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            data: body.action === "sessions.attachment" ? { item } : { released: true },
+          }),
+        };
+      },
+    },
+  );
+  t.after(() => bridge.dispose());
+  const event = f.event();
+  event.data.payload.attachmentBatch = {
+    token: "synthetic-authorized-token",
+    expiresAt: Date.now() + 10000,
+    items: [{ ...item, contentBase64: undefined }],
+  };
+  return {
+    ...f,
+    bridge,
+    event,
+    owned,
+    released,
+    apiCalls,
+    readGate,
+    delayRead() {
+      gate = true;
+    },
+    snapshot: () => shell.state.getSnapshot(),
+  };
+}
+
+test("attachment readiness requires all real client faces, and an existing draft prevents even a byte read", async (t) => {
+  const f = attachmentFixture(t, { existing: true });
+  await f.bridge.handleMessage(f.event);
+  assert.equal(f.replies[0].value.draftStatus, "preserved");
+  assert.equal(
+    f.apiCalls.some((item) => item.action === "sessions.attachment"),
+    false,
+  );
+  assert.deepEqual(f.snapshot(), {
+    draft: "Existing user draft",
+    attachmentIds: ["existing-id"],
+    phase: "editing",
+  });
+});
+
+test("attachment admission failure reports partial text and releases only newly owned drafts", async (t) => {
+  const f = attachmentFixture(t, { add: false });
+  await f.bridge.handleMessage(f.event);
+  const response = f.replies[0].value;
+  assert.equal(response.ok, false);
+  assert.equal(response.draftStatus, "partial");
+  assert.equal(response.textStatus, "restored");
+  assert.equal(response.attachmentStatus, "failed");
+  assert.equal(response.uploadStatus, "ready");
+  assert.equal(response.openStatus, "not-requested");
+  assert.deepEqual(f.released, ["owned-0"]);
+  assert.equal(f.snapshot().draft, "SYNTHETIC_DRAFT");
+});
+
+test("cancel/dispose during a delayed authorized read prevents late createDrafts and text mutation", async (t) => {
+  for (const mode of ["cancel", "dispose", "deadline"]) {
+    const f = attachmentFixture(t);
+    f.delayRead();
+    const work = f.bridge.handleMessage(f.event);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(f.apiCalls[0].action, "sessions.attachment");
+    if (mode === "cancel") f.bridge.cancelAll();
+    if (mode === "dispose") f.bridge.dispose();
+    if (mode === "deadline") await new Promise((resolve) => setTimeout(resolve, 40));
+    f.readGate.resolve();
+    await work;
+    assert.equal(f.owned.length, 0);
+    assert.equal(f.writes.length, 0);
+    assert.equal(f.opens.length, 0);
+    assert.equal(f.apiCalls.at(-1).action, "sessions.releaseAttachments");
+    if (mode === "dispose") assert.equal(f.replies.length, 0);
+    else assert.equal(f.replies[0].value.attachmentStatus, "cancelled");
+  }
+});

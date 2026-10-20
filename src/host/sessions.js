@@ -1,3 +1,4 @@
+import { AttachmentBatches } from "./attachment-batches.js";
 import { StoreError, enumValue, fail, object, string } from "../core/validation.js";
 
 const CUT_TYPES = new Set(["step/end", "turn/end", "session/end-seed"]);
@@ -31,12 +32,14 @@ export class DesktopSessions {
     this.ctx = ctx;
     this.store = store;
     this.inFlight = new Set();
+    this.attachmentBatches = new AttachmentBatches(() => this.services());
   }
   services() {
     return {
       controller: service(this.ctx, "sessionController"),
       registry: service(this.ctx, "workspaceRegistry"),
       agents: service(this.ctx, "agents"),
+      attachments: service(this.ctx, "attachments"),
     };
   }
   capabilities() {
@@ -61,7 +64,10 @@ export class DesktopSessions {
       rewind: required.every((name) => methods[name]),
       draftRestore: "client-bridge-required",
       missing: required.filter((name) => !methods[name]),
-      unsupported: ["subagent-to-parent-cut", "draft-attachments", "task-state-rewrite"],
+      unsupported: ["subagent-to-parent-cut", "task-state-rewrite"],
+      attachmentRecovery:
+        typeof this.services().attachments?.readImage === "function" &&
+        typeof this.services().attachments?.readFileStream === "function",
     };
   }
   async list() {
@@ -172,18 +178,24 @@ export class DesktopSessions {
     } else atSeq = turnCut;
     const removedHuman = events.find((event) => event.seq > atSeq && human(event));
     let draft = "";
-    if (removedHuman) {
-      const content = removedHuman.data.content;
-      if (
-        !Array.isArray(content) ||
-        content.some((part) => part.type !== "text" || typeof part.text !== "string")
-      )
-        fail(
-          "UNSUPPORTED_CAPABILITY",
-          "This draft bridge restores text only; attachments require a separate official restoration path",
-        );
-      draft = content.map((part) => part.text).join("");
-    }
+    const content = removedHuman?.data.content ?? [];
+    if (
+      !Array.isArray(content) ||
+      content.some((part) => !part || (part.type === "text" && typeof part.text !== "string"))
+    )
+      fail("INVALID_HOST_RESULT", "The human message has invalid content");
+    draft = content
+      .filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join("");
+    if (
+      content.some((part) => part.type !== "text") &&
+      payload.draftBridgeSupports?.attachments !== true
+    )
+      fail(
+        "CLIENT_ATTACHMENTS_REQUIRED",
+        "Confirm the official client attachment restoration APIs before creating a rewind session",
+      );
     const strategy = atSeq < 0 ? "empty" : "fork";
     if (strategy === "empty" && !capabilities.emptySession)
       fail(
@@ -198,6 +210,9 @@ export class DesktopSessions {
         );
     }
     const workspace = this.store.dispatch("workspaces.forSession", { sessionId }).item;
+    const attachmentBatch = removedHuman
+      ? this.attachmentBatches.create(sessionId, removedHuman, content)
+      : undefined;
     return {
       sessionId,
       mode,
@@ -205,6 +220,7 @@ export class DesktopSessions {
       strategy,
       draft,
       draftStatus: "pending-client",
+      ...(attachmentBatch ? { attachmentBatch } : {}),
       ...(workspace ? { workspaceId: workspace.id } : {}),
       ...(strategy === "empty"
         ? {
@@ -230,9 +246,10 @@ export class DesktopSessions {
       );
     this.inFlight.add(sessionId);
     let progress;
+    let plan;
     let stage = "prepare";
     try {
-      const plan = await this.prepare(payload);
+      plan = await this.prepare(payload);
       const { controller, registry } = this.services();
       progress = {
         sessionId,
@@ -240,6 +257,7 @@ export class DesktopSessions {
         ...(plan.atSeq === undefined ? {} : { atSeq: plan.atSeq }),
         draft: plan.draft,
         draftStatus: "pending-client",
+        ...(plan.attachmentBatch ? { attachmentBatch: plan.attachmentBatch } : {}),
         archived: false,
         archive: { requested: false, verified: false },
         stop: { requested: false, settledIds: [], pendingIds: [] },
@@ -305,8 +323,13 @@ export class DesktopSessions {
         .map((agent) => agent.id);
       if (progress.stop.pendingIds.length)
         fail("STOP_INCOMPLETE", "Some target agents still have running or queued work");
+      if (plan.attachmentBatch)
+        this.attachmentBatches.bind(plan.attachmentBatch.token, progress.newSessionId);
       return progress;
     } catch (error) {
+      if (plan?.attachmentBatch)
+        this.attachmentBatches.release({ token: plan.attachmentBatch.token });
+      if (progress) delete progress.attachmentBatch;
       if (!progress) throw error;
       // Official fork may report a created identity in its structured partial-failure data.
       if (
@@ -333,6 +356,15 @@ export class DesktopSessions {
     } finally {
       this.inFlight.delete(sessionId);
     }
+  }
+  attachment(payload) {
+    return this.attachmentBatches.read(payload);
+  }
+  releaseAttachments(payload) {
+    return this.attachmentBatches.release(payload);
+  }
+  close() {
+    this.attachmentBatches.close();
   }
 }
 

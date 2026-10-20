@@ -269,7 +269,14 @@ export class LocalEnvironment {
       return {
         available: false,
         validation: "metadata-only",
-        reason: error instanceof StoreError ? error.code : "UNAVAILABLE",
+        reason:
+          error instanceof StoreError
+            ? error.code
+            : ["ENOENT", "ENOTDIR"].includes(error.code)
+              ? "NOT_FOUND"
+              : ["EACCES", "EPERM"].includes(error.code)
+                ? "PERMISSION_DENIED"
+                : "UNAVAILABLE",
       };
     }
   }

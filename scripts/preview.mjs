@@ -129,7 +129,11 @@ try {
   flow = new Flow(store);
   const skills = new SkillLibrary(join(temporary, "skills"));
   const admission = new DrillAdmission(store, temporary);
-  const catalog = new HostCatalog({ get: () => undefined }, { library: skills, toolkit });
+  const environment = new LocalEnvironment(realpathSync(temporary));
+  const catalog = new HostCatalog(
+    { get: () => undefined },
+    { library: skills, toolkit, environment },
+  );
   const workflow = new DesktopWorkflow({ get: () => undefined }, store, flow, { admission });
   const controller = new Controller({
     store,
@@ -142,7 +146,7 @@ try {
     catalog,
     workflow,
     plans: new DesktopWorkflowPlan(workflow, { catalog }),
-    environment: new LocalEnvironment(realpathSync(temporary)),
+    environment,
     continuation: new Continuation({}, store, hostInfo),
     flow,
     sessions: { list: () => [] },

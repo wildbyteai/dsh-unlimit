@@ -23,6 +23,7 @@ const state = {
   report: "",
   graph: null,
   bridgeReady: false,
+  bridgeSupports: { attachments: false },
   rewindOutcome: null,
   assetImport: null,
   knowledgeFilters: { kind: "", tags: "", verified: "" },
@@ -51,7 +52,8 @@ function formControls(form) {
     (input) =>
       input.name &&
       ["INPUT", "SELECT", "TEXTAREA"].includes(input.tagName) &&
-      input.type !== "file",
+      !["file", "password"].includes(input.type) &&
+      input.dataset.draft !== "off",
   );
 }
 function readDraftFields(form) {
@@ -270,8 +272,13 @@ const recordFields = {
   credential: [
     field("name", "名称"),
     field("username", "账号"),
-    field("secret", "凭据内容", "password"),
+    field("secret", "替换凭据内容", "password", {
+      help: "留空保留已保存内容；填写新值才替换。不会回显原值，也不保留密码草稿。",
+    }),
+    field("clearSecret", "明确清空已保存的凭据内容", "checkbox", { draft: false }),
     field("target", "关联目标"),
+    field("role", "登记角色 / 权限说明"),
+    field("source", "资料来源"),
     field("notes", "说明", "textarea"),
   ],
   access: [
@@ -594,7 +601,16 @@ window.addEventListener("message", (event) => {
   if (response.ok) pending.resolve(response);
   else {
     const error = new Error(response.error || "宿主草稿桥调用失败");
-    for (const key of ["draftStatus", "openStatus", "navigationConfirmed", "newSessionId", "code"])
+    for (const key of [
+      "draftStatus",
+      "textStatus",
+      "attachmentStatus",
+      "uploadStatus",
+      "openStatus",
+      "navigationConfirmed",
+      "newSessionId",
+      "code",
+    ])
       error[key] = response[key];
     pending.reject(error);
   }
@@ -656,9 +672,12 @@ function bridgeRequest(operation, payload = {}) {
 }
 async function probeBridge() {
   try {
-    state.bridgeReady = Boolean((await bridgeRequest("probe")).ready);
+    const result = await bridgeRequest("probe");
+    state.bridgeReady = Boolean(result.ready);
+    state.bridgeSupports = { attachments: result.supports?.attachments === true };
   } catch {
     state.bridgeReady = false;
+    state.bridgeSupports = { attachments: false };
   }
   return state.bridgeReady;
 }
@@ -838,11 +857,11 @@ function redactCell(value, key = "") {
   return value;
 }
 function table(items, columns, actions) {
-  return `<div class="tablewrap"><table><thead><tr>${columns.map((c) => `<th>${esc(c[1])}</th>`).join("")}${actions ? '<th style="text-align:right">操作</th>' : ""}</tr></thead><tbody>${items.map((item, index) => `<tr>${columns.map(([key], j) => `<td>${key === "verified" ? badge(item.verified ? "verified" : "unverified") : ["severity", "status"].includes(key) ? badge(item[key]) : `<div class="${j === 0 ? "celltitle" : ""}">${esc(friendly(item.kind === "credential" ? (key === "name" ? `凭据记录 ${index + 1}` : "•••••• · 已隐藏") : redactCell(item[key], key))).slice(0, 360)}</div>${j === 0 && item.updatedAt ? `<div class="cellsub">${esc(time(item.updatedAt))}</div>` : ""}`}</td>`).join("")}${actions ? `<td><div class="rowactions">${actions(item, index)}</div></td>` : ""}</tr>`).join("")}</tbody></table></div>`;
+  return `<div class="tablewrap"><table><thead><tr>${columns.map((c) => `<th>${esc(c[1])}</th>`).join("")}${actions ? '<th style="text-align:right">操作</th>' : ""}</tr></thead><tbody>${items.map((item, index) => `<tr>${columns.map(([key], j) => `<td>${key === "verified" ? badge(item.verified ? "verified" : "unverified") : ["severity", "status"].includes(key) ? badge(item[key]) : `<div class="${j === 0 ? "celltitle" : ""}">${esc(friendly(redactCell(item[key], key))).slice(0, 360)}</div>${j === 0 && item.updatedAt ? `<div class="cellsub">${esc(time(item.updatedAt))}</div>` : ""}`}</td>`).join("")}${actions ? `<td><div class="rowactions">${actions(item, index)}</div></td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 function renderField(f, value) {
-  const v = value ?? f.default ?? "";
-  const attr = `name="${esc(f.name)}" id="f-${esc(f.name)}" ${f.required ? "required" : ""} ${f.disabled ? "disabled" : ""} ${f.readonly ? "readonly" : ""} ${f.pattern ? `pattern="${esc(f.pattern)}"` : ""} ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""}`;
+  const v = f.type === "password" ? "" : (value ?? f.default ?? "");
+  const attr = `name="${esc(f.name)}" id="f-${esc(f.name)}" ${f.draft === false ? 'data-draft="off"' : ""} ${f.required ? "required" : ""} ${f.disabled ? "disabled" : ""} ${f.readonly ? "readonly" : ""} ${f.pattern ? `pattern="${esc(f.pattern)}"` : ""} ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""}`;
   let input;
   if (f.type === "textarea")
     input = `<textarea ${attr} rows="${f.name === "content" ? 8 : 4}">${esc(Array.isArray(v) ? v.join("\n") : v)}</textarea>`;
@@ -872,10 +891,19 @@ function openForm(title, fields, values, onSave, options = {}) {
           : `new:${title}`);
   const scope = draftScope(identity, context);
   const dialog = $("#editor");
-  dialog.innerHTML = `<form id="edit-form"><div class="dialoghead"><h2>${esc(title)}</h2><button type="button" class="quiet small" id="close-dialog" aria-label="关闭">✕</button></div>${options.note ? `<div class="note">${esc(options.note)}</div>` : ""}<p class="draft-help">未保存编辑仅保留在本面板内存；关闭后重新编辑同一对象可恢复，刷新会丢失。</p><div class="fields">${fields.map((f) => renderField(f, values[f.name])).join("")}</div><p class="inlineerror" id="form-error" role="alert"></p><div class="dialogfoot"><button type="button" id="cancel-dialog">放弃修改</button><button class="primary" type="submit">${esc(options.submit || "保存")}</button></div></form>`;
+  dialog.innerHTML = `<form id="edit-form" method="post"><div class="dialoghead"><h2>${esc(title)}</h2><button type="button" class="quiet small" id="close-dialog" aria-label="关闭">✕</button></div>${options.note ? `<div class="note">${esc(options.note)}</div>` : ""}<p class="draft-help">非秘密编辑仅保留在本面板内存；重新编辑同一对象可恢复，刷新会丢失。密码和清空选项不进入草稿。</p><div class="fields">${fields.map((f) => renderField(f, values[f.name])).join("")}</div><p class="inlineerror" id="form-error" role="alert"></p><div class="dialogfoot"><button type="button" id="cancel-dialog">放弃修改</button><button class="primary" type="submit">${esc(options.submit || "保存")}</button></div></form>`;
   dialog.showModal();
   options.afterOpen?.(dialog);
   const form = $("#edit-form");
+  const clearSensitiveInputs = () => {
+    $$('input[type="password"]', form).forEach((input) => {
+      input.value = "";
+    });
+    $$('input[type="checkbox"][data-draft="off"]', form).forEach((input) => {
+      input.checked = false;
+    });
+  };
+  dialog.addEventListener("close", clearSensitiveInputs, { once: true });
   const binding = bindMemoryDraft(form, scope, {
     dependentSelects: fields.some((field) => field.name === "serviceId")
       ? ["assetId", "serviceId"]
@@ -925,6 +953,7 @@ function openForm(title, fields, values, onSave, options = {}) {
         binding.capture();
         throw error;
       } finally {
+        clearSensitiveInputs();
         editor.saving = false;
         if (form.isConnected) {
           $("#close-dialog", form).disabled = false;
@@ -1686,8 +1715,13 @@ async function skillsPage() {
   );
   const originLabel = (origin) => (origin === "host" ? "宿主注册表" : "项目技能库");
   const checkState = (value) =>
-    ({ available: "已检测到", missing: "缺失", unknown: "未知", invalid: "声明无效" })[value] ||
-    value;
+    ({
+      available: "已检测到",
+      ready: "已配置",
+      missing: "缺失",
+      unknown: "未知",
+      invalid: "声明无效",
+    })[value] || value;
   const preflightHTML = (value) => {
     if (!value) return "";
     const labels = { ready: "声明范围内通过", unknown: "仍有未知项", blocked: "存在依赖缺口" };
@@ -1704,12 +1738,15 @@ async function skillsPage() {
           declaration: "声明完整性",
           catalog: "目录来源",
           "skill-body": "技能正文",
+          "environment-variable": "环境变量",
+          "environment-host": "主机登记",
+          "environment-key": "私钥元信息",
         }[check.kind] || check.kind,
       result: checkState(check.state),
     }));
     return panel(
       "依赖预检结果",
-      `<div class="note">${esc(labels[value.status] || value.status)}。仅检查明确声明与本地目录；不代表目标授权，也不启动任务、下载或执行工具。</div>${
+      `<div class="note">${esc(labels[value.status] || value.status)}。仅检查明确声明、本地目录与配置状态；不代表目标授权，也不启动任务、下载或执行工具。</div>${
         rows.length
           ? table(rows, [
               ["subject", "技能 / 范围"],
@@ -2035,6 +2072,16 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
   let points = [],
     assets = [],
     stages = [];
+  if (kind === "credential") {
+    assets = (await api("assets.list", workspacePayload())).items;
+    fields = [
+      ...fields,
+      field("assetId", "关联本项目资产", "select", {
+        options: [["", "未关联"], ...assets.map((asset) => [asset.id, asset.name])],
+      }),
+      field("serviceId", "关联资产服务", "select", { options: [["", "未关联服务"]] }),
+    ];
+  }
   if (["score-point", "score-hit"].includes(kind)) {
     const requests = await Promise.all([
       api("records.list", { ...workspacePayload(), kind: "stage" }),
@@ -2105,7 +2152,12 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
               item.stage ||
               "未分阶段",
           }
-        : item,
+        : kind === "credential"
+          ? {
+              ...item,
+              storedContent: `${item.secretState.hasSecret ? "标准内容已保存 · 不回显" : "标准内容未保存"}${item.secretState.legacyFieldCount ? ` · ${item.secretState.legacyFieldCount} 个旧隐藏字段` : ""}`,
+            }
+          : item,
   );
   const columns =
     kind === "score-hit"
@@ -2121,10 +2173,17 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
             ["points", "基准分值"],
             ["stageLabel", "阶段"],
           ]
-        : fields
-            .filter((f) => !["textarea", "password"].includes(f.type))
-            .slice(0, 4)
-            .map((f) => [f.name, f.label]);
+        : kind === "credential"
+          ? [
+              ["name", "名称"],
+              ["username", "账号"],
+              ["target", "登记目标"],
+              ["storedContent", "内容状态"],
+            ]
+          : fields
+              .filter((f) => !["textarea", "password"].includes(f.type))
+              .slice(0, 4)
+              .map((f) => [f.name, f.label]);
   const noPoints = kind === "score-hit" && !points.length;
   return {
     html:
@@ -2142,37 +2201,57 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
                 )
                 .join(
                   "",
-                )}</div><div class="note">这是本地证据台账。记录凭据、隧道或 WebShell 信息不会连接目标或执行操作；敏感字段仅在编辑时显示。</div>`
+                )}</div><div class="note">这是本地证据台账。记录凭据、隧道或 WebShell 信息不会连接目标或执行操作。凭据内容不回显，编辑留空保留，明确勾选才清空；普通说明字段不适合填写秘密。</div>`
         }${noPoints ? '<div class="note">请先在「得分点」中创建计分点，再记录命中。</div>' : ""}${shown.length ? table(shown, columns, (item, index) => `<button class="small quiet" data-record-edit="${index}">编辑</button><button class="small quiet danger" data-record-delete="${index}">删除</button>`) : empty(`暂无${kinds[kind]}记录`)}${embedded ? `<button id="create-record" style="margin-top:15px" class="small" ${noPoints ? 'disabled title="请先创建得分点"' : ""}>＋ 新增记录</button>` : ""}`,
       ),
     bind() {
       const edit = (item) => {
         const values = { ...item };
-        const dynamic =
-          kind === "score-hit"
-            ? fields.map((f) =>
-                f.name === "serviceId"
-                  ? {
-                      ...f,
-                      options: [
-                        ["", "未选服务（可手动填写端口）"],
-                        ...(assets.find((asset) => asset.id === item?.assetId)?.services || []).map(
-                          (service) => [
-                            service.id,
-                            `${service.protocol}/${service.port}${service.name ? " · " + service.name : ""}`,
-                          ],
-                        ),
-                      ],
-                    }
-                  : f,
-              )
-            : fields;
+        let dynamic = ["score-hit", "credential"].includes(kind)
+          ? fields.map((f) =>
+              f.name === "serviceId"
+                ? {
+                    ...f,
+                    options: [
+                      ["", kind === "credential" ? "未关联服务" : "未选服务（可手动填写端口）"],
+                      ...(assets.find((asset) => asset.id === item?.assetId)?.services || []).map(
+                        (service) => [
+                          service.id,
+                          `${service.protocol}/${service.port}${service.name ? " · " + service.name : ""}`,
+                        ],
+                      ),
+                    ],
+                  }
+                : f,
+            )
+          : fields;
+        if (kind === "credential" && item?.secretState.legacyFieldCount)
+          dynamic = [
+            ...dynamic,
+            field(
+              "clearLegacyFields",
+              `删除 ${item.secretState.legacyFieldCount} 个旧隐藏字段`,
+              "checkbox",
+              {
+                draft: false,
+                help: "仅在明确不再需要旧字段时勾选；未勾选会原样保留，标准凭据内容另行管理。",
+              },
+            ),
+          ];
         openForm(
           `${item ? "编辑" : "新增"}${kinds[kind]}`,
           dynamic,
           values,
           async (input) => {
-            const outgoing = { ...item?.data, ...input };
+            const outgoing = kind === "credential" ? { ...input } : { ...item?.data, ...input };
+            if (kind === "credential") {
+              if (input.clearSecret && input.secret)
+                throw new Error("替换和清空不能同时选择，请明确本次修改");
+              delete outgoing.clearSecret;
+              delete outgoing.clearLegacyFields;
+              if (input.clearSecret) outgoing.secret = "";
+              else if (!input.secret) delete outgoing.secret;
+            }
             if (["score-point", "score-hit"].includes(kind) && !outgoing.stageId)
               delete outgoing.stageId;
             if (kind === "score-hit") {
@@ -2198,14 +2277,29 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
               ...payload,
               ...(item ? { id: item.id } : {}),
               data: outgoing,
+              ...(kind === "credential"
+                ? { clearLegacyFields: input.clearLegacyFields === true }
+                : {}),
             });
           },
           {
             note:
-              kind === "score-hit"
-                ? "同一得分点按资产与服务分别累计；相同资产、协议和端口的重复命中只计一次。"
-                : "仅保存本地记录；不会触发远程操作。",
+              kind === "credential"
+                ? `凭据内容${item?.secretState.hasSecret ? "已保存" : "尚未保存"}，不会读回或预填。登记的角色和来源只是资料记录，不授予访问权限。文件权限保护不等于存储加密。`
+                : kind === "score-hit"
+                  ? "同一得分点按资产与服务分别累计；相同资产、协议和端口的重复命中只计一次。"
+                  : "仅保存本地记录；不会触发远程操作。",
             afterOpen(dialog) {
+              if (kind === "credential") {
+                const assetInput = $('[name="assetId"]', dialog);
+                const serviceInput = $('[name="serviceId"]', dialog);
+                assetInput.onchange = () => {
+                  const services =
+                    assets.find((asset) => asset.id === assetInput.value)?.services || [];
+                  serviceInput.innerHTML = `<option value="">未关联服务</option>${services.map((service) => `<option value="${esc(service.id)}">${esc(`${service.protocol}/${service.port}${service.name ? " · " + service.name : ""}`)}</option>`).join("")}`;
+                };
+                return;
+              }
               if (kind !== "score-hit") return;
               const assetInput = $('[name="assetId"]', dialog),
                 serviceInput = $('[name="serviceId"]', dialog),
@@ -3087,21 +3181,44 @@ function rewindSummary(outcome) {
   if (!outcome) return "";
   const archived = outcome.archived ? "原记录已保留并归档。" : "原会话归档未确认。";
   const restored = outcome.draftStatus === "restored";
+  const textRestored = outcome.textStatus === "restored" || restored;
   const title =
     outcome.draftStatus === "host-partial"
       ? "宿主回退尚未完成"
       : restored
         ? "回退分支已创建，草稿已恢复到新会话"
-        : outcome.draftStatus === "pending-client"
-          ? "新会话已创建，草稿恢复待确认"
-          : "新会话已创建，草稿未恢复";
+        : outcome.draftStatus === "partial"
+          ? "文字已恢复，附件恢复未完成"
+          : outcome.draftStatus === "pending-client"
+            ? "新会话已创建，草稿恢复待确认"
+            : "新会话已创建，草稿未恢复";
   const navigation =
     outcome.openStatus === "requested"
       ? "已向宿主请求打开新会话；可见页面切换尚无完成回执。"
       : outcome.openStatus === "failed"
         ? "打开新会话失败，可在宿主中按编号查找。"
         : "";
-  return `<div class="${restored ? "note" : "error"}"><strong>${title}</strong><br>${archived}${outcome.newSessionId ? `新会话：<span class="mono">${esc(outcome.newSessionId)}</span>` : ""}<br>${restored ? "纯文本草稿恢复已读回，没有自动发送。" : ""}${esc(navigation)}${outcome.error ? esc(outcome.error) : restored ? "" : "等待宿主恢复草稿。"}</div>`;
+  const attachmentLabels = {
+    "not-required": "无附件",
+    pending: "待处理",
+    reading: "读取中",
+    staged: "已重建草稿",
+    restored: "已加入输入框",
+    failed: "未完成",
+    cancelled: "已取消",
+  };
+  const uploadLabels = {
+    "not-required": "无需上传",
+    "not-requested": "未开始",
+    uploading: "上传中",
+    ready: "上传已就绪",
+    failed: "未完成",
+    cancelled: "已取消",
+  };
+  const attachmentInfo = outcome.attachmentBatch
+    ? ` 附件：${attachmentLabels[outcome.attachmentStatus] || "未确认"}；文件上传：${uploadLabels[outcome.uploadStatus] || "未确认"}。`
+    : "";
+  return `<div class="${restored ? "note" : "error"}"><strong>${title}</strong><br>${archived}${outcome.newSessionId ? `新会话：<span class="mono">${esc(outcome.newSessionId)}</span>` : ""}<br>${textRestored ? "文字草稿已恢复，没有自动发送。" : ""}${esc(attachmentInfo)}${esc(navigation)}${outcome.error ? esc(outcome.error) : restored ? "" : "等待宿主恢复草稿。"}</div>`;
 }
 function openRewind(item) {
   if (!canLeaveEditor()) return;
@@ -3145,6 +3262,7 @@ function openRewind(item) {
             id: item.id,
             mode: new FormData(e.target).get("mode"),
             draftBridgeReady: true,
+            draftBridgeSupports: state.bridgeSupports,
           });
           binding.commit();
           state.rewindOutcome = { ...fork, draftStatus: "pending-client" };
@@ -3154,10 +3272,14 @@ function openRewind(item) {
           const restored = await bridgeRequest("restore", {
             newSessionId: fork.newSessionId,
             draft: fork.draft,
+            ...(fork.attachmentBatch ? { attachmentBatch: fork.attachmentBatch } : {}),
           });
           state.rewindOutcome = {
             ...fork,
             draftStatus: restored.draftStatus,
+            textStatus: restored.textStatus,
+            attachmentStatus: restored.attachmentStatus,
+            uploadStatus: restored.uploadStatus,
             openStatus: restored.openStatus,
             navigationConfirmed: restored.navigationConfirmed,
           };
@@ -3167,6 +3289,9 @@ function openRewind(item) {
             draftStatus:
               error.draftStatus || (error.message.includes("未响应") ? "pending-client" : "failed"),
             error: error.message,
+            textStatus: error.textStatus,
+            attachmentStatus: error.attachmentStatus,
+            uploadStatus: error.uploadStatus,
             openStatus: error.openStatus,
             navigationConfirmed: error.navigationConfirmed,
           };
@@ -3187,9 +3312,12 @@ function openRewind(item) {
           $("#cancel-rewind").textContent = "关闭";
         } else if (fork) {
           $("#rewind-result").innerHTML = rewindSummary(state.rewindOutcome);
-          if (state.rewindOutcome?.draftStatus === "restored") {
+          if (state.rewindOutcome?.draftStatus === "restored" || fork.attachmentBatch) {
             button.hidden = true;
             $("#cancel-rewind").textContent = "关闭";
+            if (fork.attachmentBatch && state.rewindOutcome.draftStatus !== "restored")
+              $("#rewind-error").textContent =
+                "本次附件恢复已结束，原会话和原附件仍保留。请按新会话编号检查文字和附件状态；不会重复创建分支或用已释放的批次重试。";
           } else
             setTimeout(() => {
               if (button.isConnected) button.textContent = "重试恢复同一分支草稿";
@@ -3314,7 +3442,7 @@ async function environmentPage() {
       ? ""
       : panel(
           "环境依赖预检",
-          `<div class="note">${esc({ ready: "声明范围内通过", unknown: "仍有未知项", blocked: "存在依赖缺口" }[value.status] || value.status)}。预检只检查明确声明、注册表可见性和本地目录存在性；不代表授权、连接健康或任务执行成功。</div>${
+          `<div class="note">${esc({ ready: "声明范围内通过", unknown: "仍有未知项", blocked: "存在依赖缺口" }[value.status] || value.status)}。预检只检查明确声明、注册表、本地目录与配置状态；不读取秘密值或私钥内容，不代表授权、连接健康或任务执行成功。${value.environment?.revision !== undefined ? ` 环境配置版本 ${esc(value.environment.revision)}。` : ""}</div>${
             value.checks.length
               ? table(
                   value.checks.map((check) => ({
@@ -3323,6 +3451,7 @@ async function environmentPage() {
                     result:
                       {
                         available: "已检测到",
+                        ready: "已配置",
                         missing: "缺失",
                         unknown: "未知",
                         invalid: "声明无效",
@@ -3335,6 +3464,9 @@ async function environmentPage() {
                         skill: "技能",
                         catalog: "目录来源",
                         declaration: "声明完整性",
+                        "environment-variable": "环境变量",
+                        "environment-host": "主机登记",
+                        "environment-key": "私钥元信息",
                       }[check.kind] || check.kind,
                   })),
                   [
@@ -3412,7 +3544,7 @@ async function environmentPage() {
             ],
           )}</details>`
         : ""
-    }<form id="${requirementsFormId}"><details><summary>明确声明本次所需依赖</summary><div class="fields" style="margin-top:16px"><div class="field"><label for="required-host-tools">所需宿主工具 · 每行公开名称</label><textarea id="required-host-tools" name="hostTools" rows="3" placeholder="例如已登记的工具名称"></textarea></div><div class="field"><label for="required-local-tools">所需本机工具 · 每行标识</label><textarea id="required-local-tools" name="localTools" rows="3" placeholder="例如 nmap"></textarea></div><div class="field wide"><label for="required-directories">所需本地目录 · 每行一个</label><textarea id="required-directories" name="directories" rows="3" placeholder="绝对路径，或相对于当前会话工作目录的路径"></textarea></div></div></details><p class="info">留空表示本次未声明额外依赖；仍检查已配置的工具目录。未声明的技能依赖不会被猜测或自动安装。</p><button type="submit" ${can("catalog.preflight") ? "" : "disabled"}>预检声明与本地目录</button></form>`,
+    }<form id="${requirementsFormId}"><details><summary>明确声明本次所需依赖</summary><div class="fields" style="margin-top:16px"><div class="field"><label for="required-host-tools">所需宿主工具 · 每行公开名称</label><textarea id="required-host-tools" name="hostTools" rows="3" placeholder="例如已登记的工具名称"></textarea></div><div class="field"><label for="required-local-tools">所需本机工具 · 每行标识</label><textarea id="required-local-tools" name="localTools" rows="3" placeholder="例如 nmap"></textarea></div><div class="field wide"><label for="required-directories">所需本地目录 · 每行一个</label><textarea id="required-directories" name="directories" rows="3" placeholder="绝对路径，或相对于当前会话工作目录的路径"></textarea></div><div class="field"><label for="required-variables">所需环境变量 · 每行名称</label><textarea id="required-variables" name="variables" rows="3" placeholder="SYNTHETIC_TOKEN"></textarea><small>只检查已配置且非空，不返回值。</small></div><div class="field"><label for="required-hosts">所需登记主机 · 每行一个</label><textarea id="required-hosts" name="hosts" rows="3" placeholder="operator@example.invalid"></textarea><small>只核对本安装登记，不连接或授予权限。</small></div><div class="field wide"><label for="required-keys">所需私钥登记编号 · 每行一个</label><textarea id="required-keys" name="keys" rows="3" placeholder="使用上方私钥登记编号"></textarea><small>只检查登记编号与文件元信息，不读取内容或验证密钥有效性。</small></div></div></details><p class="info">留空表示本次未声明额外依赖；仍检查已配置的工具目录。未声明的技能依赖不会被猜测或自动安装。</p><button type="submit" ${can("catalog.preflight") ? "" : "disabled"}>预检明确依赖</button></form>`,
   );
   const data = await api("toolkit.status");
   const tools = data.tools || [];
@@ -3512,6 +3644,9 @@ async function environmentPage() {
           ...lines("hostTools").map((name) => ({ kind: "tool", name })),
           ...lines("localTools").map((name) => ({ kind: "toolkit", name })),
           ...lines("directories").map((path) => ({ kind: "directory", path })),
+          ...lines("variables").map((name) => ({ kind: "environment-variable", name })),
+          ...lines("hosts").map((name) => ({ kind: "environment-host", name })),
+          ...lines("keys").map((name) => ({ kind: "environment-key", name })),
         ];
         run($('button[type="submit"]', form), () => preflight(requirements));
       };

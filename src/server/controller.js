@@ -273,6 +273,13 @@ export class Controller {
         if (!this.host.supported) return unavailable("此宿主版本尚未通过会话回退适配验证");
         if (!this.sessions?.rewind) return unavailable("当前宿主没有已验证的会话回退适配");
         return this.sessions.rewind(payload);
+      case "sessions.attachment":
+        if (!this.host.supported) return unavailable("此宿主版本尚未通过会话附件恢复适配验证");
+        if (!this.sessions?.attachment) return unavailable("当前宿主没有已验证的附件恢复接口");
+        return this.sessions.attachment(payload);
+      case "sessions.releaseAttachments":
+        if (!this.sessions?.releaseAttachments) return unavailable("附件恢复接口未加载");
+        return this.sessions.releaseAttachments(payload);
       case "diagnostics.run":
         return {
           ...(await this.status()),

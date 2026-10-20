@@ -43,6 +43,8 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 记录类型：`credential`、`access`、`webshell`、`tunnel`、`screenshot`、`http`、`chain`、`file`、`score-point`、`score-hit`、`stage`、`session`。这些是本地证据记录，写入记录不执行远程操作。
 
+凭据的字段白名单、安全读回、秘密保留/替换/清空及旧字段处理见 [credentials-contract.md](credentials-contract.md)。`records.list/save` 只返回非秘密元数据和 `secretState`，同 ID 不能变换记录类型、项目或数据域绕过投影。数据库仍为本地明文存储。
+
 设置默认值：
 
 ```json
@@ -180,7 +182,7 @@ PNG/JPEG/WebP/GIF 的预览先检查格式结构与尺寸，最长边 16384 像�
 
 未保存表单按工作区、页面和对象保留在面板内存。关闭弹窗或切换页面后可恢复同一对象的草稿；保存、主动放弃和删除只清理对应草稿。刷新或卸载会丢失内存草稿并提示，不写入浏览器持久存储。这不是官方聊天输入框的草稿桥或崩溃恢复。
 
-环境秘密表单与入口确认表单不进入上述内存草稿。环境表单成功、失败、切页或销毁后清空秘密输入；变量读回只显示配置状态。
+环境秘密表单与入口确认表单不进入上述内存草稿。凭据编辑只保留非秘密字段，密码和显式清空选项不保留。秘密输入在保存成功、失败或关闭后清空；配置和凭据读回只显示保存状态。
 
 ## 当前安装的演练入口
 
@@ -194,12 +196,16 @@ PNG/JPEG/WebP/GIF 的预览先检查格式结构与尺寸，最长边 16384 像�
 
 环境配置的 action、脱敏、修订与文件权限约定见 [environment-contract.md](environment-contract.md)。实际变量解析仅为内部方法，不开放给 HTTP、模型工具、报告或提示词。模型不会通过工具替用户保存秘密或确认演练入场。
 
+环境依赖预检见 [environment-preflight-contract.md](environment-preflight-contract.md)：检查明确声明的变量、主机登记及密钥登记 ID，仅读取状态快照和文件元信息，不返回秘密、路径或无关配置。技能、目录和计划共用声明规范。配置项通过不证明连接有效；目录来源不可用仍使整体结果为 unknown。
+
 多任务队列合同见 [workflow-plan-contract.md](workflow-plan-contract.md)。HTTP 与模型工具使用同一 coordinator；模型调用强制使用调用者的项目和父会话。未知宿主版本不能创建计划，仍可查看/停止已有计划。撤销和卸载按计划协调器 → 单个工作流顺序清理，`stopped:false` 不当作成功。
 
 ## 官方输入框草稿桥
 
-客户端只接收同源且来自本面板 iframe 的请求。`restore` 的 payload 为 `{newSessionId,draft}`，仅支持纯文本；通过官方 `sessions.using` 保留绑定，再调用 `requestDraftInitialization`，不发送消息。已有草稿/附件返回 `preserved`，被阻止时返回 `blocked`；均不覆盖目标内容。
+客户端只接收同源且来自本面板 iframe 的请求。`restore` 的 payload 为 `{newSessionId,draft,attachmentBatch?}`；通过官方 `sessions.using` 保留绑定，再调用 `requestDraftInitialization`，不发送消息。已有草稿/附件返回 `preserved`，被阻止时返回 `blocked`；均不覆盖目标内容。
 
-返回的 `draftStatus` 与 `openStatus` 分开：`restored` 代表官方输入状态已恢复，`requested` 仅代表同步 `openSession` 已返回，不声称可见页面完成切换。打开失败但已恢复时，页面保留该事实，不重试写入草稿。
+附件批次只引用该次回退移除的第一条人工消息，完成后绑定新会话。固定的 `sessions.attachment/releaseAttachments` 仅供工作台 HTTP 使用，不开放为模型 action；读取未知版本拒绝，清理仍可执行。图片重建为本地草稿，文件通过官方上传到新 Agent，不能复用原收据。完整合同、载体限制和原生 todo 语义见 [session-attachments-contract.md](session-attachments-contract.md)。
+
+返回的 `draftStatus`、`textStatus`、`attachmentStatus`、`uploadStatus` 与 `openStatus` 分开：整体 `restored` 代表文字与必要附件已恢复；`partial` 明示已恢复文字但附件未完成。`requested` 仅代表同步 `openSession` 已返回，不声称可见页面完成切换。打开失败但已恢复时，页面保留该事实，不重试写入草稿。附件批次释放后不提供同批次重试按钮。
 
 请求可带顶层绝对 `expiresAt`。父桥按最早截止时刻取消，并在写入前重新核对截止时间；页面超时发送 `cancel`。关闭、重新加载和卸载也取消，关闭后到达的旧消息不能开始恢复。此为官方模块隔离验证的合同，真实桌面可见导航、编辑重发和附件恢复仍未验。

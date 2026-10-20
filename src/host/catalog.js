@@ -1,9 +1,11 @@
 import { statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { fail, object, string } from "../core/validation.js";
+import { normalizeServers } from "../core/servers.js";
 
 const ORIGINS = ["host", "project"];
-const REQUIREMENT_KINDS = ["tool", "toolkit", "directory", "skill"];
+const ENVIRONMENT_KINDS = ["environment-variable", "environment-host", "environment-key"];
+const REQUIREMENT_KINDS = ["tool", "toolkit", "directory", "skill", ...ENVIRONMENT_KINDS];
 
 function fields(value, allowed) {
   object(value);
@@ -16,15 +18,44 @@ function reference(value) {
   string(value.id, "id");
   return { origin: value.origin, id: value.id };
 }
-function requirements(value) {
+export function normalizeRequirements(value) {
   if (!Array.isArray(value)) fail("INVALID_INPUT", "requirements must be an array");
   return value.map((item) => {
-    fields(item, ["kind", "name", "path"]);
+    fields(item, ["kind", "name", "path", "nonEmpty"]);
     if (!REQUIREMENT_KINDS.includes(item.kind)) fail("INVALID_INPUT", "Unknown requirement kind");
     const key = item.kind === "directory" ? "path" : "name";
     string(item[key], key);
-    if (Object.keys(item).some((name) => !["kind", key].includes(name)))
+    const allowed =
+      item.kind === "environment-variable" ? ["kind", key, "nonEmpty"] : ["kind", key];
+    if (Object.keys(item).some((name) => !allowed.includes(name)))
       fail("INVALID_INPUT", `Only ${key} identifies this requirement`);
+    if (item.kind === "environment-variable") {
+      if (
+        !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(item.name) ||
+        (item.nonEmpty !== undefined && typeof item.nonEmpty !== "boolean")
+      )
+        fail(
+          "INVALID_INPUT",
+          "Environment variables require a portable name and optional boolean nonEmpty",
+        );
+      return { kind: item.kind, name: item.name, nonEmpty: item.nonEmpty ?? true };
+    }
+    if (item.kind === "environment-host") {
+      let names;
+      try {
+        names = normalizeServers([item.name]);
+      } catch {
+        fail(
+          "INVALID_INPUT",
+          "Environment host must identify one configured host, without credentials, URLs or ports",
+        );
+      }
+      if (names.length !== 1)
+        fail("INVALID_INPUT", "Environment host must identify one configured host");
+      return { kind: item.kind, name: names[0] };
+    }
+    if (item.kind === "environment-key" && !/^[0-9a-f-]{36}$/.test(item.name))
+      fail("INVALID_INPUT", "Environment key must identify a registered private-key metadata ID");
     return { kind: item.kind, [key]: item[key] };
   });
 }
@@ -46,7 +77,7 @@ function declaration(definition, explicit) {
       detail: "No dependency declaration; skill prose is not inspected",
     };
   try {
-    return { state: "declared", source, requirements: requirements(raw) };
+    return { state: "declared", source, requirements: normalizeRequirements(raw) };
   } catch (error) {
     return { state: "invalid", source, requirements: [], detail: error.message };
   }
@@ -83,10 +114,11 @@ function combined(checks) {
 
 /** Read-only catalog. Never executes tools, inspects skill prose for dependencies, or fetches MCP directories. */
 export class HostCatalog {
-  constructor(ctx, { library, toolkit } = {}) {
+  constructor(ctx, { library, toolkit, environment } = {}) {
     this.ctx = ctx;
     this.library = library;
     this.toolkit = toolkit;
+    this.environment = environment;
   }
   service(name) {
     return this.ctx.get(name);
@@ -259,7 +291,123 @@ export class HostCatalog {
       };
     }
   }
-  check(requirement, catalog) {
+  environmentObservation(cache) {
+    if (cache.loaded) return cache;
+    cache.loaded = true;
+    if (typeof this.environment?.dispatch !== "function") {
+      cache.source = {
+        state: "unsupported",
+        detail: "Local environment configuration is unavailable",
+      };
+      return cache;
+    }
+    try {
+      const raw = this.environment.dispatch("environment.status");
+      if (
+        !Number.isSafeInteger(raw?.revision) ||
+        raw.revision < 0 ||
+        !Array.isArray(raw.variables) ||
+        !Array.isArray(raw.hosts) ||
+        !Array.isArray(raw.privateKeys)
+      )
+        throw new Error("Invalid snapshot");
+      const variables = new Map();
+      for (const item of raw.variables) {
+        if (
+          typeof item.name !== "string" ||
+          !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(item.name) ||
+          typeof item.configured !== "boolean" ||
+          variables.has(item.name)
+        )
+          throw new Error("Invalid variable status");
+        variables.set(item.name, item.configured);
+      }
+      const hosts = normalizeServers(raw.hosts);
+      const keys = new Map();
+      for (const item of raw.privateKeys) {
+        if (
+          typeof item.id !== "string" ||
+          !/^[0-9a-f-]{36}$/.test(item.id) ||
+          keys.has(item.id) ||
+          typeof item.metadata?.available !== "boolean"
+        )
+          throw new Error("Invalid key status");
+        keys.set(item.id, {
+          available: item.metadata.available,
+          validation: item.metadata.validation,
+          reason: item.metadata.reason,
+        });
+      }
+      cache.value = { variables, hosts: new Set(hosts), keys };
+      cache.source = {
+        state: "available",
+        revision: raw.revision,
+        detail:
+          "Local configuration status only; no secret resolution, key read or connection validation",
+      };
+    } catch {
+      // An environment failure must never echo a provider error or its possibly secret data.
+      cache.source = {
+        state: "error",
+        detail: "Local environment configuration could not be inspected safely",
+      };
+    }
+    return cache;
+  }
+  environmentCheck(requirement, cache) {
+    const observation = this.environmentObservation(cache);
+    if (!observation.value)
+      return { ...requirement, state: "unknown", detail: observation.source.detail };
+    const { variables, hosts, keys } = observation.value;
+    if (requirement.kind === "environment-variable") {
+      const present = variables.has(requirement.name);
+      const nonEmpty = variables.get(requirement.name) === true;
+      return {
+        ...requirement,
+        state: present && (!requirement.nonEmpty || nonEmpty) ? "ready" : "missing",
+        detail: !present
+          ? "Variable is not configured in this installation"
+          : requirement.nonEmpty && !nonEmpty
+            ? "Variable is configured with an empty value"
+            : requirement.nonEmpty
+              ? "Variable is configured and non-empty; value and credential validity are not exposed or tested"
+              : "Variable is registered; an empty value is permitted by this declaration",
+      };
+    }
+    if (requirement.kind === "environment-host")
+      return {
+        ...requirement,
+        state: hosts.has(requirement.name) ? "ready" : "missing",
+        detail: hosts.has(requirement.name)
+          ? "Host is in the local infrastructure inventory; connectivity and target authorization are not tested"
+          : "Host is not in the local infrastructure inventory",
+      };
+    const key = keys.get(requirement.name);
+    if (!key)
+      return {
+        ...requirement,
+        state: "missing",
+        detail: "Private-key metadata ID is not registered in this installation",
+      };
+    if (key.available && key.validation === "metadata-only")
+      return {
+        ...requirement,
+        state: "ready",
+        detail:
+          "Registered path currently identifies an ordinary file; key bytes, format and authentication are not checked",
+      };
+    const absent = ["NOT_FOUND", "UNSAFE_PATH", "INVALID_PATH"].includes(key.reason);
+    return {
+      ...requirement,
+      state: absent ? "missing" : "unknown",
+      detail: absent
+        ? "Registered key path is missing or no longer an acceptable ordinary file"
+        : "Registered key path metadata cannot currently be verified; no key bytes were read",
+    };
+  }
+  check(requirement, catalog, environment) {
+    if (ENVIRONMENT_KINDS.includes(requirement.kind))
+      return this.environmentCheck(requirement, environment);
     switch (requirement.kind) {
       case "directory":
         return { ...requirement, ...this.directory(requirement.path, catalog.context.cwd) };
@@ -317,12 +465,13 @@ export class HostCatalog {
     if (!Array.isArray(selected)) fail("INVALID_INPUT", "skills must be an array");
     const refs = selected.map(reference);
     const explicit =
-      payload.requirements === undefined ? undefined : requirements(payload.requirements);
+      payload.requirements === undefined ? undefined : normalizeRequirements(payload.requirements);
     for (const item of selected)
-      if (item.requirements !== undefined) requirements(item.requirements);
+      if (item.requirements !== undefined) normalizeRequirements(item.requirements);
     const context = this.context(payload.sessionId);
     const catalog = await this.collect(context, signal);
-    const checks = (explicit || []).map((item) => this.check(item, catalog));
+    const environment = { loaded: false };
+    const checks = (explicit || []).map((item) => this.check(item, catalog, environment));
     const skills = [];
     for (let index = 0; index < refs.length; index++) {
       signal?.throwIfAborted();
@@ -340,7 +489,7 @@ export class HostCatalog {
       }
       const dependency = declaration(item, selected[index].requirements);
       const ownChecks = dependency.requirements.map((requirement) =>
-        this.check(requirement, catalog),
+        this.check(requirement, catalog, environment),
       );
       if (dependency.state !== "declared")
         ownChecks.push({ kind: "declaration", state: dependency.state, detail: dependency.detail });
@@ -397,9 +546,10 @@ export class HostCatalog {
       checks,
       sources: catalog.sources,
       toolkit: catalog.toolkit,
+      ...(environment.loaded ? { environment: environment.source } : {}),
       executionAuthorized: false,
       scope:
-        "Declared dependencies and local directory presence only; no download, execution, network probe or admission grant",
+        "Declared dependencies, local configuration status and directory presence only; no secret resolution, key read, download, execution, network probe or admission grant",
     };
   }
   dispatch(action, payload = {}, options = {}) {

@@ -14,9 +14,13 @@ test("unverified desktop versions cannot prepare or perform a destructive sessio
       calls++;
       return { newSessionId: "synthetic" };
     },
+    attachment() {
+      calls++;
+      return { item: {} };
+    },
   };
   const controller = new Controller({ host, sessions });
-  for (const action of ["sessions.prepare", "sessions.rewind"]) {
+  for (const action of ["sessions.prepare", "sessions.rewind", "sessions.attachment"]) {
     await assert.rejects(controller.dispatch(action), { code: "UNSUPPORTED" });
   }
   assert.equal(calls, 0);

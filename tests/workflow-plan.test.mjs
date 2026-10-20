@@ -174,6 +174,46 @@ test("two explicit harmless tasks queue behind one slot and disposal, with exact
   assert.deepEqual((await f.status(item.id)).summary.results[0].result, result);
 });
 
+test("plan environment declarations use the catalog contract and block missing configuration before activation", async (t) => {
+  const observed = [];
+  const f = fixture(t, {
+    async preflight(payload) {
+      observed.push(payload);
+      return {
+        status: "blocked",
+        checks: [{ ...payload.requirements[0], state: "missing" }],
+        executionAuthorized: false,
+      };
+    },
+  });
+  const { item } = await f.create([
+    task("requires-local-config", {
+      requirements: [{ kind: "environment-variable", name: "SYNTHETIC_PLAN_TOKEN" }],
+    }),
+  ]);
+  const result = await until(async () => {
+    const value = await f.status(item.id);
+    return value.state === "finished-with-errors" && value;
+  });
+  assert.deepEqual(observed[0], {
+    sessionId: "parent-a",
+    requirements: [{ kind: "environment-variable", name: "SYNTHETIC_PLAN_TOKEN", nonEmpty: true }],
+  });
+  assert.equal(result.tasks[0].state, "blocked");
+  assert.equal(result.tasks[0].error.code, "DEPENDENCIES_UNAVAILABLE");
+  assert.equal(f.starts.length, 0);
+  await assert.rejects(
+    f.create([
+      task("invalid", {
+        requirements: [
+          { kind: "environment-variable", name: "SYNTHETIC_PLAN_TOKEN", nonEmpty: "false" },
+        ],
+      }),
+    ]),
+    /boolean/,
+  );
+});
+
 test("project capacity occupied by an unrelated workflow is queued, never taken over", async (t) => {
   const f = fixture(t);
   const direct = (

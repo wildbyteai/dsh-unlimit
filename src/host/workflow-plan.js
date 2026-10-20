@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { fail, object, string } from "../core/validation.js";
+import { normalizeRequirements } from "./catalog.js";
 
 const now = () => new Date().toISOString();
 const diagnostic = (error) => ({
@@ -34,15 +35,10 @@ function tasks(value, roles) {
     if (Buffer.byteLength(task) > 32 * 1024) fail("INVALID_INPUT", "Task exceeds 32 KiB");
     if (!Array.isArray(input.requirements) || input.requirements.length > 32)
       fail("INVALID_INPUT", "Declare requirements explicitly (at most 32; [] means none declared)");
-    const requirements = input.requirements.map((requirement) => {
-      const key = requirement?.kind === "directory" ? "path" : "name";
-      fields(requirement, ["kind", key]);
-      if (!["tool", "toolkit", "directory", "skill"].includes(requirement.kind))
-        fail("INVALID_INPUT", "Unknown requirement kind");
-      const value = string(requirement[key], key);
-      if (value.length > 4096) fail("INVALID_INPUT", "Requirement identifier is too long");
-      return { kind: requirement.kind, [key]: value };
-    });
+    const requirements = normalizeRequirements(input.requirements);
+    for (const requirement of requirements)
+      if ((requirement.path ?? requirement.name).length > 4096)
+        fail("INVALID_INPUT", "Requirement identifier is too long");
     const dependsOn = input.dependsOn ?? [];
     if (!Array.isArray(dependsOn) || dependsOn.length > 32)
       fail("INVALID_INPUT", "Invalid task dependencies");

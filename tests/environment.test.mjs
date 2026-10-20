@@ -254,7 +254,30 @@ test("private key paths reject traversal, relative paths, directories and links,
   fs.unlinkSync(key);
   const stale = f.call("environment.status").privateKeys[0];
   assert.equal(stale.metadata.available, false);
+  assert.equal(stale.metadata.reason, "NOT_FOUND");
   assert.equal(stale.id, saved.privateKeys[0].id);
+});
+
+test("private-key permission inspection failures return a safe uncertainty reason without key bytes or raw errors", (t) => {
+  const f = fixture(t);
+  const key = join(f.root, "synthetic-key-permission");
+  fs.writeFileSync(key, SECRET, { mode: 0o600 });
+  f.call("environment.keys.save", { revision: 0, label: "Synthetic", path: key });
+  const original = fs.lstatSync;
+  t.mock.method(fs, "lstatSync", (path, ...args) => {
+    if (path === key) throw Object.assign(new Error(SECRET), { code: "EACCES" });
+    return original(path, ...args);
+  });
+  syncBuiltinESMExports();
+  try {
+    const result = f.call("environment.status");
+    noSecret(result);
+    assert.equal(result.privateKeys[0].metadata.available, false);
+    assert.equal(result.privateKeys[0].metadata.reason, "PERMISSION_DENIED");
+  } finally {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
+  }
 });
 
 test("onboarding skip/configured state survives reopen, different data roots stay independent", (t) => {

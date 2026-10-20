@@ -67,7 +67,7 @@ export async function environmentSettings({ api, esc, panel, toast, run }) {
   }
   function keyTable() {
     return state.privateKeys.length
-      ? `<div class="tablewrap"><table><thead><tr><th>标签 / 路径</th><th>元信息</th><th>操作</th></tr></thead><tbody>${state.privateKeys.map((item, index) => `<tr><td><strong>${esc(item.label)}</strong><div class="mono">${esc(item.path)}</div></td><td>${item.metadata?.available ? `普通文件 · ${esc(item.metadata.bytes)} 字节<br>权限 ${esc(item.metadata.mode)} · 仅元信息检查` : `<span class="tag orange">路径当前不可用</span><br>${esc(item.metadata?.reason || "未提供元信息")}`}</td><td><button class="small" type="button" data-env-action="edit-key" data-env-index="${index}">编辑</button> <button class="small danger" type="button" data-env-action="delete-key" data-env-index="${index}">删除登记</button></td></tr>`).join("")}</tbody></table></div>`
+      ? `<div class="tablewrap"><table><thead><tr><th>标签 / 路径</th><th>元信息</th><th>操作</th></tr></thead><tbody>${state.privateKeys.map((item, index) => `<tr><td><strong>${esc(item.label)}</strong><div class="mono">${esc(item.path)}</div><small>登记编号 <span class="mono">${esc(item.id)}</span></small></td><td>${item.metadata?.available ? `普通文件 · ${esc(item.metadata.bytes)} 字节<br>权限 ${esc(item.metadata.mode)} · 仅元信息检查` : `<span class="tag orange">路径当前不可用</span><br>${esc(item.metadata?.reason || "未提供元信息")}`}</td><td><button class="small" type="button" data-env-action="edit-key" data-env-index="${index}">编辑</button> <button class="small danger" type="button" data-env-action="delete-key" data-env-index="${index}">删除登记</button></td></tr>`).join("")}</tbody></table></div>`
       : '<p class="info">尚未登记私钥路径。</p>';
   }
   function keyEditor() {

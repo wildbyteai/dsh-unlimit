@@ -41,9 +41,9 @@ export function mount(ctx, host) {
   const retry = new RetryPolicy(ctx, store);
   const admission = new DrillAdmission(store, host.dataRoot);
   const workflow = new DesktopWorkflow(ctx, store, flow, { admission });
-  const catalog = new HostCatalog(ctx, { library: skills, toolkit });
-  const plans = new DesktopWorkflowPlan(workflow, { catalog });
   const environment = new LocalEnvironment(realpathSync(host.dataRoot));
+  const catalog = new HostCatalog(ctx, { library: skills, toolkit, environment });
+  const plans = new DesktopWorkflowPlan(workflow, { catalog });
   const continuation = new Continuation(ctx, store, host);
   const sessions = new DesktopSessions(ctx, store);
   let skillConnection;
@@ -76,6 +76,7 @@ export function mount(ctx, host) {
         if (!result.stopped) throw new Error("多任务计划仍有未确认清理的执行者");
       },
       () => workflow.close(),
+      () => sessions.close(),
       () => toolkit.close(),
       () => flow.close(),
       () => store.close(),

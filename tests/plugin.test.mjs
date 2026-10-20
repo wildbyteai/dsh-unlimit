@@ -447,6 +447,104 @@ test(
 );
 
 test(
+  "credential HTTP and official model-tool responses never expose stored content, while edits retain or explicitly clear it",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const agent = f.agent("synthetic-credential-agent");
+    const workspaceId = f.controller.store.dispatch("workspaces.save", {
+      name: "Synthetic credential records",
+    }).item.id;
+    f.controller.store.dispatch("workspaces.bind", { id: workspaceId, sessionId: agent.id });
+    const payload = { workspaceId, kind: "credential" };
+    const secret = "fixture-only-not-a-real-password-472";
+    const saved = await f.request({
+      action: "records.save",
+      payload: { ...payload, data: { name: "Synthetic account", username: "example", secret } },
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.includes(secret), false);
+    const id = saved.json.data.item.id;
+    assert.equal(saved.json.data.item.secretState.hasSecret, true);
+    const modelRead = await f.execute(agent, "records.list", { kind: "credential" });
+    assert.equal(modelRead.isError, false);
+    assert.equal(JSON.stringify(modelRead).includes(secret), false);
+    assert.equal(modelRead.value.items[0].data.secret, undefined);
+    const renamed = await f.execute(agent, "records.save", {
+      kind: "credential",
+      id,
+      data: { name: "Renamed without a secret value" },
+    });
+    assert.equal(renamed.isError, false, JSON.stringify(renamed));
+    assert.equal(renamed.value.item.secretState.hasSecret, true);
+    assert.equal(JSON.stringify(renamed).includes(secret), false);
+    const rejected = await f.request({
+      action: "records.save",
+      payload: { ...payload, id, data: { password: secret } },
+    });
+    assert.equal(rejected.status, 400);
+    assert.equal(rejected.body.includes(secret), false);
+    const typeChange = await f.execute(agent, "records.save", {
+      id,
+      kind: "http",
+      data: {},
+    });
+    assert.equal(typeChange.isError, true);
+    const cleared = await f.request({
+      action: "records.save",
+      payload: { ...payload, id, data: { secret: "" } },
+    });
+    assert.equal(cleared.json.data.item.secretState.hasSecret, false);
+    assert.equal(cleared.json.data.item.data.name, "Renamed without a secret value");
+    const report = await f.execute(agent, "report.build", {});
+    assert.equal(report.isError, false);
+    assert.equal(JSON.stringify(report).includes(secret), false);
+  },
+);
+
+test(
+  "HTTP and official model-tool preflight use this installation's environment status without resolving secrets",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const agent = f.agent("synthetic-environment-agent");
+    const secret = "fixture-environment-secret-not-real";
+    t.mock.method(f.controller.environment, "resolve", () => assert.fail("No secret resolution"));
+    t.mock.method(f.controller.environment, "exportEnvironment", () =>
+      assert.fail("No environment export"),
+    );
+    const saved = await f.request({
+      action: "environment.variables.save",
+      payload: { revision: 0, name: "SYNTHETIC_PREFLIGHT", secret: true, value: secret },
+    });
+    assert.equal(saved.status, 200);
+    const requirements = [{ kind: "environment-variable", name: "SYNTHETIC_PREFLIGHT" }];
+    const modelCheck = await f.execute(agent, "catalog.preflight", { requirements });
+    assert.equal(modelCheck.isError, false, JSON.stringify(modelCheck));
+    assert.equal(modelCheck.value.status, "ready");
+    assert.equal(modelCheck.value.environment.revision, saved.json.data.revision);
+    assert.equal(modelCheck.value.checks[0].state, "ready");
+    assert.equal(JSON.stringify(modelCheck).includes(secret), false);
+    assert.equal(modelCheck.value.executionAuthorized, false);
+    const cleared = await f.request({
+      action: "environment.variables.save",
+      payload: {
+        revision: saved.json.data.revision,
+        name: "SYNTHETIC_PREFLIGHT",
+        secret: true,
+        value: "",
+      },
+    });
+    assert.equal(cleared.status, 200);
+    const blocked = await f.request({ action: "catalog.preflight", payload: { requirements } });
+    assert.equal(blocked.json.data.status, "blocked");
+    assert.equal(blocked.json.data.checks[0].state, "missing");
+    assert.equal(blocked.body.includes(secret), false);
+    assert.equal(process.env.SYNTHETIC_PREFLIGHT, undefined);
+  },
+);
+
+test(
   "unconfirmed entry protects both HTTP and real model tools; environment secrets never become model actions",
   hostOnly,
   async (t) => {
@@ -459,7 +557,13 @@ test(
     const text = JSON.stringify(schema);
     assert.ok(!text.includes("admission.confirm"));
     assert.ok(!text.includes("environment.variables"));
-    for (const action of ["admission.confirm", "environment.resolve", "environment.variables.save"])
+    for (const action of [
+      "admission.confirm",
+      "environment.resolve",
+      "environment.variables.save",
+      "sessions.attachment",
+      "sessions.releaseAttachments",
+    ])
       assert.equal((await f.execute(parent, action, {})).isError, true);
     let result = await f.request({
       action: "environment.variables.save",
