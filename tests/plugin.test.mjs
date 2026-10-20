@@ -588,7 +588,12 @@ test(
         .status,
       400,
     );
-    for (const file of ["admission.js", "environment-settings.js", "workflow-plans.js"]) {
+    for (const file of [
+      "admission.js",
+      "environment-settings.js",
+      "workflow-plans.js",
+      "workspace-rules.js",
+    ]) {
       const resource = await f.request({ method: "GET", url: `/dsh-unlimit/ui/${file}` });
       assert.equal(resource.status, 200);
       assert.match(resource.headers["Content-Type"], /javascript/);

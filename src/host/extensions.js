@@ -54,13 +54,6 @@ export class HostExtensions {
         : target.reason;
     return [
       {
-        id: "readLimit",
-        label: "文件读取上限",
-        state: "unsupported",
-        detail:
-          "官方tool-fs在挂载时捕获静态读取上限，没有动态服务。read工具仅可逐调用传offset/limit（行数），没有max_bytes；本项目readLimit不能冒充已生效的字节配置。",
-      },
-      {
         id: "hooks",
         label: "Hook处理策略",
         state: "unsupported",

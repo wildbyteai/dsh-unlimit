@@ -14,6 +14,7 @@ const ASSETS = new Map([
     ["environment-settings.js", "text/javascript; charset=utf-8"],
   ],
   ["/dsh-unlimit/ui/workflow-plans.js", ["workflow-plans.js", "text/javascript; charset=utf-8"]],
+  ["/dsh-unlimit/ui/workspace-rules.js", ["workspace-rules.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/styles.css", ["styles.css", "text/css; charset=utf-8"]],
 ]);
 

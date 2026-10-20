@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { workspaceInstructions } from "../core/prompts.js";
+import { readWorkspaceRule, workspaceInstructions } from "../core/workspace-rules.js";
 
 const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
 const unavailable = (message) => {
@@ -19,6 +19,7 @@ export class Controller {
     files,
     retry,
     repeat,
+    readLimits,
     templates,
     catalog,
     workflow,
@@ -40,6 +41,7 @@ export class Controller {
       files,
       retry,
       repeat,
+      readLimits,
       templates,
       catalog,
       workflow,
@@ -55,6 +57,7 @@ export class Controller {
     for (const service of [
       this.continuation,
       this.repeat,
+      this.readLimits,
       this.extensions,
       this.retry,
       this.runtime,
@@ -66,6 +69,11 @@ export class Controller {
       }
     }
     if (errors.length) throw new AggregateError(errors, "部分运行控制未能还原，请检查诊断状态");
+  }
+  async updateReadLimits(method) {
+    const capability = this.readLimits?.capabilities().find((item) => item.id === "readLimit");
+    if (capability && (capability.state !== "unsupported" || capability.owned))
+      await this.readLimits[method]();
   }
   async status() {
     const sessionCapabilities = this.sessions?.capabilities?.() ?? {
@@ -125,6 +133,7 @@ export class Controller {
       capabilities: [
         ...runtimeCapabilities,
         ...(this.repeat?.capabilities() ?? []),
+        ...(this.readLimits?.capabilities() ?? []),
         ...(this.continuation?.capabilities() ?? []),
         ...(this.retry?.capabilities() ?? []).map((item) =>
           this.host.supported
@@ -213,6 +222,7 @@ export class Controller {
             await this.continuation.apply();
           this.extensions?.apply();
           await this.repeat?.apply();
+          await this.updateReadLimits("apply");
           this.store.dispatch("settings.save", {
             revision: current.revision,
             value: { ...current.value, enabled: true },
@@ -265,7 +275,11 @@ export class Controller {
         for (const change of [
           () => this.continuation?.changed(),
           ...(this.runtime.enabled
-            ? [() => this.runtime.permissionDefaults?.changed(), () => this.repeat?.changed()]
+            ? [
+                () => this.runtime.permissionDefaults?.changed(),
+                () => this.repeat?.changed(),
+                () => this.updateReadLimits("changed"),
+              ]
             : []),
         ]) {
           try {
@@ -289,6 +303,8 @@ export class Controller {
       }
       case "rules.workspace":
         return { items: workspaceInstructions(payload.directory) };
+      case "rules.preview":
+        return { item: readWorkspaceRule(payload) };
       case "rules.select":
       case "rules.policy": {
         const current = this.store.dispatch("settings.get", {});
@@ -297,7 +313,7 @@ export class Controller {
             ? { workspaceFiles: payload.paths }
             : { workspacePolicy: payload.policy };
         return this.store.dispatch("settings.save", {
-          revision: current.revision,
+          revision: payload.revision,
           value: { ...current.value, ...change },
         });
       }

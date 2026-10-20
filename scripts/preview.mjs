@@ -11,6 +11,7 @@ import { Flow } from "../src/core/flow.js";
 import { WorkspaceFiles } from "../src/core/files.js";
 import { DesktopRuntime } from "../src/host/runtime.js";
 import { RetryPolicy } from "../src/host/retry-policy.js";
+import { ReadLimits } from "../src/host/read-limits.js";
 import { HostCatalog } from "../src/host/catalog.js";
 import { DesktopWorkflow } from "../src/host/workflow.js";
 import { Continuation } from "../src/host/continuation.js";
@@ -141,6 +142,7 @@ try {
     skills,
     files: new WorkspaceFiles(join(temporary, "materials"), store),
     retry: new RetryPolicy({}, store),
+    readLimits: new ReadLimits({}, store, hostInfo),
     toolkit,
     templates: new Templates(toolkit),
     catalog,

@@ -154,6 +154,75 @@ test("a post-enable catalog notification error discloses active controls without
   assert.ok(!f.calls.includes("runtime.revert"));
 });
 
+test("read cap remount must complete before enabling, and activation failure restores all controls", async () => {
+  const f = controlFixture();
+  const gate = Promise.withResolvers();
+  f.controller.readLimits = {
+    capabilities: () => [{ id: "readLimit", state: "available", owned: false }],
+    async apply() {
+      f.calls.push("read.start");
+      await gate.promise;
+    },
+    async revert() {
+      f.calls.push("read.revert");
+    },
+  };
+  const applying = f.controller.dispatch("control.apply");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(f.store.dispatch("settings.get").value.enabled, false);
+  gate.reject(new Error("Synthetic read remount failure"));
+  await assert.rejects(applying, /read remount failure/);
+  assert.deepEqual(f.calls, [
+    "runtime.apply",
+    "repeat.apply:false",
+    "read.start",
+    "repeat.revert",
+    "read.revert",
+    "runtime.revert",
+  ]);
+  assert.equal(f.runtime.enabled, false);
+});
+
+test("unverified read caps stay unavailable without blocking core controls; owned conflicts are reported on save", async () => {
+  const f = controlFixture();
+  const capability = { id: "readLimit", state: "unsupported", owned: false, effectiveCaps: null };
+  f.controller.readLimits = {
+    capabilities: () => [capability],
+    async apply() {
+      assert.fail("unverified entry must not be applied");
+    },
+    async changed() {
+      f.calls.push("read.changed");
+    },
+    async revert() {},
+  };
+  await f.controller.dispatch("control.apply");
+  assert.equal(
+    (await f.controller.status()).capabilities.find((cap) => cap.id === "readLimit").state,
+    "unsupported",
+  );
+  f.calls.length = 0;
+  await f.save({ readLimit: 2048 });
+  assert.deepEqual(f.calls, ["saved:true", "permission.changed", "repeat.changed"]);
+  capability.state = "applying";
+  await f.save({ readLimit: 1024 });
+  assert.equal(f.calls.at(-1), "read.changed");
+  capability.state = "unsupported";
+  capability.owned = true;
+  f.controller.readLimits.changed = async () => {
+    throw Object.assign(new Error("Synthetic read ownership conflict"), { code: "CONFLICT" });
+  };
+  await assert.rejects(f.save({ readLimit: 512 }), (error) => {
+    assert.equal(error.code, "SETTINGS_APPLIED_PARTIAL");
+    assert.equal(error.partial.savedRevision, 4);
+    assert.match(error.message, /read ownership conflict/);
+    return true;
+  });
+  const before = f.store.dispatch("settings.get");
+  await assert.rejects(f.save({ readLimit: Number.MAX_SAFE_INTEGER }), { code: "INVALID_INPUT" });
+  assert.deepEqual(f.store.dispatch("settings.get"), before);
+});
+
 test("unverified desktop versions cannot prepare or perform a destructive session transition", async () => {
   let calls = 0;
   const host = { supported: false };

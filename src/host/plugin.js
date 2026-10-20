@@ -22,6 +22,7 @@ import { DrillAdmission } from "../core/admission.js";
 import { LocalEnvironment } from "../core/environment.js";
 import { DesktopWorkflowPlan } from "./workflow-plan.js";
 import { RepeatReminder } from "./repeat-reminder.js";
+import { ReadLimits } from "./read-limits.js";
 
 export const name = "dsh-unlimit";
 export const inject = ["webServer", "connection"];
@@ -41,6 +42,7 @@ export function mount(ctx, host) {
   const extensions = new HostExtensions(ctx, store);
   const retry = new RetryPolicy(ctx, store);
   const repeat = new RepeatReminder(ctx, store, host);
+  const readLimits = new ReadLimits(ctx, store, host);
   const admission = new DrillAdmission(store, host.dataRoot);
   const workflow = new DesktopWorkflow(ctx, store, flow, { admission });
   const environment = new LocalEnvironment(realpathSync(host.dataRoot));
@@ -62,6 +64,7 @@ export function mount(ctx, host) {
     files,
     retry,
     repeat,
+    readLimits,
     workflow,
     continuation,
     admission,
@@ -160,6 +163,7 @@ export function mount(ctx, host) {
   ctx.inject(["systemPrompt", "approval", "sandboxPolicy"], async (scope) => {
     runtime.ctx = scope;
     repeat.ctx = scope;
+    readLimits.ctx = scope;
     scope.effect(() => () => controller.revertControls());
     const settings = store.dispatch("settings.get").value;
     if (settings.enabled && settings.autoReapply && host.supported) {

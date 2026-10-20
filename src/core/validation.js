@@ -125,6 +125,8 @@ export function settings(value) {
   if (result.maxSubagents < 1 || result.maxSubagents > 128 || result.maxDepth > 64)
     fail("INVALID_INPUT", "Agent count must be 1..128 and depth 0..64");
   if (result.retryLimit > 20) fail("INVALID_INPUT", "Request retry limit must be 0..20");
+  if (!Number.isSafeInteger(result.readLimit + 1))
+    fail("INVALID_INPUT", "Read byte limit plus one must remain a safe integer");
   if (result.continueLimit > 20) fail("INVALID_INPUT", "Continuation limit must be 0..20");
   string(result.continueText, "continueText");
   if (Buffer.byteLength(result.continueText) > 4096)

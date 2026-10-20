@@ -124,10 +124,14 @@ export class DesktopRuntime {
                 library.items.find((item) => item.model && item.model === model) ??
                 library.items.find((item) => item.id === library.activeId);
               const directory = context.agent?.session?.header?.cwd;
-              const workspaceText =
-                config.workspacePolicy === "strict"
-                  ? ""
-                  : selectedInstructions(directory, config.workspaceFiles);
+              const usesWorkspace =
+                config.workspacePolicy === "always" ||
+                (config.workspacePolicy === "fallback" &&
+                  !rule?.content?.trim() &&
+                  !config.prompt.trim());
+              const workspaceText = usesWorkspace
+                ? selectedInstructions(directory, config.workspaceFiles)
+                : "";
               const composed = composePrompt(output, config, {
                 rule,
                 workspaceText,

@@ -356,3 +356,20 @@ test("strict skips selected rules and replacement retains functional tool sectio
   assert.equal(result.sections[0].text, "Synthetic operator");
   assert.equal(result.sections[1], f.assembly.sections[1]);
 });
+
+test("fallback ignores unavailable selected paths when an effective prompt or rule is present", async (t) => {
+  const f = fixture(t, {
+    enabled: true,
+    workspacePolicy: "fallback",
+    workspaceFiles: ["/missing/synthetic/AGENTS.md"],
+  });
+  const context = { agent: { session: { header: { cwd: f.directory } } } };
+  f.runtime.apply();
+  assert.equal((await f.ctx.systemPrompt.assemble(context)).sections[0].text, "Synthetic operator");
+  f.settings.prompt = " \t";
+  f.library.items.push({ id: "active", content: "SYNTHETIC_RULE" });
+  f.library.activeId = "active";
+  assert.equal((await f.ctx.systemPrompt.assemble(context)).sections[0].text, "SYNTHETIC_RULE");
+  f.library.items[0].content = "\n";
+  await assert.rejects(f.ctx.systemPrompt.assemble(context), { code: "RULE_NOT_FOUND" });
+});

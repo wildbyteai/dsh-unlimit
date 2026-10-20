@@ -2,6 +2,7 @@ import { MemoryDrafts } from "./drafts.js";
 import { admissionPage } from "./admission.js";
 import { environmentSettings } from "./environment-settings.js";
 import { workflowPlans } from "./workflow-plans.js";
+import { openWorkspaceRules } from "./workspace-rules.js";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -1522,6 +1523,7 @@ async function controlPage() {
   state.settings = settings;
   const v = { ...defaults, ...settings.value };
   const permission = state.status.permissionDefaults;
+  const readCapability = state.status.capabilities?.find((item) => item.id === "readLimit");
   const permissionOptions = [
     ["", "跟随宿主默认"],
     ...(permission?.options ?? []).map((option) => [option.value, option.label ?? option.value]),
@@ -1592,13 +1594,13 @@ async function controlPage() {
             ],
           }),
           v.workspacePolicy,
-        )}<div class="field wide"><label for="workspace-files">规则文件路径 · 每行一个</label><textarea name="workspaceFiles" id="workspace-files" rows="4">${esc(v.workspaceFiles.join("\n"))}</textarea><small>此策略仅控制本插件主动选取的规则文件；宿主原生工作区指令的运行上下文会保留。</small></div></div><div class="toolbar" style="margin-bottom:0"><button type="button" id="scan-rules">扫描工作区规则</button><button type="button" id="select-rule-paths">设置选定文件</button></div>`,
+        )}<div class="field wide"><label for="workspace-files">规则文件路径 · 每行一个</label><textarea name="workspaceFiles" id="workspace-files" rows="4">${esc(v.workspaceFiles.join("\n"))}</textarea><small>此策略仅控制本插件主动选取的规则文件；宿主原生工作区指令的运行上下文会保留。</small></div></div><div class="toolbar" style="margin-bottom:0"><button type="button" id="scan-rules">浏览并选择规则</button><button type="button" id="select-rule-paths">保存路径列表</button></div>`,
       )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>可填写 IP、完整主机名或 user@host；不要填写密码、URL、网段、端口或通配符。此清单仍不是出口访问控制。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "仅在会话未明确选择权限时请求完整访问；新会话采用下方默认预设。")}${switchRow("autoApprove", "自动审批", "仅处理未明确指定审批策略的会话；显式选择仍由宿主执行。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "设置变更后重新应用", "启用时按运行时生命周期重新注册控制。")}${switchRow("retryOverride", "接管请求重试次数", "关闭时沿用提供方；开启且运行控制已启用后按 0—20 次设置，0 表示不重试。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${sessionDefaults}${panel(
         "执行限额",
         `<div class="fields">${[
           field("maxSubagents", "最大子代理数", "number", { min: 1, max: 128 }),
           field("maxDepth", "最大递归深度", "number", { min: 0 }),
-          field("readLimit", "读取上限（字节）", "number", { min: 0 }),
+          field("readLimit", "读取正文预算（字节）", "number", { min: 0, step: 1 }),
           field("retryLimit", "重试次数", "number", { min: 0, max: 20, step: 1 }),
         ]
           .map((f) => {
@@ -1612,7 +1614,14 @@ async function controlPage() {
               {
                 ...f,
                 disabled: !can(id),
-                help: can(id) ? "" : "宿主未提供此能力；当前保存值暂不生效。",
+                help:
+                  id === "readLimit"
+                    ? can(id)
+                      ? `当前有效预算：${readCapability.effectiveCaps?.readMaxBytes ?? "未知"} B。0 沿用宿主；仅限制 read 返回正文，行号与封装、实际文件 I/O 另计。`
+                      : `${readCapability?.detail ?? "宿主未提供此能力"}；当前保存值暂不生效。0 表示沿用宿主。`
+                    : can(id)
+                      ? ""
+                      : "宿主未提供此能力；当前保存值暂不生效。",
               },
               v[f.name],
             );
@@ -1690,23 +1699,35 @@ async function controlPage() {
         );
       $("#scan-rules").onclick = () =>
         openForm(
-          "扫描工作区规则",
+          "选择工作区目录",
           [field("directory", "本地工作区目录", "text", { required: true })],
           {},
           async (data) => {
-            const result = await api("rules.workspace", data);
-            const paths = result.items;
-            const list = paths.map((i) => i.path).filter(Boolean);
-            if (list.length) {
-              $("#workspace-files").value = list.join("\n");
-              toast(`发现 ${list.length} 个规则文件`);
-            } else toast("未发现规则文件");
+            openWorkspaceRules({
+              api,
+              esc,
+              directory: data.directory,
+              selectedPaths: read().workspaceFiles,
+              async onSelect(paths) {
+                state.settings = await api("rules.select", {
+                  revision: state.settings.revision,
+                  paths,
+                });
+                $("#workspace-files").value = paths.join("\n");
+                $("#settings-revision").textContent = `revision ${state.settings.revision}`;
+                commitInlineDraft("settings-form", ["workspaceFiles"]);
+                toast(`已保存 ${paths.length} 个选定规则文件`);
+              },
+            });
           },
-          { submit: "扫描", keepPage: true, success: "扫描结果已填入表单，尚未保存配置" },
+          { submit: "浏览规则", keepPage: true, success: "请选择规则，可先查看完整正文" },
         );
       $("#select-rule-paths").onclick = (e) =>
         run(e.target, async () => {
-          state.settings = await api("rules.select", { paths: read().workspaceFiles });
+          state.settings = await api("rules.select", {
+            revision: state.settings.revision,
+            paths: read().workspaceFiles,
+          });
           $("#settings-revision").textContent = `revision ${state.settings.revision}`;
           commitInlineDraft("settings-form", ["workspaceFiles"]);
           toast("已更新选定规则文件");
