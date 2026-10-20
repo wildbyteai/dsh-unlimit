@@ -1,6 +1,6 @@
 # 工作区规则候选、选择与只读预览
 
-对应 `RULE-DISCOVER` / `RULE-SELECT`。本轮新增独立 core / web 模块，不改变宿主原生工作区指令，也不把规则正文作为代码执行。
+对应 `RULE-DISCOVER` / `RULE-SELECT`。本合同描述独立 core / web 的文件浏览和选择，不把规则正文作为代码执行。宿主原生指令的运行策略由另一适配器处理，见 [原生规则合同](native-instructions-contract.md)。
 
 ## Core 导出与路径边界
 

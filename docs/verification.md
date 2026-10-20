@@ -48,7 +48,7 @@
 | V-PLAN        | [workflow-plan.test.mjs](../tests/workflow-plan.test.mjs) | 16项合成收据检查：单槽排队、目录及环境依赖、原始结果只传直接依赖、上下文超限阻断、失败及清理保槽、父/项目隔离、停止/撤销/启动竞态 | 真实Store/Flow/DesktopWorkflow，activation结果为合成；官方计划执行另见 V-WORKFLOW，无自动拆解或跨重启恢复 |
 | V-CLIENT      | [client-bridge.test.mjs](../tests/client-bridge.test.mjs) | 13项桥验证：同源/指定iframe、文字/图片/文件草稿、字节与元信息、已有输入保护、部分失败、取消/关闭/过期、晚写拒绝、批次释放         | DOM为最小合成模型；官方客户端路径另见下节                                                                 |
 
-2026-10-21，在 `2afb697` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，完整运行 `node --expose-internals --test tests/*.test.mjs`，退出码0，结果为 **334通过、0失败、0跳过**。JavaScript 语法检查 **91/91通过**。这些是合成、官方模块隔离和入口集成测试，不是334项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。
+2026-10-21，在 `3573d6f` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，完整运行 `node --expose-internals --test tests/*.test.mjs`，退出码0，结果为 **362通过、0失败、0跳过**。JavaScript 语法检查 **97/97通过**。这些是合成、官方模块隔离和入口集成测试，不是362项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。
 
 新增凭据与环境预检：
 
@@ -86,16 +86,18 @@
 
 本轮核心运行差距的新增证据：
 
-| 证据编号          | 入口                                                                                                                     | 实际接口及观察                                                                                                                               | 剩余边界                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| V-PROMPT-SECTIONS | [prompt-sections-host.test.mjs](../tests/prompt-sections-host.test.mjs)、[合同](prompt-sections-contract.md)             | 5项官方组装测试：真实native/PTC、SDK renderer、plan状态；scope complete覆盖与撤销、disabled/append；功能段、tools/contexts/variables引用保持 | PTC后端仅合成描述服务，未执行工具；MCP/交付等段为合成注册；原生workspace历史基线不在该修复内   |
-| V-PERMISSION      | [permission-defaults-host.test.mjs](../tests/permission-defaults-host.test.mjs)、[合同](permission-defaults-contract.md) | 8项合成+2项官方：17会话的新默认canonical事件、existing/seeded保留、官方set有效、never真实拒绝、volatile更新/重挂载/所有权与通知              | 活动目录为内存合成目录，JSONL经公开persistence句柄主动写后读回；未验证实际文件权限或桌面选择器 |
-| V-REPEAT          | [repeat-reminder-host.test.mjs](../tests/repeat-reminder-host.test.mjs)、[合同](repeat-reminder-contract.md)             | 6项合成+5项官方Loader/Cordis/ToolRuntime/HMR：三次临时文件调用、提醒关闭/恢复、拒绝/反馈保持；noSave不写配置，async/veto/失败/取消/冲突      | 只控制建议；重挂载重置计数，在途旧监听器可能完成一条提醒；不等于桌面三入口验收                 |
-| V-STEERING        | [steering-host.test.mjs](../tests/steering-host.test.mjs)、[合同](steering-contract.md)                                  | 3项官方AgentLoop：steer在下一步、followup在下一轮、cancel清队列与inject不唤醒；插件提示词启用，7次完整messages与物理JSONL重建一致            | 慢工具只等待内存gate，LLM合成；未验真实composer按钮、快捷键、UI传输                            |
+| 证据编号              | 入口                                                                                                                                                                                            | 实际接口及观察                                                                                                                                                        | 剩余边界                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| V-PROMPT-SECTIONS     | [prompt-sections-host.test.mjs](../tests/prompt-sections-host.test.mjs)、[合同](prompt-sections-contract.md)                                                                                    | 5项官方组装测试：真实native/PTC、SDK renderer、plan状态；scope complete覆盖与撤销、disabled/append；功能段、tools/contexts/variables引用保持                          | PTC后端仅合成描述服务，未执行工具；MCP/交付等段为合成注册；原生workspace历史基线不在该修复内   |
+| V-PERMISSION          | [permission-defaults-host.test.mjs](../tests/permission-defaults-host.test.mjs)、[合同](permission-defaults-contract.md)                                                                        | 8项合成+2项官方：17会话的新默认canonical事件、existing/seeded保留、官方set有效、never真实拒绝、volatile更新/重挂载/所有权与通知                                       | 活动目录为内存合成目录，JSONL经公开persistence句柄主动写后读回；未验证实际文件权限或桌面选择器 |
+| V-REPEAT              | [repeat-reminder-host.test.mjs](../tests/repeat-reminder-host.test.mjs)、[合同](repeat-reminder-contract.md)                                                                                    | 6项合成+5项官方Loader/Cordis/ToolRuntime/HMR：三次临时文件调用、提醒关闭/恢复、拒绝/反馈保持；noSave不写配置，async/veto/失败/取消/冲突                               | 只控制建议；重挂载重置计数，在途旧监听器可能完成一条提醒；不等于桌面三入口验收                 |
+| V-STEERING            | [steering-host.test.mjs](../tests/steering-host.test.mjs)、[合同](steering-contract.md)                                                                                                         | 3项官方AgentLoop：steer在下一步、followup在下一轮、cancel清队列与inject不唤醒；插件提示词启用，7次完整messages与物理JSONL重建一致                                     | 慢工具只等待内存gate，LLM合成；未验真实composer按钮、快捷键、UI传输                            |
+| V-NATIVE-INSTRUCTIONS | [native-instructions.test.mjs](../tests/native-instructions.test.mjs)、[native-instructions-host.test.mjs](../tests/native-instructions-host.test.mjs)、[合同](native-instructions-contract.md) | 合成层8项及官方隔离11项：准确来源、旧/新基线与刷新、三策略、模型优先/并发、拒绝/取消、在途撤销、正常关闭、已加载fork遗留恢复；6会话28次完整请求与物理JSONL重建一致    | producer仍发现文件；未加载/异常遗留历史不自动打开，fallback语义差异与真实桌面仍未闭合          |
+| V-FILE-PERMISSIONS    | [file-permissions-host.test.mjs](../tests/file-permissions-host.test.mjs)、[合同](file-permissions-contract.md)                                                                                 | 9项官方隔离、35次文件工具调用：read-only/workspace-write/full-access、显式限制优先、禁用/撤销、路径/软链接、观察与旧版本拒绝、预览后端、原生拒绝/取消、终端无后端失败 | 不含PTY/shell/内核沙箱、read_image/present/watch、扩大权限重试或桌面Gateway认证与渲染          |
 
 根集成新增4项Controller检查：非法默认选择在落盘前拒绝、重复配置异步完成后才enabled、失败回滚、保存部分成功披露revision并继续独立更新、目录通知失败保留已启用事实。全量运行曾发现真实Cordis缺少hmr时的属性读取错误，已改为只读ctx.get；V-PLUGIN完整mount保留缺可选服务仍能应用和卸载的回归断言。
 
-当前本机 `dsh-tool-fs` 与 `dsh-agent-instructions` 的入口摘要仍不匹配发行清单，因此没有执行这两个安装入口，也未读取或恢复其他工具留下的备份。另从公开npm取得两份确切版本归档，完整性和入口库存摘要均匹配；tool-fs只在临时运行时执行，agent-instructions仅用于静态调查。原生工作区基线来自带agent-instructions来源的历史消息，不能由section过滤解决；静态全局零预算也不满足按会话历史和撤销合同，见 [剩余差距](native-instructions-gap.md)。Hook通用事件存在，但尚未验证Claude/Codex/Mnemon专用策略配置器；不凭段名猜测来源。
+当前本机 `dsh-tool-fs`、`dsh-tool-bash`、`dsh-tool-pwsh` 与 `dsh-agent-instructions` 的入口摘要不匹配发行清单，没有执行这些安装入口，也未读取或恢复其他工具留下的备份。公开npm的tool-fs及agent-instructions确切版本归档通过完整性和库存校验，仅在临时运行时执行。原生工作区基线来自带来源的历史消息；当前适配器按准确来源处理步骤接纳与已有surface，并用物理JSONL证明请求一致，见 [原生规则证据](evidence/native-instructions-acceptance.json)。这不会修复实际安装，剩余边界见 [差距记录](native-instructions-gap.md)。Hook与第三方记忆的发行包及消费端调查尚未找到目标专用策略接口；通用事件或MCP段名不替代来源合同，见 [调查依据](hooks-memory-contract.md)。
 
 初始基线的独立专项记录仍只支持其限定断言：主代理执行 `verify-host.mjs` 为 **14/14通过**，只读doctor确认 `0.2.1-rc.2 / darwin / arm64`。协议 artifact 的 `passed` 为 true、`networkRequests` 为 0、`blockedNetworkAttempts` 为 0，21 个直接导入入口（含延迟协议 SDK）摘要匹配清单。此结果不能推论未加载的模块干净，也不代表整个本机安装未被修改；不匹配模块不能用作官方原始证据。
 
@@ -169,6 +171,8 @@ V-PLUGIN 另验证新模块的真实 ToolRuntime schema/执行与受控HTTP入�
 
 本轮工作区规则预览在1280×720完成：父子候选与超限禁选、全文与摘要、取消不保存、确认保存及清空、旧修订冲突保留弹窗，具体修订读回见 [工作区规则合同](workspace-rules-contract.md)。最终控制页也实际检查了read正文预算禁用、0沿用宿主及不生效说明。两次临时页console warning/error均为空；页面和临时服务已关闭，合成文件及临时库已清理。
 
+原生规则策略另做1280×720回环预览：三种策略名称可见，缺官方接口时明确提示只处理本插件所选规则；选择strict后保存revision 0→1，重新加载页面读回strict和revision 1。应用按钮仍禁用，console warning/error为空。截图 [native-rules-preview.png](native-rules-preview.png) 只含合成数据；尚未验证真实桌面的原生能力可用分支。临时标签及服务已关闭，端口无监听；本次合成库和空目录经核对后清理。
+
 ## 本地复验命令
 
 在项目根目录执行，Node 至少 `24.13.0`；可将 `NODE_BIN` 设为已提供的 Node 24 路径。命令使用当前机器已安装官方运行时，不下载、不安装插件，不选择用户 profile。
@@ -190,7 +194,7 @@ export DSH_UNLIMIT_RUNTIME="${DSH_UNLIMIT_RUNTIME:-/Applications/DeepSeek Harnes
 "$NODE_BIN" scripts/verify-protocols.mjs --runtime "$DSH_UNLIMIT_RUNTIME"
 ```
 
-读取窗口官方测试还需要固定公开归档；测试本身不会联网下载，取得与合同一致的归档后可运行：
+读取窗口、文件权限及原生规则官方测试还需要固定公开归档；测试本身不会联网下载，取得与各合同一致的tool-fs和agent-instructions归档后可运行：
 
 ```sh
 export DSH_UNLIMIT_OFFICIAL_PACKAGES="/path/to/ignored/official-packages"

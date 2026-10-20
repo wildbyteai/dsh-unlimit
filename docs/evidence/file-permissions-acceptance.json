@@ -1,0 +1,337 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-20T16:38:41.054Z",
+  "behaviorId": "CORE-FILES",
+  "status": "partial-official-isolation",
+  "node": "v24.21.0",
+  "platform": "darwin-arm64",
+  "testResult": {
+    "tests": 9,
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0
+  },
+  "hostVersion": "0.2.1-rc.2",
+  "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
+  "sourceDigests": [
+    {
+      "path": "tests/file-permissions-host.test.mjs",
+      "sha256": "46bc66326759bb7e824da9f3f57313cc58ad32d8dd6127ad818a6159408bbe0d"
+    },
+    {
+      "path": "tests/helpers/file-permissions-fixture.mjs",
+      "sha256": "71c64d039efcfbe7d79b28340954514d3afbce04f0450343f53aa50b62d354c1"
+    },
+    {
+      "path": "tests/helpers/official-packages.mjs",
+      "sha256": "a75ba07d467dc2e28593e5cdd6497662eaa4c27845d79e76728dfff14443ca5a"
+    },
+    {
+      "path": "src/host/runtime.js",
+      "sha256": "05b834cca346499ee7f8297d8d7e14ac3a42a8f11eba4f8f73a2f161aabb19bd"
+    },
+    {
+      "path": "src/host/permission-defaults.js",
+      "sha256": "062667bad8e8761c1613e2d95d349932ee2fd712e7a2743b2c384cb0ee32709a"
+    }
+  ],
+  "archive": {
+    "name": "dsh-tool-fs-0.2.1-rc.2.tgz",
+    "sha256": "6b3f1d6136fb49b908eb85c563b7aa13f052c982bcc71f591a75003b9b78aaaa",
+    "integrity": "sha512-hd3LmMFiOa4TTFL9+oabTe26CjzGUbflCMm8TcXm9jHN1tIhB8el1cyzaQ2x4A15G/jIlAsGZyuwuf5/FFJIOQ==",
+    "checkedBy": "tests/helpers/official-packages.mjs"
+  },
+  "entries": [
+    {
+      "name": "@deepseek-ai/cordis",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/cordis/lib/index.js",
+      "sha256": "6a9394c0877ff45218818c6e815edd038f8057e1a1deb390a8d43ec81c57691e",
+      "inventorySha256": "6a9394c0877ff45218818c6e815edd038f8057e1a1deb390a8d43ec81c57691e",
+      "matchesInventory": true,
+      "source": "temporary-clean-runtime",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-agent",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-agent/lib/index.js",
+      "sha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b",
+      "inventorySha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-api-workspace-files",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-api-workspace-files/lib/index.js",
+      "sha256": "1d633aaf12df42e477438738f5939273ffc139ad96299ba471f97b46b2dd256c",
+      "inventorySha256": "1d633aaf12df42e477438738f5939273ffc139ad96299ba471f97b46b2dd256c",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-fs",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-fs/lib/index.js",
+      "sha256": "b165659f1eff0607222a7fe761bc56bae03fec8337c2e25affd064a3047dacb9",
+      "inventorySha256": "b165659f1eff0607222a7fe761bc56bae03fec8337c2e25affd064a3047dacb9",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-fs-local",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-fs-local/lib/index.js",
+      "sha256": "63fbb41d2c33e07111884b798be507e68c2752acab8249c821c20ade436e894f",
+      "inventorySha256": "63fbb41d2c33e07111884b798be507e68c2752acab8249c821c20ade436e894f",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-fs-observation-policy",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-fs-observation-policy/lib/index.js",
+      "sha256": "e36b54cdb5c6fa01ccfa29f0433753e810ec1ac29a6a22be349d66b77eb64b03",
+      "inventorySha256": "e36b54cdb5c6fa01ccfa29f0433753e810ec1ac29a6a22be349d66b77eb64b03",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-fs-sandbox",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-fs-sandbox/lib/index.js",
+      "sha256": "cac65e21a0f0895b073cb9a447196ac265f2a171cc7f67c7434a6b3b7782caf5",
+      "inventorySha256": "cac65e21a0f0895b073cb9a447196ac265f2a171cc7f67c7434a6b3b7782caf5",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-sandbox",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-sandbox/lib/index.js",
+      "sha256": "b56373befbfcfe281c17c8892e9a4b2cdcb96851290b3ed0ff56b08915e2f743",
+      "inventorySha256": "b56373befbfcfe281c17c8892e9a4b2cdcb96851290b3ed0ff56b08915e2f743",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-sandbox-policy",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-sandbox-policy/lib/index.js",
+      "sha256": "772ca58f0f786d6cb4d839deb621634c31097c13228d81b14e3f3153d0524924",
+      "inventorySha256": "772ca58f0f786d6cb4d839deb621634c31097c13228d81b14e3f3153d0524924",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-scope",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-scope/lib/index.js",
+      "sha256": "2829df71d76e08941457d4dd173eac60783e55354921137c8b75e8b5c0d2ecca",
+      "inventorySha256": "2829df71d76e08941457d4dd173eac60783e55354921137c8b75e8b5c0d2ecca",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-session",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-session/lib/index.js",
+      "sha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+      "inventorySha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-session-projection",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-session-projection/lib/index.js",
+      "sha256": "7dc2b212819baf4fc292751054d30b97afcbdee0a4733230abf92c6722e6550c",
+      "inventorySha256": "7dc2b212819baf4fc292751054d30b97afcbdee0a4733230abf92c6722e6550c",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-system-prompt",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-system-prompt/lib/index.js",
+      "sha256": "7be9f7aafbf345d01ddcc12fd297b16e9a1d41283a6a04073b867becca0bf020",
+      "inventorySha256": "7be9f7aafbf345d01ddcc12fd297b16e9a1d41283a6a04073b867becca0bf020",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-terminal",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-terminal/lib/index.js",
+      "sha256": "d89bd6e304d0904dc3cd6c9fd50085be2e5eeaf8f1444f18a4c669b6e764ecb4",
+      "inventorySha256": "d89bd6e304d0904dc3cd6c9fd50085be2e5eeaf8f1444f18a4c669b6e764ecb4",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-tool-fs",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-tool-fs/lib/index.js",
+      "sha256": "b11d3fa50b9042019a91cc38a6abe35d74ed651374278f95e60b42734e079df1",
+      "inventorySha256": "b11d3fa50b9042019a91cc38a6abe35d74ed651374278f95e60b42734e079df1",
+      "matchesInventory": true,
+      "source": "temporary-clean-runtime",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-tool-terminal",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-tool-terminal/lib/index.js",
+      "sha256": "e75845292220ed21c0af6763ffa0a044d38f7b9b4d05c2b00248aea8718a7e83",
+      "inventorySha256": "e75845292220ed21c0af6763ffa0a044d38f7b9b4d05c2b00248aea8718a7e83",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-tools",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-tools/lib/index.js",
+      "sha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
+      "inventorySha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-typert-registry",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-typert-registry/lib/index.js",
+      "sha256": "ea5e3beb6ddd09a7b77e6fc79933f71ba93382d0ec1caa70bd1f92c904caccdd",
+      "inventorySha256": "ea5e3beb6ddd09a7b77e6fc79933f71ba93382d0ec1caa70bd1f92c904caccdd",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-user-approval",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-user-approval/lib/index.js",
+      "sha256": "6a5ad1ba3c3dc3abbbae52e6c8c4463970ee0c1c8988cebb0d5cf2acd17ee90b",
+      "inventorySha256": "6a5ad1ba3c3dc3abbbae52e6c8c4463970ee0c1c8988cebb0d5cf2acd17ee90b",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-working-directory",
+      "role": "executed-official-entry",
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/lib/index.js",
+      "sha256": "af5bb7f33c52efe018da19c39c54e07b5a3ac804fff83f8a68e341f411ecf703",
+      "inventorySha256": "af5bb7f33c52efe018da19c39c54e07b5a3ac804fff83f8a68e341f411ecf703",
+      "matchesInventory": true,
+      "source": "inventory-verified-installed-dependency",
+      "executed": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-tool-bash",
+      "role": "installed-entry-inspection-only",
+      "path": "node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js",
+      "sha256": "e64e11d4c542c8d85e70c2a810205d22ef20e8252d49fd6ea102108282178434",
+      "inventorySha256": "a1215d7bcaf82c0755be48321ef6bb45075f1cb33296d6263009e9d10fd596f6",
+      "matchesInventory": false,
+      "executed": false
+    },
+    {
+      "name": "@deepseek-ai/dsh-tool-fs",
+      "role": "installed-entry-inspection-only",
+      "path": "node_modules/@deepseek-ai/dsh-tool-fs/lib/index.js",
+      "sha256": "a8866836428f7af011482dfe769b9eba15073759abad69b30bc4e74e7abdaf54",
+      "inventorySha256": "b11d3fa50b9042019a91cc38a6abe35d74ed651374278f95e60b42734e079df1",
+      "matchesInventory": false,
+      "executed": false
+    },
+    {
+      "name": "@deepseek-ai/dsh-tool-pwsh",
+      "role": "installed-entry-inspection-only",
+      "path": "node_modules/@deepseek-ai/dsh-tool-pwsh/lib/index.js",
+      "sha256": "f74bef5d2c65b7d7ad5979be9c8d6a7505be372ac08707eb13b466e5209905bb",
+      "inventorySha256": "94c7f68c425e62c8006907b3f4fea771935321581fd2327b7ee1f0ba8d15eec1",
+      "matchesInventory": false,
+      "executed": false
+    }
+  ],
+  "isolation": {
+    "syntheticInputsOnly": true,
+    "temporaryWorkspaceOutsidePlatformTempRoots": true,
+    "installedModifiedEntriesExecuted": false,
+    "installedEntriesUnchanged": true,
+    "temporaryRootsRemoved": true,
+    "profileLoaded": false,
+    "desktopInstalledOrReloaded": false,
+    "networkAttempts": [],
+    "subprocessAttempts": [],
+    "filesystemProviderMocked": false,
+    "permissionResolverMocked": false,
+    "calls": 35
+  },
+  "scenarios": [
+    {
+      "id": "FILES-READ-ONLY",
+      "result": "passed",
+      "description": "read-only reads both synthetic directories but rejects actual create, overwrite and edit"
+    },
+    {
+      "id": "FILES-WORKSPACE-WRITE",
+      "result": "passed",
+      "description": "workspace-write creates and edits real files, rejects sibling/traversal/symlink mutations and permits platform temp"
+    },
+    {
+      "id": "FILES-FULL-ACCESS",
+      "result": "passed",
+      "description": "plugin fullAccess reaches the real provider while explicit per-session restrictions retain priority"
+    },
+    {
+      "id": "FILES-DISABLE-REVERT",
+      "result": "passed",
+      "description": "disabling and reverting the plugin restore effective read-only writes without modifying the official policy method"
+    },
+    {
+      "id": "FILES-OBSERVATION-ERRORS",
+      "result": "passed",
+      "description": "official observation guards reject unread and stale mutation, then accept a reread retry"
+    },
+    {
+      "id": "FILES-DENIAL-CANCEL",
+      "result": "passed",
+      "description": "official pre-denial and cancellation prevent actual filesystem publication"
+    },
+    {
+      "id": "FILES-PREVIEW",
+      "result": "passed",
+      "description": "official preview host service reads exact synthetic text/bytes and rejects invalid targets and outside directory listing"
+    },
+    {
+      "id": "FILES-TERMINAL-REFUSAL",
+      "result": "passed",
+      "description": "official terminal tools expose missing-backend errors and never report a created terminal"
+    }
+  ],
+  "limitations": [
+    "No desktop installation, reload, profile, real Session history or rendered preview was exercised.",
+    "Preview coverage invokes the real Host service after its official live Session-header lookup; Gateway transport and authorization were not exercised.",
+    "Filesystem sandboxing is the official trusted-code mutation fence, not a kernel sandbox; read authority remains unconfined by these modes.",
+    "Terminal coverage proves a real missing-backend error only; no PTY, shell command, terminal process permission or cross-family process confinement was executed.",
+    "Known modified tool-fs, tool-bash and tool-pwsh installed entries were hashed only, never imported or restored.",
+    "read_image, filesystem search tools, present, watches, elevation retries and platform-specific process sandboxing remain outside this acceptance slice."
+  ]
+}

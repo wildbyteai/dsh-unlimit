@@ -1,0 +1,200 @@
+{
+  "kind": "official-isolated-native-instructions-acceptance",
+  "observedAt": "2026-10-20T16:40:40.285246+00:00",
+  "baseRevision": "3573d6f39002dbb902f474c2d332f90a5c9db2e2",
+  "workingTree": true,
+  "sourceChecks": [
+    {
+      "path": "src/host/native-instructions.js",
+      "sha256": "fc1d199b57675fdc034470a6329a4628321fd7b43667e2ca466fd5ff9c4f02b2"
+    },
+    {
+      "path": "src/host/runtime.js",
+      "sha256": "05b834cca346499ee7f8297d8d7e14ac3a42a8f11eba4f8f73a2f161aabb19bd"
+    },
+    {
+      "path": "src/core/prompts.js",
+      "sha256": "d75dad1e76f737b1239dc9fc2ea9c962c91597ba280259a68097307879585fea"
+    },
+    {
+      "path": "tests/helpers/native-instructions-fixture.mjs",
+      "sha256": "3320262f9b0bba035ff427fa676fe1d9fd8f048d7fd4ba978373200ce0a7a607"
+    },
+    {
+      "path": "tests/native-instructions-host.test.mjs",
+      "sha256": "73a7a03aeb98e7ddd47e1ed36a7a98d99bc5b70e25ccc287984c6961b2d406c4"
+    }
+  ],
+  "runtime": {
+    "version": "0.2.1-rc.2",
+    "nodeVersion": "v24.21.0",
+    "officialExecutedModulesInventoryVerified": 214,
+    "producer": {
+      "package": "@deepseek-ai/dsh-agent-instructions",
+      "version": "0.2.1-rc.2",
+      "archive": "artifacts/official-packages/dsh-agent-instructions-0.2.1-rc.2.tgz",
+      "sri": "sha512-a1VQsocz34VvkwYMNc/zolMXrLXWIClhZ62kb3pi8hYd/8MSgjuE09YcoqX6ZmU8i4tmaroC9W1PdUEIksSgiQ==",
+      "entrySha256": "4011f6e4c08228601bd4348ac78e322913142264f6e491ffdf9dcfda97393988",
+      "matchesDesktopInventory": true,
+      "installedProducerEntryRead": false,
+      "installedProducerEntryExecuted": false
+    }
+  },
+  "isolation": {
+    "homeEnvironmentEstablishedBeforeOfficialImports": true,
+    "temporaryEnvironmentVariables": ["HOME", "DSH_HOME", "DSH_AGENTS_HOME"],
+    "temporarySyntheticSessions": 6,
+    "realProfileRead": false,
+    "realSessionReadOrWrite": false,
+    "realApplicationInstallOrReload": false,
+    "networkOrSubprocessAttempts": 0,
+    "filesystemOutsideSyntheticDataOrVerifiedRuntimeAttempts": 0,
+    "globalProducerRemountOrConfigMutation": false,
+    "sessionAppendWrapped": false,
+    "pluginMessageProjectionRegistered": false
+  },
+  "execution": {
+    "command": "node --expose-internals --test tests/*.test.mjs",
+    "environment": {
+      "DSH_UNLIMIT_RUNTIME": "explicit local inventory-verified official runtime; absolute machine path omitted",
+      "DSH_UNLIMIT_OFFICIAL_PACKAGES": "explicit local cache of pinned public archives; absolute machine path omitted"
+    },
+    "exitCode": 0,
+    "tests": 11,
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0,
+    "completeRequestsReconstructedFromPhysicalJsonl": 28,
+    "requestMessagesMatchOfficialProjection": true,
+    "requestHeadersMatchOfficialProjection": true,
+    "scope": "Native-instructions host file within the full root run",
+    "fullRun": {
+      "tests": 362,
+      "passed": 362,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "scenarios": [
+    {
+      "id": "producer-baseline-and-refresh",
+      "passed": true,
+      "assertions": [
+        "Official producer discovers project and both global synthetic AGENTS files",
+        "One first-turn model request",
+        "Successful synthetic read triggers one official refresh and exactly two model requests in its tool turn"
+      ]
+    },
+    {
+      "id": "strict-history-and-new-admission",
+      "passed": true,
+      "assertions": [
+        "Original raw event prefix preserved",
+        "Only exact user agent-instructions instructions source removed",
+        "Human, other plugin and other form retained",
+        "Repeated baseline discovery and read refresh cause no extra model loop"
+      ]
+    },
+    {
+      "id": "always-fallback-and-disable-restoration",
+      "passed": true,
+      "assertions": [
+        "Restored user data equals original data",
+        "Restoration cites placeholder and original sequences",
+        "Whitespace rule and prompt count as empty",
+        "Nonempty saved prompt suppresses native instructions",
+        "Disabling control restores native instructions"
+      ]
+    },
+    {
+      "id": "concurrent-session-model-policy",
+      "passed": true,
+      "assertions": [
+        "Shared producer supports concurrent suppressed and preserved sessions",
+        "Model-specific rule takes precedence over active rule",
+        "A selected blank model rule allows fallback despite a different nonempty active rule"
+      ]
+    },
+    {
+      "id": "rejection-and-cancellation",
+      "passed": true,
+      "assertions": [
+        "Reject decision object identity retained",
+        "Rejected turn is blocked without a model call",
+        "Official loop cancellation ends as aborted"
+      ]
+    },
+    {
+      "id": "inflight-unload",
+      "passed": true,
+      "assertions": [
+        "Unload restores currently visible owned placeholders during request preparation",
+        "Already waiting request callback creates no late policy writes",
+        "Request uses restored canonical history"
+      ]
+    },
+    {
+      "id": "agent-dispose-durable-restore",
+      "passed": true,
+      "assertions": [
+        "Official AgentHandle.dispose restores before persistence handle closes",
+        "Physical JSONL readback equals committed events after disposal",
+        "Official Session reconstruction retains native instructions and original audit markers"
+      ]
+    },
+    {
+      "id": "replacement-ownership-and-unload",
+      "passed": true,
+      "assertions": [
+        "Subsequent owner replacement remains visible",
+        "Hidden original owned by later replacement is not revived",
+        "All remaining visible plugin placeholders restore",
+        "Official producer continues after plugin unload without a plugin projection definition"
+      ]
+    },
+    {
+      "id": "public-desktop-runtime-integration",
+      "passed": true,
+      "assertions": [
+        "Public DesktopRuntime.apply activates nativeInstructions capability",
+        "Strict request excludes native instructions while real system prompt composition uses the operator prompt",
+        "Public DesktopRuntime.revert restores canonical native history and subsequent producer requests retain it"
+      ]
+    },
+    {
+      "id": "fresh-adapter-restores-unobserved-loaded-fork",
+      "passed": true,
+      "assertions": [
+        "Official buildForkSeed and AgentRegistry.create create a durable loaded fork with inherited marker events and original parent lineage",
+        "The fork has no model request and has not entered agent/pre-step before restore",
+        "A trusted new NativeInstructions instance calls revert without apply and restores inherited native data",
+        "Inherited raw prefix remains unchanged and restoration cites marker plus original sequences",
+        "Physical JSONL readback matches every fork event and official Session reconstruction restores native instructions"
+      ]
+    },
+    {
+      "id": "request-log-equivalence",
+      "passed": true,
+      "assertions": [
+        "Every complete request messages array and header equals its exact durable official JSONL prefix projection"
+      ]
+    }
+  ],
+  "limitations": [
+    "Synthetic isolated official runtime only; no real desktop installation, reload or UI acceptance",
+    "Unloaded or crash-left persisted sessions are not proactively opened or automatically restored",
+    "No cross-version compatibility claim",
+    "Native producer still discovers and reads instruction files under strict policy"
+  ],
+  "inputGates": {
+    "runtimeOrPublicArchiveCacheMissing": "explicit skip; separately observed missing both: 1 skipped, 0 passed",
+    "explicitMissingArchiveDirectory": "hard failure ENOENT before any official import; separately observed exit 1, 1 failed, 0 skipped",
+    "silentArchiveFallback": false
+  },
+  "defectDetectedAndResolved": {
+    "before": "A developer replacement appended during pre-step was accepted in memory but rejected by physical JSONL readback because step/start had not opened its declared step",
+    "observedError": "developer/message does not match an open turn and step",
+    "fix": "Filter new native messages after pre-step; append historical builtin replacements in the official awaited agent/request callback after step/start and before request build",
+    "verified": "All 28 complete requests reconstruct from physical JSONL after the change"
+  }
+}

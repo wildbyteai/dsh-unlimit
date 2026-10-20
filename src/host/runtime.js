@@ -1,6 +1,12 @@
-import { composePrompt, selectedInstructions } from "../core/prompts.js";
+import {
+  composePrompt,
+  selectedInstructions,
+  selectedRule,
+  usesWorkspaceInstructions,
+} from "../core/prompts.js";
 import { connectPromptRefresh } from "./prompt-refresh.js";
 import { PermissionDefaults } from "./permission-defaults.js";
+import { NativeInstructions } from "./native-instructions.js";
 
 function replace(target, key, create) {
   const descriptor = Object.getOwnPropertyDescriptor(target, key);
@@ -45,6 +51,7 @@ export class DesktopRuntime {
     this.store = store;
     this.host = host;
     this.permissionDefaults = new PermissionDefaults(ctx, store, host);
+    this.nativeInstructions = new NativeInstructions(this);
   }
   settings() {
     return this.store.dispatch("settings.get", {}).value;
@@ -89,6 +96,7 @@ export class DesktopRuntime {
             : "当前组合未提供所需接口",
       })),
       ...this.permissionDefaults.capabilities(),
+      ...this.nativeInstructions.capabilities(),
     ];
   }
   apply() {
@@ -120,15 +128,9 @@ export class DesktopRuntime {
               if (!config.enabled) return output;
               const library = runtime.store.dispatch("rules.list", {});
               const model = context.model ?? context.agent?.options?.model;
-              const rule =
-                library.items.find((item) => item.model && item.model === model) ??
-                library.items.find((item) => item.id === library.activeId);
+              const rule = selectedRule(library, model);
               const directory = context.agent?.session?.header?.cwd;
-              const usesWorkspace =
-                config.workspacePolicy === "always" ||
-                (config.workspacePolicy === "fallback" &&
-                  !rule?.content?.trim() &&
-                  !config.prompt.trim());
+              const usesWorkspace = usesWorkspaceInstructions(config, rule);
               const workspaceText = usesWorkspace
                 ? selectedInstructions(directory, config.workspaceFiles)
                 : "";
@@ -186,6 +188,8 @@ export class DesktopRuntime {
       if (this.host.runtimeRoot && typeof this.ctx.on === "function") {
         pending.push(connectPromptRefresh(this.ctx, this));
       }
+      this.nativeInstructions.apply();
+      pending.push(() => this.nativeInstructions.revert());
       const subagents = this.service("subagents")?.config;
       for (const [field, setting] of [
         ["maxDepth", "maxDepth"],
@@ -215,6 +219,9 @@ export class DesktopRuntime {
     }
   }
   revert() {
+    // A failed durable restoration remains retryable after other wrappers have
+    // already been released by a previous revert attempt.
+    if (this.#undo.length === 0) return this.nativeInstructions.revert();
     const errors = [];
     for (const undo of this.#undo.reverse()) {
       try {

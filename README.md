@@ -7,6 +7,7 @@
 ## 现在可以做什么
 
 - 替换或追加系统正文，保留模式、PTC SDK、MCP 等功能说明；保存多套规则、按模型选择规则、选择本地工作区规则，每轮与重试读取当前正文。
+- 通过已核验的原生接口，按 strict / fallback / always 处理工作区基线及刷新消息；历史保留原日志，切回保留或还原时恢复仍由本插件持有的节点。原生入口摘要不符时明确不支持，当前只完成官方隔离验收。
 - 从宿主目录选择未来新会话的默认权限预设，配置未明确选定策略时的审批和访问行为、子代理数量与深度。已有会话和显式选择保持有效；撤销恢复未来默认，不回滚已创建会话。
 - 按需关闭官方重复调用建议提醒，恢复时沿用原配置。工具拒绝与取消仍有效；配置不写入宿主 profile，外部修改发生冲突时保留。
 - 按需接管模型请求的重试次数（0–20），沿用官方退避、Retry-After、取消和日志；默认沿用提供方策略。
@@ -66,14 +67,17 @@ npm run pack:local
 
 ```sh
 export DSH_UNLIMIT_RUNTIME="/Applications/DeepSeek Harness.app/Contents/Resources/app/dsh"
-node --test tests/*.test.mjs
+export DSH_UNLIMIT_OFFICIAL_PACKAGES="/path/to/ignored/official-packages"
+node --expose-internals --test tests/*.test.mjs
 node scripts/verify-host.mjs --runtime "$DSH_UNLIMIT_RUNTIME"
 node scripts/verify-protocols.mjs --runtime "$DSH_UNLIMIT_RUNTIME"
 ```
 
-这些检查只在新建上下文中使用本机官方模块、合成会话和临时数据。协议测试经过官方 AgentLoop、模型运行层、适配器及 SDK，最终由假传输端接收；回退、继续、请求重试、工作流与会话目录另有官方模块隔离测试。不调用真实模型，不读取真实会话，不修改宿主。
+这些检查只在新建上下文中使用官方模块、合成会话和临时数据。原生规则测试经过官方 producer、AgentLoop 与真实 JSONL，逐次核对请求和磁盘重建；文件权限测试实际调用官方读取、创建、编辑及预览接口。协议测试经过官方适配器及 SDK，最终由假传输端接收；回退、继续、请求重试、工作流与会话目录另有官方隔离测试。不调用真实模型，不读取真实会话，不修改宿主。
 
-校验脚本检查直接导入入口的摘要，并不构成宿主全量依赖审计。未指定 `DSH_UNLIMIT_RUNTIME` 时，依赖官方模块的测试会明确跳过。
+读取窗口、文件权限与原生规则测试另需公开的 `dsh-tool-fs`、`dsh-agent-instructions` 确切版本归档，来源与完整性见 [复验说明](docs/verification.md#本地复验命令)。测试不自动下载；环境门缺失时明确跳过，显式配置后归档缺失或摘要不符则失败。`--expose-internals` 仅供隔离测试的模块解析钩子使用。
+
+校验脚本检查直接导入入口，部分专项还核对所有执行的官方文件；这些都不构成宿主全量审计。当前已安装程序中有若干入口摘要不符，测试使用校验过的临时副本，不会修复实际安装。Hook 与第三方记忆策略、真实终端执行和桌面安装等剩余项仍见功能对照。
 
 ## 维护结构
 

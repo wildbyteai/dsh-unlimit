@@ -102,9 +102,9 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 `flow.status / configure / assign / acquire / release` 管理已绑定会话的明确角色与本地执行槽，槽位默认3、允许1至10。这里的槽登记不会启动任务或替代宿主子代理限制；活动槽不持久化。角色正文按绑定会话注入，普通未分配会话不带演练角色稿。
 
-`workspacePolicy` 仅控制本插件主动选择的规则：`strict` 忽略所选规则，`fallback` 在规则库和自写正文为空时使用所选规则，`always` 合并所选规则。原生宿主运行上下文仍保留；不能把这个设置解释为移除所有宿主工作区基线。
+`workspacePolicy` 控制所选规则，并在原生接口通过版本与摘要检查时处理宿主工作区指令：`strict` 排除，`always` 保留；`fallback` 在当前模型所选规则和保存正文都只有空白时保留。原生策略逐步骤读取，历史通过官方可恢复替换事件处理，新消息在接纳前筛选；不改请求副本，不停止宿主发现文件，不删除人工内容、其他来源或工具说明。未通过原生接口检查时仅处理所选规则，UI 明确显示这一限制。来源、物理日志重建、卸载恢复与未加载会话边界见 [原生规则合同](native-instructions-contract.md)。
 
-`rules.workspace / rules.preview` 浏览明确目录的祖先链和完整正文；扫描不保存选择。`rules.select / rules.policy` 必须带 `revision`，冲突拒绝覆盖。路径、字节、UTF-8 和链接边界见 [工作区规则合同](workspace-rules-contract.md)，原生历史差距见 [调查结论](native-instructions-gap.md)。
+`rules.workspace / rules.preview` 浏览明确目录的祖先链和完整正文；扫描不保存选择。`rules.select / rules.policy` 必须带 `revision`，冲突拒绝覆盖。路径、字节、UTF-8 和链接边界见 [工作区规则合同](workspace-rules-contract.md)。Hook 与第三方记忆专用策略尚无已验证目标接口，保存值不代表生效，详见 [接口调查](hooks-memory-contract.md)。
 
 服务器清单只接受 IP、完整主机名或 `username@host`。空行忽略，主机名转小写和 IDNA，IPv6 使用规范化方括号格式，按完整项去重。密码、密钥、URL、端口、网段、通配符和多目标表达式拒绝，错误不回显输入。清单仍是本地库存，不提供 DNS/地区判定或出口授权。
 

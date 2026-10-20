@@ -13,6 +13,20 @@ const PERSONA_SECTIONS = new Set([
   "deployment:persona-suffix",
 ]);
 
+export function selectedRule(library, model) {
+  return (
+    library.items.find((item) => item.model && item.model === model) ??
+    library.items.find((item) => item.id === library.activeId)
+  );
+}
+
+export function usesWorkspaceInstructions(settings, rule) {
+  return (
+    settings.workspacePolicy === "always" ||
+    (settings.workspacePolicy === "fallback" && !rule?.content?.trim() && !settings.prompt.trim())
+  );
+}
+
 export function selectedInstructions(directory, selected) {
   if (!directory || selected.length === 0) return "";
   const text = selected
@@ -36,9 +50,7 @@ export function composePrompt(
     selectedWorkspace ||
     DEFAULT_PROMPT
   ).trim();
-  const useWorkspace =
-    settings.workspacePolicy === "always" ||
-    (settings.workspacePolicy === "fallback" && !rule?.content?.trim() && !settings.prompt.trim());
+  const useWorkspace = usesWorkspaceInstructions(settings, rule);
   const parts = [chosen];
   if (useWorkspace && selectedWorkspace && selectedWorkspace !== chosen)
     parts.push(selectedWorkspace);

@@ -1589,13 +1589,17 @@ async function controlPage() {
         `<div class="fields">${renderField(
           field("workspacePolicy", "加载策略", "select", {
             options: [
-              ["fallback", "正文为空时使用所选规则"],
-              ["strict", "忽略所选规则"],
-              ["always", "合并所选规则"],
+              ["fallback", "正文为空时保留工作区规则"],
+              ["strict", "排除工作区规则"],
+              ["always", "保留并合并工作区规则"],
             ],
           }),
           v.workspacePolicy,
-        )}<div class="field wide"><label for="workspace-files">规则文件路径 · 每行一个</label><textarea name="workspaceFiles" id="workspace-files" rows="4">${esc(v.workspaceFiles.join("\n"))}</textarea><small>此策略仅控制本插件主动选取的规则文件；宿主原生工作区指令的运行上下文会保留。</small></div></div><div class="toolbar" style="margin-bottom:0"><button type="button" id="scan-rules">浏览并选择规则</button><button type="button" id="select-rule-paths">保存路径列表</button></div>`,
+        )}<div class="field wide"><label for="workspace-files">规则文件路径 · 每行一个</label><textarea name="workspaceFiles" id="workspace-files" rows="4">${esc(v.workspaceFiles.join("\n"))}</textarea><small>${
+          can("nativeInstructions")
+            ? "此策略同时处理所选规则与原生规则，在后续步骤生效。原生历史保留原日志；还原仅恢复仍属本插件的节点，其他工具说明保持。"
+            : "当前仅处理本插件所选规则；原生规则接口尚未通过检查，宿主原生基线与刷新消息继续保留。"
+        }</small></div></div><div class="toolbar" style="margin-bottom:0"><button type="button" id="scan-rules">浏览并选择规则</button><button type="button" id="select-rule-paths">保存路径列表</button></div>`,
       )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>可填写 IP、完整主机名或 user@host；不要填写密码、URL、网段、端口或通配符。此清单仍不是出口访问控制。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "仅在会话未明确选择权限时请求完整访问；新会话采用下方默认预设。")}${switchRow("autoApprove", "自动审批", "仅处理未明确指定审批策略的会话；显式选择仍由宿主执行。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "设置变更后重新应用", "启用时按运行时生命周期重新注册控制。")}${switchRow("retryOverride", "接管请求重试次数", "关闭时沿用提供方；开启且运行控制已启用后按 0—20 次设置，0 表示不重试。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${sessionDefaults}${panel(
         "执行限额",
         `<div class="fields">${[
