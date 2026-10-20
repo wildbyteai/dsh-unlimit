@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,6 +14,9 @@ import { RetryPolicy } from "../src/host/retry-policy.js";
 import { HostCatalog } from "../src/host/catalog.js";
 import { DesktopWorkflow } from "../src/host/workflow.js";
 import { Continuation } from "../src/host/continuation.js";
+import { DrillAdmission } from "../src/core/admission.js";
+import { LocalEnvironment } from "../src/core/environment.js";
+import { DesktopWorkflowPlan } from "../src/host/workflow-plan.js";
 import { Controller } from "../src/server/controller.js";
 import { createHandler } from "../src/server/http.js";
 
@@ -125,6 +128,9 @@ try {
   toolkit = new Toolkit(store);
   flow = new Flow(store);
   const skills = new SkillLibrary(join(temporary, "skills"));
+  const admission = new DrillAdmission(store, temporary);
+  const catalog = new HostCatalog({ get: () => undefined }, { library: skills, toolkit });
+  const workflow = new DesktopWorkflow({ get: () => undefined }, store, flow, { admission });
   const controller = new Controller({
     store,
     runtime,
@@ -133,12 +139,15 @@ try {
     retry: new RetryPolicy({}, store),
     toolkit,
     templates: new Templates(toolkit),
-    catalog: new HostCatalog({ get: () => undefined }, { library: skills, toolkit }),
-    workflow: new DesktopWorkflow({ get: () => undefined }, store, flow),
+    catalog,
+    workflow,
+    plans: new DesktopWorkflowPlan(workflow, { catalog }),
+    environment: new LocalEnvironment(realpathSync(temporary)),
     continuation: new Continuation({}, store, hostInfo),
     flow,
     sessions: { list: () => [] },
     host: hostInfo,
+    admission,
   });
   server = createServer(createHandler(controller, () => origin));
   await new Promise((resolve, reject) => {

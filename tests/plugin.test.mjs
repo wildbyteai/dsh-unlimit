@@ -74,7 +74,7 @@ async function eventually(check, message) {
   assert.fail(message);
 }
 
-async function fixture(t, { optional = true } = {}) {
+async function fixture(t, { optional = true, admitted = true } = {}) {
   const api = await loadOfficial();
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "dsh-unlimit-plugin-")));
   const host = {
@@ -158,6 +158,18 @@ async function fixture(t, { optional = true } = {}) {
   });
   await plugin.await();
   assert.ok(controller, "required services must activate mount");
+  if (admitted) {
+    const clock = controller.admission.clock;
+    controller.admission.clock = () => 0;
+    const { challengeId } = controller.admission.dispatch("admission.begin");
+    controller.admission.dispatch("admission.read", { challengeId });
+    controller.admission.clock = () => 5000;
+    controller.admission.dispatch("admission.confirm", {
+      challengeId,
+      checks: { scope: true, permissions: true, evidence: true },
+    });
+    controller.admission.clock = clock;
+  }
   if (optional)
     await eventually(
       () => ctx.tools.get("unlimit_workspace") !== undefined,
@@ -398,6 +410,113 @@ test(
       2,
       "the authorized workspace UI keeps both parents",
     );
+  },
+);
+
+test(
+  "plan tools derive workspace and parent from the executing session before reaching the coordinator",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const parent = f.agent("synthetic-plan-parent");
+    const workspace = f.controller.store.dispatch("workspaces.save", {
+      name: "Synthetic plan",
+    }).item;
+    await f.execute(parent, "workspaces.bind", { id: workspace.id });
+    const calls = [];
+    f.controller.plans.dispatch = async (action, payload) => {
+      calls.push({ action, payload });
+      return { item: { id: "synthetic-plan", ...payload } };
+    };
+    for (const action of ["workflow.plan.create", "workflow.plan.status", "workflow.plan.stop"]) {
+      const result = await f.execute(parent, action, { id: "synthetic-plan" });
+      assert.equal(result.isError, false);
+      assert.equal(result.value.item.workspaceId, workspace.id);
+      assert.equal(result.value.item.parentSessionId, parent.session.id);
+      assert.equal(
+        (await f.execute(parent, action, { parentSessionId: "foreign-parent" })).isError,
+        true,
+      );
+      assert.equal(
+        (await f.execute(parent, action, { workspaceId: "foreign-workspace" })).isError,
+        true,
+      );
+    }
+    assert.equal(calls.length, 3);
+  },
+);
+
+test(
+  "unconfirmed entry protects both HTTP and real model tools; environment secrets never become model actions",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t, { admitted: false });
+    const parent = f.agent("synthetic-unconfirmed-parent");
+    const before = await f.request({ action: "workspaces.list" });
+    assert.equal(before.json.error.code, "ADMISSION_REQUIRED");
+    assert.equal((await f.execute(parent, "workspaces.save", { name: "Blocked" })).isError, true);
+    const schema = f.ctx.tools.schemas().find((item) => item.name === "unlimit_workspace");
+    const text = JSON.stringify(schema);
+    assert.ok(!text.includes("admission.confirm"));
+    assert.ok(!text.includes("environment.variables"));
+    for (const action of ["admission.confirm", "environment.resolve", "environment.variables.save"])
+      assert.equal((await f.execute(parent, action, {})).isError, true);
+    let result = await f.request({
+      action: "environment.variables.save",
+      payload: {
+        revision: 0,
+        name: "SYNTHETIC_KEY",
+        secret: true,
+        value: "synthetic-secret-do-not-echo",
+      },
+    });
+    assert.equal(result.status, 200);
+    assert.ok(!result.body.includes("synthetic-secret-do-not-echo"));
+    const environment = await f.request({ action: "environment.status" });
+    assert.equal(environment.json.data.variables[0].configured, true);
+    assert.ok(!environment.body.includes("synthetic-secret-do-not-echo"));
+    assert.ok(!(await f.request()).body.includes("synthetic-secret-do-not-echo"));
+    assert.ok(
+      !JSON.stringify(f.controller.store.dispatch("settings.get")).includes("SYNTHETIC_KEY"),
+    );
+    assert.equal(
+      (await f.request({ action: "environment.resolve", payload: { name: "SYNTHETIC_KEY" } }))
+        .status,
+      400,
+    );
+    for (const file of ["admission.js", "environment-settings.js", "workflow-plans.js"]) {
+      const resource = await f.request({ method: "GET", url: `/dsh-unlimit/ui/${file}` });
+      assert.equal(resource.status, 200);
+      assert.match(resource.headers["Content-Type"], /javascript/);
+    }
+    f.controller.admission.clock = () => 0;
+    const challenge = await f.request({ action: "admission.begin" });
+    const challengeId = challenge.json.data.challengeId;
+    await f.request({ action: "admission.read", payload: { challengeId } });
+    f.controller.admission.clock = () => 5000;
+    result = await f.request({
+      action: "admission.confirm",
+      payload: {
+        challengeId,
+        checks: { scope: true, permissions: true, evidence: true },
+      },
+    });
+    assert.equal(result.json.data.accepted, true);
+    assert.equal(
+      (await f.execute(parent, "workspaces.save", { name: "Accepted synthetic" })).isError,
+      false,
+    );
+    const revoked = await f.request({
+      action: "admission.revoke",
+      payload: { revision: result.json.data.revision },
+    });
+    assert.equal(revoked.json.data.accepted, false);
+    assert.equal(
+      (await f.request({ action: "workspaces.list" })).json.error.code,
+      "ADMISSION_REQUIRED",
+    );
+    assert.equal((await f.request({ action: "settings.get" })).status, 200);
+    assert.equal((await f.request({ action: "environment.status" })).json.data.variables.length, 1);
   },
 );
 

@@ -1,3 +1,224 @@
+const BRIDGE_REQUEST = "dsh-unlimit:draft-bridge-request";
+const BRIDGE_RESPONSE = "dsh-unlimit:draft-bridge-response";
+
+/** Uses the official 0.2.1 client faces; never submits a prompt or overwrites an existing draft. */
+export function createDraftBridge(ctx, { origin, getFrame, timeoutMs = 14000 }) {
+  let disposed = false;
+  const pending = new Map();
+  const services = () => {
+    if (disposed || !origin || origin === "null") return null;
+    try {
+      const sessions = ctx.get("sessions");
+      const conversation = ctx.get("conversation");
+      const workspace = ctx.get("uiWorkspace");
+      if (
+        typeof sessions?.using !== "function" ||
+        typeof sessions?.binding !== "function" ||
+        typeof conversation?.input?.requestDraftInitialization !== "function" ||
+        typeof workspace?.openSession !== "function"
+      )
+        return null;
+      return { sessions, conversation, workspace };
+    } catch {
+      return null;
+    }
+  };
+  const cancelAll = (message = "草稿恢复已取消") => {
+    for (const operation of pending.values()) operation.abort(new Error(message));
+  };
+  const handleMessage = async (event) => {
+    const frame = getFrame();
+    if (
+      disposed ||
+      !frame ||
+      !origin ||
+      origin === "null" ||
+      event.origin !== origin ||
+      event.source !== frame.contentWindow
+    )
+      return;
+    const request = event.data;
+    if (
+      !request ||
+      request.type !== BRIDGE_REQUEST ||
+      typeof request.id !== "string" ||
+      !request.id ||
+      request.id.length > 100 ||
+      !["probe", "restore", "cancel"].includes(request.operation) ||
+      pending.has(request.id)
+    )
+      return;
+    const reply = (result) => {
+      if (!disposed && getFrame() === frame && event.source === frame.contentWindow)
+        event.source.postMessage({ type: BRIDGE_RESPONSE, id: request.id, ...result }, origin);
+    };
+    const available = services();
+    if (request.operation === "probe") {
+      reply({
+        ok: true,
+        ready: Boolean(available),
+        supports: {
+          plainText: Boolean(available),
+          attachments: false,
+          cancellation: true,
+          navigationAcknowledgement: false,
+        },
+        restoreTimeoutMs: timeoutMs,
+      });
+      return;
+    }
+    if (request.operation === "cancel") {
+      const target = request.payload?.requestId;
+      const operation = typeof target === "string" ? pending.get(target) : undefined;
+      operation?.abort(new Error("工作台已取消此草稿恢复请求"));
+      reply({
+        ok: true,
+        cancelled: Boolean(operation),
+        requestId: typeof target === "string" ? target : null,
+      });
+      return;
+    }
+    const expiresAt = request.expiresAt;
+    if (expiresAt !== undefined && (!Number.isSafeInteger(expiresAt) || expiresAt <= 0)) {
+      reply({
+        ok: false,
+        code: "INVALID_INPUT",
+        error: "草稿恢复截止时间无效",
+        draftStatus: "failed",
+        openStatus: "not-requested",
+      });
+      return;
+    }
+    if (expiresAt !== undefined && Date.now() >= expiresAt) {
+      reply({
+        ok: false,
+        code: "CANCELLED",
+        error: "草稿恢复请求已过期，未开始恢复",
+        newSessionId: request.payload?.newSessionId,
+        draftStatus: "cancelled",
+        openStatus: "not-requested",
+      });
+      return;
+    }
+    if (!available) {
+      reply({
+        ok: false,
+        code: "UNSUPPORTED",
+        error: "当前宿主没有可验证的草稿恢复接口",
+        draftStatus: "failed",
+        openStatus: "not-requested",
+      });
+      return;
+    }
+    const payload = request.payload;
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      Array.isArray(payload) ||
+      Object.keys(payload).some((key) => !["newSessionId", "draft"].includes(key)) ||
+      typeof payload.newSessionId !== "string" ||
+      !payload.newSessionId ||
+      typeof payload.draft !== "string"
+    ) {
+      reply({
+        ok: false,
+        code: "INVALID_INPUT",
+        error: "草稿参数无效；当前仅支持纯文本，不接受附件恢复参数",
+        draftStatus: "failed",
+        openStatus: "not-requested",
+      });
+      return;
+    }
+    const { newSessionId, draft } = payload;
+    const controller = new AbortController();
+    pending.set(request.id, controller);
+    const timer = setTimeout(
+      () => controller.abort(new Error("草稿恢复等待超时，已取消；不会晚到写入")),
+      expiresAt === undefined
+        ? timeoutMs
+        : Math.min(timeoutMs, Math.max(0, expiresAt - Date.now())),
+    );
+    const checkDeadline = () => {
+      if (expiresAt !== undefined && Date.now() >= expiresAt)
+        controller.abort(new Error("草稿恢复请求已过期，已取消后续写入"));
+      controller.signal.throwIfAborted();
+    };
+    let draftStatus = "failed",
+      openStatus = "not-requested";
+    try {
+      checkDeadline();
+      await available.sessions.using(
+        newSessionId,
+        { source: "controllerOperation", signal: controller.signal },
+        async (reference) => {
+          const binding = await reference.ready;
+          checkDeadline();
+          if (
+            disposed ||
+            getFrame() !== frame ||
+            available.sessions.binding(newSessionId) !== binding
+          )
+            throw new Error("会话绑定已失效，草稿未恢复");
+          const outcome = available.conversation.input.requestDraftInitialization(binding, {
+            prompt: draft,
+            clearPreviousDraft: false,
+          });
+          if (outcome === "preserved") {
+            draftStatus = "preserved";
+            throw new Error("目标会话已有草稿或附件，已保留原内容；回退草稿未恢复");
+          }
+          if (outcome === "blocked") {
+            draftStatus = "blocked";
+            throw new Error("宿主当前阻止草稿初始化，回退草稿未恢复");
+          }
+          if (outcome !== "applied") throw new Error("宿主返回未知草稿初始化结果，未确认恢复");
+          draftStatus = "restored";
+          checkDeadline();
+          if (disposed || getFrame() !== frame) throw new Error("工作台已失效，未请求打开会话");
+          openStatus = "failed";
+          available.workspace.openSession(newSessionId);
+          // Official openSession is synchronous and has no rendered-view acknowledgement.
+          openStatus = "requested";
+        },
+      );
+      reply({ ok: true, newSessionId, draftStatus, openStatus, navigationConfirmed: false });
+    } catch (error) {
+      const cancelled = controller.signal.aborted;
+      if (cancelled && draftStatus !== "restored") draftStatus = "cancelled";
+      reply({
+        ok: false,
+        code: cancelled
+          ? "CANCELLED"
+          : draftStatus === "preserved"
+            ? "DRAFT_PRESERVED"
+            : draftStatus === "blocked"
+              ? "DRAFT_BLOCKED"
+              : "RESTORE_FAILED",
+        newSessionId,
+        draftStatus,
+        openStatus,
+        navigationConfirmed: false,
+        error:
+          draftStatus === "restored"
+            ? `草稿已恢复；打开会话${openStatus === "requested" ? "已请求但后续保留流程失败" : "未完成"}：${error.message || "未知错误"}`
+            : error.message || "草稿恢复失败",
+      });
+    } finally {
+      clearTimeout(timer);
+      pending.delete(request.id);
+    }
+  };
+  return {
+    handleMessage,
+    cancelAll,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      cancelAll("工作台已卸载，已取消草稿恢复");
+    },
+  };
+}
+
 export function apply(ctx) {
   ctx.effect(() => {
     const button = document.createElement("button");
@@ -20,101 +241,15 @@ export function apply(ctx) {
       boxShadow: "0 3px 18px #17271c33",
     });
     let overlay, frame;
-    let disposed = false;
-    const pending = new Set();
-    const services = () => {
-      try {
-        const sessions = ctx.get("sessions");
-        const conversation = ctx.get("conversation");
-        const workspace = ctx.get("uiWorkspace");
-        if (
-          typeof sessions?.using !== "function" ||
-          typeof conversation?.input?.requestDraftInitialization !== "function" ||
-          typeof workspace?.openSession !== "function"
-        )
-          return null;
-        return { sessions, conversation, workspace };
-      } catch {
-        return null;
-      }
-    };
-    const onBridge = async (event) => {
-      if (
-        disposed ||
-        !frame ||
-        event.origin !== location.origin ||
-        event.source !== frame.contentWindow
-      )
-        return;
-      const request = event.data;
-      if (
-        !request ||
-        request.type !== "dsh-unlimit:draft-bridge-request" ||
-        typeof request.id !== "string" ||
-        request.id.length > 100 ||
-        !["probe", "restore"].includes(request.operation) ||
-        pending.has(request.id)
-      )
-        return;
-      const reply = (result) => {
-        if (!disposed && event.source === frame?.contentWindow)
-          event.source.postMessage(
-            { type: "dsh-unlimit:draft-bridge-response", id: request.id, ...result },
-            event.origin,
-          );
-      };
-      const available = services();
-      if (request.operation === "probe") {
-        reply({ ok: true, ready: Boolean(available) });
-        return;
-      }
-      if (!available) {
-        reply({ ok: false, error: "当前宿主没有可验证的草稿恢复接口", draftStatus: "failed" });
-        return;
-      }
-      const { newSessionId, draft } = request.payload || {};
-      if (typeof newSessionId !== "string" || !newSessionId || typeof draft !== "string") {
-        reply({ ok: false, error: "草稿恢复参数无效", draftStatus: "failed" });
-        return;
-      }
-      pending.add(request.id);
-      let restored = false;
-      try {
-        await available.sessions.using(
-          newSessionId,
-          { source: "controllerOperation" },
-          async (ref) => {
-            const binding = await ref.ready;
-            if (disposed) throw new Error("工作台已卸载，草稿未恢复");
-            const outcome = available.conversation.input.requestDraftInitialization(binding, {
-              prompt: draft,
-              clearPreviousDraft: false,
-            });
-            if (outcome !== "applied")
-              throw new Error(
-                outcome === "preserved"
-                  ? "目标会话已有草稿，已保留原草稿；回退草稿未恢复"
-                  : "宿主阻止了草稿初始化，回退草稿未恢复",
-              );
-            restored = true;
-            available.workspace.openSession(newSessionId);
-          },
-        );
-        reply({ ok: true, newSessionId, draftStatus: "restored" });
-      } catch (error) {
-        reply({
-          ok: false,
-          newSessionId,
-          draftStatus: restored ? "restored" : "failed",
-          error: restored
-            ? "草稿已恢复，但宿主未能打开新会话：" + error.message
-            : error.message || "草稿恢复失败",
-        });
-      } finally {
-        pending.delete(request.id);
-      }
+    const bridge = createDraftBridge(ctx, {
+      origin: location.origin,
+      getFrame: () => (overlay && overlay.style.display !== "none" ? frame : null),
+    });
+    const onBridge = (event) => {
+      void bridge.handleMessage(event);
     };
     const close = () => {
+      bridge.cancelAll("工作台已关闭，已取消尚未完成的草稿恢复");
       if (overlay) overlay.style.display = "none";
       button.setAttribute("aria-expanded", "false");
       button.focus();
@@ -171,6 +306,9 @@ export function apply(ctx) {
       closeButton.addEventListener("click", close);
       header.append(label, closeButton);
       frame = document.createElement("iframe");
+      frame.addEventListener("load", () =>
+        bridge.cancelAll("工作台页面已重新加载，已取消旧页面的草稿恢复"),
+      );
       frame.src = "/dsh-unlimit/ui/";
       frame.title = "DSH Unlimit 工作台";
       Object.assign(frame.style, { width: "100%", flex: "1", border: "0", minHeight: "0" });
@@ -183,7 +321,7 @@ export function apply(ctx) {
     window.addEventListener("message", onBridge);
     document.body.append(button);
     return () => {
-      disposed = true;
+      bridge.dispose();
       document.removeEventListener("keydown", escape);
       window.removeEventListener("message", onBridge);
       overlay?.remove();

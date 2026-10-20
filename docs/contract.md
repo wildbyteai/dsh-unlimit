@@ -163,12 +163,12 @@ PNG/JPEG/WebP/GIF 的预览先检查格式结构与尺寸，最长边 16384 像�
 
 `DesktopWorkflow` 通过官方 `subagents.startActivation` 创建进程内子代理；先预留会话标识并绑定项目、分配角色、领取槽位，再启动第一轮。只分派明确提供的任务，沿用当前宿主工具和权限，不因项目登记或角色名称扩大授权。结果通过调用收据返回，不发送到其他聊天。
 
-| action            | 输入                                                 | 返回                             |
-| ----------------- | ---------------------------------------------------- | -------------------------------- | -------------- | ------------------------------------------------ |
-| workflow.dispatch | `{workspaceId,parentSessionId,role,task,usePreset?}` | `{item}`，含运行编号与实际子会话 |
-| workflow.status   | `{workspaceId,id?}`                                  | `{item}` 或 `{items}`            |
-| workflow.stop     | `{workspaceId,id}`                                   | `{item,stopped}`                 |
-| workflow.presets  | `{operation:"status"                                 | "register"                       | "unregister"}` | `{item,owned,runtimeOnly:true,persistent:false}` |
+| action            | 输入                                                 | 返回                                             |
+| ----------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| workflow.dispatch | `{workspaceId,parentSessionId,role,task,usePreset?}` | `{item}`，含运行编号与实际子会话                 |
+| workflow.status   | `{workspaceId,id?}`                                  | `{item}` 或 `{items}`                            |
+| workflow.stop     | `{workspaceId,id}`                                   | `{item,stopped}`                                 |
+| workflow.presets  | `{operation:"status"\|"register"\|"unregister"}`     | `{item,owned,runtimeOnly:true,persistent:false}` |
 
 任务正文最多 32 KiB。父会话必须已绑定相同项目。模型工具把父会话限定为调用者：同项目内也不能读取或停止别的父会话所分派的执行者；页面按项目显示运行列表。
 
@@ -179,3 +179,27 @@ PNG/JPEG/WebP/GIF 的预览先检查格式结构与尺寸，最长边 16384 像�
 ## 页面编辑状态
 
 未保存表单按工作区、页面和对象保留在面板内存。关闭弹窗或切换页面后可恢复同一对象的草稿；保存、主动放弃和删除只清理对应草稿。刷新或卸载会丢失内存草稿并提示，不写入浏览器持久存储。这不是官方聊天输入框的草稿桥或崩溃恢复。
+
+环境秘密表单与入口确认表单不进入上述内存草稿。环境表单成功、失败、切页或销毁后清空秘密输入；变量读回只显示配置状态。
+
+## 当前安装的演练入口
+
+`admission.status/begin/read/confirm/revoke` 只提供给经宿主认证的工作台 HTTP，不注册为模型工具 action。普通规则、技能、环境设置和聊天不受演练门影响；工作区数据与新工作流分派在 Controller 检查，排队任务实际启动时也在 DesktopWorkflow 再检查。
+
+`begin` 返回 15 分钟有效的 `challengeId`、服务端 `readyAt`、说明和三个勾选项。`read` 接收 `{challengeId}` 记录已读确认，页面只在滚动至说明末尾后开放按钮。`confirm` 使用 `{challengeId,checks:{scope:true,permissions:true,evidence:true}}`，服务端必须已过 5 秒、收到已读确认且逐项为 true。已读与勾选是用户操作声明，不是人类实际阅读的技术证明，也不是目标授权或法律协议。成功、撤销或过期使旧 challenge 失效。
+
+确认按数据安装根和说明版本保存于本地 meta；替换插件包不清空同一数据安装，复制数据库到另一根会重新要求确认。`revoke` 使用最新 `{revision}`，先持久撤销，再停止本实例计划和所属执行者；`ADMISSION_REVOKED_PARTIAL` 明确 `partial.accepted:false`。状态/停止接口仍开放，诊断页在已撤销时也能再次请求清理。没有实现官方卸载事件与确认状态清理的联动。
+
+## 本地环境与多任务计划
+
+环境配置的 action、脱敏、修订与文件权限约定见 [environment-contract.md](environment-contract.md)。实际变量解析仅为内部方法，不开放给 HTTP、模型工具、报告或提示词。模型不会通过工具替用户保存秘密或确认演练入场。
+
+多任务队列合同见 [workflow-plan-contract.md](workflow-plan-contract.md)。HTTP 与模型工具使用同一 coordinator；模型调用强制使用调用者的项目和父会话。未知宿主版本不能创建计划，仍可查看/停止已有计划。撤销和卸载按计划协调器 → 单个工作流顺序清理，`stopped:false` 不当作成功。
+
+## 官方输入框草稿桥
+
+客户端只接收同源且来自本面板 iframe 的请求。`restore` 的 payload 为 `{newSessionId,draft}`，仅支持纯文本；通过官方 `sessions.using` 保留绑定，再调用 `requestDraftInitialization`，不发送消息。已有草稿/附件返回 `preserved`，被阻止时返回 `blocked`；均不覆盖目标内容。
+
+返回的 `draftStatus` 与 `openStatus` 分开：`restored` 代表官方输入状态已恢复，`requested` 仅代表同步 `openSession` 已返回，不声称可见页面完成切换。打开失败但已恢复时，页面保留该事实，不重试写入草稿。
+
+请求可带顶层绝对 `expiresAt`。父桥按最早截止时刻取消，并在写入前重新核对截止时间；页面超时发送 `cancel`。关闭、重新加载和卸载也取消，关闭后到达的旧消息不能开始恢复。此为官方模块隔离验证的合同，真实桌面可见导航、编辑重发和附件恢复仍未验。

@@ -70,6 +70,12 @@ test("unknown versions cannot start workflow or continuation mutations", async (
         calls++;
       },
     },
+    plans: {
+      capabilities: () => ({ available: true }),
+      dispatch: () => {
+        calls++;
+      },
+    },
   });
   for (const action of [
     "workflow.dispatch",
@@ -77,10 +83,12 @@ test("unknown versions cannot start workflow or continuation mutations", async (
     "workflow.presets",
     "continuation.continue",
     "continuation.stop",
+    "workflow.plan.create",
   ]) {
     await assert.rejects(controller.dispatch(action, { operation: "register" }), {
       code: "UNSUPPORTED",
     });
   }
+  assert.equal((await controller.dispatch("workflow.plan.capabilities")).available, false);
   assert.equal(calls, 0);
 });

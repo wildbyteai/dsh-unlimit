@@ -12,12 +12,13 @@ const terminal = (run) => ["completed", "failed", "stopped"].includes(run.item.s
 
 /** Calls the official subagents service; never edits host sessions or profiles directly. */
 export class DesktopWorkflow {
-  constructor(ctx, store, flow) {
+  constructor(ctx, store, flow, { admission } = {}) {
     this.ctx = ctx;
     this.store = store;
     this.flow = flow;
     this.runs = new Map();
     this.closed = false;
+    this.admission = admission;
     this.presetOwner = null;
     this.presetPending = null;
   }
@@ -159,6 +160,7 @@ export class DesktopWorkflow {
     }
   }
   async start(payload) {
+    this.admission?.require();
     const workspaceId = this.workspace(payload.workspaceId);
     const workspace = this.store.get("workspaces", workspaceId);
     const parentSessionId = string(payload.parentSessionId, "parentSessionId");
@@ -184,6 +186,8 @@ export class DesktopWorkflow {
       const preset = await this.service("agentPresets").resolve(WORKFLOW_PRESET_ID);
       if (preset.broken) fail("PRESET_BROKEN", "Workflow runtime preset is broken");
     }
+    this.admission?.require();
+    if (this.closed) fail("CLOSED", "Workflow has been closed");
     // Binding and slot acquisition precede the official factory's first async operation.
     const sessionId = randomUUID();
     this.store.dispatch("workspaces.bind", { id: workspaceId, sessionId });
@@ -347,8 +351,7 @@ export class DesktopWorkflow {
     run.item.finishedAt = now();
     return { item: this.snapshot(run), stopped: true };
   }
-  async close() {
-    this.closed = true;
+  async stopAll() {
     const failures = [];
     for (const run of this.runs.values())
       if (!run.item.disposed && !run.item.slotReleased) {
@@ -358,6 +361,20 @@ export class DesktopWorkflow {
           failures.push(error);
         }
       }
+    if (failures.length)
+      throw new AggregateError(
+        failures,
+        "Some owned workflow executors have not confirmed termination",
+      );
+  }
+  async close() {
+    this.closed = true;
+    const failures = [];
+    try {
+      await this.stopAll();
+    } catch (error) {
+      failures.push(error);
+    }
     try {
       await this.presets({ operation: "unregister" });
     } catch (error) {

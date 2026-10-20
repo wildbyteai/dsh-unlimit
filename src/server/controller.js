@@ -22,6 +22,9 @@ export class Controller {
     catalog,
     workflow,
     continuation,
+    admission,
+    plans,
+    environment,
     onSkillsChanged,
   }) {
     Object.assign(this, {
@@ -39,6 +42,9 @@ export class Controller {
       catalog,
       workflow,
       continuation,
+      admission,
+      plans,
+      environment,
       onSkillsChanged,
     });
   }
@@ -91,6 +97,10 @@ export class Controller {
       ["workflow.stop", this.host.supported && workflowCapabilities.stop],
       ["workflow.status", Boolean(this.workflow)],
       ["workflow.presets", this.host.supported && workflowCapabilities.presets],
+      ["workflow.plan.create", this.host.supported && this.plans?.capabilities().available],
+      ["workflow.plan.status", Boolean(this.plans)],
+      ["workflow.plan.stop", Boolean(this.plans)],
+      ["environment.status", Boolean(this.environment)],
       ["continuation.status", this.host.supported && Boolean(this.continuation)],
       ["continuation.stop", this.host.supported && Boolean(this.continuation)],
       ["maintenance.install", false],
@@ -121,6 +131,7 @@ export class Controller {
         })),
       ],
       settings: this.store.dispatch("settings.get", {}),
+      admission: this.admission?.status(),
       sessions: sessionCapabilities.list ? await this.sessions.list() : [],
       sessionCapabilities,
       workflowCapabilities,
@@ -128,6 +139,26 @@ export class Controller {
     };
   }
   async dispatch(action, payload = {}) {
+    const cleanupOrStatus =
+      [
+        "workflow.status",
+        "workflow.stop",
+        "workflow.capabilities",
+        "workflow.plan.capabilities",
+        "workflow.plan.status",
+        "workflow.plan.stop",
+        "flow.status",
+        "flow.release",
+      ].includes(action) ||
+      (action === "workflow.presets" &&
+        ["status", "unregister"].includes(payload.operation ?? "status"));
+    if (
+      /^(workspaces|assets|findings|records|roles|report|flow|files|workflow|knowledge)\./.test(
+        action,
+      ) &&
+      !cleanupOrStatus
+    )
+      this.admission?.require();
     if (
       ["flow.assign", "flow.release", "workspaces.bind"].includes(action) &&
       this.workflow?.controlsSession(payload.sessionId)
@@ -137,6 +168,29 @@ export class Controller {
         { code: "CONFLICT" },
       );
     switch (action) {
+      case "admission.revoke": {
+        if (!this.admission) return unavailable("演练入场确认服务未加载");
+        const result = this.admission.dispatch(action, payload);
+        const errors = [];
+        for (const service of [this.plans, this.workflow])
+          try {
+            const stopped = await service?.stopAll();
+            if (stopped?.stopped === false) errors.push(new Error("执行计划仍有未确认清理的收据"));
+          } catch (error) {
+            errors.push(error);
+          }
+        if (errors.length)
+          throw Object.assign(
+            new Error(
+              "本安装的演练确认已撤销，但部分执行者尚未确认停止；可在诊断页再次执行撤销以重试清理。",
+            ),
+            {
+              code: "ADMISSION_REVOKED_PARTIAL",
+              partial: { accepted: false, revision: result.revision },
+            },
+          );
+        return result;
+      }
       case "status":
         return this.status();
       case "control.apply": {
@@ -238,6 +292,26 @@ export class Controller {
       case "maintenance.install":
         return unavailable("此版尚未验证桌面端的本地包安装接口，请使用宿主插件管理器");
       default:
+        if (action.startsWith("admission.")) {
+          if (!this.admission) return unavailable("演练入场确认服务未加载");
+          return this.admission.dispatch(action, payload);
+        }
+        if (action.startsWith("environment.")) {
+          if (!this.environment) return unavailable("本地环境配置服务未加载");
+          return this.environment.dispatch(action, payload);
+        }
+        if (action.startsWith("workflow.plan.")) {
+          if (!this.plans) return unavailable("多任务计划服务未加载");
+          if (action === "workflow.plan.capabilities" && !this.host.supported)
+            return {
+              ...this.plans.capabilities(),
+              available: false,
+              reasons: ["此宿主版本尚未通过多任务调度适配验证"],
+            };
+          if (action === "workflow.plan.create" && !this.host.supported)
+            return unavailable("此宿主版本尚未通过多任务调度适配验证");
+          return this.plans.dispatch(action, payload);
+        }
         if (action.startsWith("continuation.")) {
           if (!this.host.supported || !this.continuation)
             return unavailable("此宿主版本尚无可验证的继续服务");

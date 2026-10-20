@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { WorkspaceStore } from "../core/store.js";
 import { SkillLibrary } from "../core/skills.js";
@@ -18,6 +18,9 @@ import { RetryPolicy } from "./retry-policy.js";
 import { HostCatalog } from "./catalog.js";
 import { DesktopWorkflow } from "./workflow.js";
 import { Continuation } from "./continuation.js";
+import { DrillAdmission } from "../core/admission.js";
+import { LocalEnvironment } from "../core/environment.js";
+import { DesktopWorkflowPlan } from "./workflow-plan.js";
 
 export const name = "dsh-unlimit";
 export const inject = ["webServer", "connection"];
@@ -36,7 +39,11 @@ export function mount(ctx, host) {
   runtime.rolePrompt = (sessionId) => flow.rolePrompt(sessionId);
   const extensions = new HostExtensions(ctx, store);
   const retry = new RetryPolicy(ctx, store);
-  const workflow = new DesktopWorkflow(ctx, store, flow);
+  const admission = new DrillAdmission(store, host.dataRoot);
+  const workflow = new DesktopWorkflow(ctx, store, flow, { admission });
+  const catalog = new HostCatalog(ctx, { library: skills, toolkit });
+  const plans = new DesktopWorkflowPlan(workflow, { catalog });
+  const environment = new LocalEnvironment(realpathSync(host.dataRoot));
   const continuation = new Continuation(ctx, store, host);
   const sessions = new DesktopSessions(ctx, store);
   let skillConnection;
@@ -45,7 +52,7 @@ export function mount(ctx, host) {
     skills,
     toolkit,
     templates: new Templates(toolkit),
-    catalog: new HostCatalog(ctx, { library: skills, toolkit }),
+    catalog,
     runtime,
     sessions,
     extensions,
@@ -54,6 +61,9 @@ export function mount(ctx, host) {
     retry,
     workflow,
     continuation,
+    admission,
+    plans,
+    environment,
     host,
     onSkillsChanged: () => skillConnection?.changed(),
   });
@@ -61,6 +71,10 @@ export function mount(ctx, host) {
     const errors = [];
     for (const cleanup of [
       () => controller.revertControls(),
+      async () => {
+        const result = await plans.close();
+        if (!result.stopped) throw new Error("多任务计划仍有未确认清理的执行者");
+      },
       () => workflow.close(),
       () => toolkit.close(),
       () => flow.close(),

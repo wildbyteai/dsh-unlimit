@@ -16,15 +16,15 @@
 
 ## 合成验证入口
 
-| 证据编号     | 文件                                                | 已覆盖的具体断言                                                                                                                                                                                                         | 仍未覆盖                                                                                      |
-| ------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| V-STORE      | [store.test.mjs](../tests/store.test.mjs)           | 设置修订冲突；规则 CRUD/UTF-8 限额；工作区与会话绑定；资产/服务归一合并、来源与首次发现；组合筛选；事务导入结果与失败回滚；发现/各类记录；角色隔离/重置；知识全文/过滤/证据验证/复用；按点、资产和服务去重计分及报告脱敏 | 真实采集、连接及桌面交互；材料文件由 V-FILES 单独验证                                         |
-| V-RUNTIME    | [runtime.test.mjs](../tests/runtime.test.mjs)       | 关闭时原样返回；完整提示词替换保留工具/上下文；逐步读取新值与模型规则优先；strict 策略；审批审计与取消；明确会话限制/用户审批优先；默认沙箱、子代理动态值；重复注册、回滚、精确撤销与版本拒绝                            | 各模式实机执行；文件/终端/浏览器权限端到端；全局 Hook、读取上限；请求重试另见 V-RETRY         |
-| V-SKILLS     | [skills.test.mjs](../tests/skills.test.mjs)         | 自写技能 CRUD、覆盖备份/删除；文件夹与多技能 ZIP；引用/二进制附属文件；调用标志；CRC/长度/路径/链接/资源限制；中途失败恢复                                                                                               | 桌面斜杠调用和真实技能执行；会话目录另见 V-CATALOG                                            |
-| V-SESSIONS   | [sessions.test.mjs](../tests/sessions.test.mjs)     | 合成事件切点、只读 prepare、文本草稿、fork/空会话策略、工作区继承、原记录归档、父子停止确认；缺接口/附件/子代理来源拒绝；部分失败披露新会话身份；并发拒绝                                                                | 官方编辑器草稿恢复；任务状态重写、附件恢复、子代理映射到父切点；真实 fork 另见 V-SESSION-HOST |
-| V-FLOW       | [flow.test.mjs](../tests/flow.test.mjs)             | 默认 3 槽/1–10 配额、显式角色分配、会话绑定与跨区拒绝、槽幂等/满额拒绝、降低配额限制、动态角色正文、撤销/重绑/关闭释放                                                                                                   | 自主任务拆解、所有官方代理强制领取本地槽；明确任务的官方执行另见 V-WORKFLOW                   |
-| V-TOOLKIT    | [toolkit.test.mjs](../tests/toolkit.test.mjs)       | 逐工具路径→工具根→有序目录优先级；原子配置与空值清除；拒绝失效精确路径静默回退和 PATH 扩张；httpx 版本/帮助产品识别及指纹变化失效；固定参数、总超时/64KiB/取消/临时 HOME 清理                                            | 真正工具扫描、联网安装、任意命令运行；Windows 原生探测及进程树实机验证                        |
-| V-EXTENSIONS | [extensions.test.mjs](../tests/extensions.test.mjs) | 日志动态引用不可变而外层字段可替换时的关闭/禁用/精确还原；接口缺失、冲突和失败回滚；对无接口能力明确报告 unsupported                                                                                                     | 关闭所有遥测或已在途上传；Hook/记忆/全局字节读取；重试策略另见 V-RETRY                        |
+| 证据编号     | 文件                                                | 已覆盖的具体断言                                                                                                                                                                                                         | 仍未覆盖                                                                                       |
+| ------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| V-STORE      | [store.test.mjs](../tests/store.test.mjs)           | 设置修订冲突；规则 CRUD/UTF-8 限额；工作区与会话绑定；资产/服务归一合并、来源与首次发现；组合筛选；事务导入结果与失败回滚；发现/各类记录；角色隔离/重置；知识全文/过滤/证据验证/复用；按点、资产和服务去重计分及报告脱敏 | 真实采集、连接及桌面交互；材料文件由 V-FILES 单独验证                                          |
+| V-RUNTIME    | [runtime.test.mjs](../tests/runtime.test.mjs)       | 关闭时原样返回；完整提示词替换保留工具/上下文；逐步读取新值与模型规则优先；strict 策略；审批审计与取消；明确会话限制/用户审批优先；默认沙箱、子代理动态值；重复注册、回滚、精确撤销与版本拒绝                            | 各模式实机执行；文件/终端/浏览器权限端到端；全局 Hook、读取上限；请求重试另见 V-RETRY          |
+| V-SKILLS     | [skills.test.mjs](../tests/skills.test.mjs)         | 自写技能 CRUD、覆盖备份/删除；文件夹与多技能 ZIP；引用/二进制附属文件；调用标志；CRC/长度/路径/链接/资源限制；中途失败恢复                                                                                               | 桌面斜杠调用和真实技能执行；会话目录另见 V-CATALOG                                             |
+| V-SESSIONS   | [sessions.test.mjs](../tests/sessions.test.mjs)     | 合成事件切点、只读 prepare、文本草稿、fork/空会话策略、工作区继承、原记录归档、父子停止确认；缺接口/附件/子代理来源拒绝；部分失败披露新会话身份；并发拒绝                                                                | 任务状态重写、附件恢复、子代理映射到父切点；真实 fork 另见 V-SESSION-HOST，客户端另见 V-CLIENT |
+| V-FLOW       | [flow.test.mjs](../tests/flow.test.mjs)             | 默认 3 槽/1–10 配额、显式角色分配、会话绑定与跨区拒绝、槽幂等/满额拒绝、降低配额限制、动态角色正文、撤销/重绑/关闭释放                                                                                                   | 自主任务拆解、所有官方代理强制领取本地槽；明确任务的官方执行另见 V-WORKFLOW                    |
+| V-TOOLKIT    | [toolkit.test.mjs](../tests/toolkit.test.mjs)       | 逐工具路径→工具根→有序目录优先级；原子配置与空值清除；拒绝失效精确路径静默回退和 PATH 扩张；httpx 版本/帮助产品识别及指纹变化失效；固定参数、总超时/64KiB/取消/临时 HOME 清理                                            | 真正工具扫描、联网安装、任意命令运行；Windows 原生探测及进程树实机验证                         |
+| V-EXTENSIONS | [extensions.test.mjs](../tests/extensions.test.mjs) | 日志动态引用不可变而外层字段可替换时的关闭/禁用/精确还原；接口缺失、冲突和失败回滚；对无接口能力明确报告 unsupported                                                                                                     | 关闭所有遥测或已在途上传；Hook/记忆/全局字节读取；重试策略另见 V-RETRY                         |
 
 新增的本地路径与失败边界：
 
@@ -39,7 +39,16 @@
 | V-CONTINUE  | [continuation.test.mjs](../tests/continuation.test.mjs) | 根会话 max-tokens 条件、动态正文/用语、默认关闭/有界计数、原生取消、新人工输入竞争、只停止自己所属的自动运行、失败回滚                                                  | 子代理继续明确不支持，官方事件与取消另见下表           |
 | V-WORKFLOW  | [workflow.test.mjs](../tests/workflow.test.mjs)         | 首轮前绑定/角色/槽位，独立项目/所有者，预设冲突保留，完成/停止/卸载；清理失败保留槽位并返回 partial，显式停止可再次清理                                                 | 合成收据；官方 spawn 与预设另见下表                    |
 
-2026-10-20，主代理在 bundled Node **24.21.0** 下提供 `DSH_UNLIMIT_RUNTIME` 完整运行 `node --test tests/*.test.mjs`，结果为 **170通过、0失败、0跳过**；包含合成测试及下述官方模块隔离用例，不是170项桌面验收。JavaScript 语法检查56/56通过。最终格式、构建与离线打包结果应与本次提交一并复核。
+本轮新增入口、环境与计划验证：
+
+| 证据编号      | 文件                                                      | 已覆盖                                                                                                                                                         | 边界                                                                               |
+| ------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| V-ADMISSION   | [admission.test.mjs](../tests/admission.test.mjs)         | 服务端倒计时、已读确认、勾选项、过期/重放、持久与根隔离、撤销先落盘、清理部分失败及显式重试；模型/HTTP入口另见V-PLUGIN                                         | 已读是操作声明，不证明实际阅读；无官方卸载清理联动                                 |
+| V-ENVIRONMENT | [environment.test.mjs](../tests/environment.test.mjs)     | 14项临时数据检查：秘密脱敏/省略保留/显式空值、修订冲突、原子失败、路径/链接/权限拒绝、私钥仅元信息、明确名单内部解析、跳过/根隔离                              | 未加密；不自动注入环境或执行连接；Windows ACL未验                                  |
+| V-PLAN        | [workflow-plan.test.mjs](../tests/workflow-plan.test.mjs) | 15项合成收据检查：单槽排队、依赖声明预检、原始结果只传直接依赖、上下文超限阻断、错误/缺依赖、清理失败保槽、父/项目隔离、停全部后可重新创建、撤销准入与启动竞态 | 真实Store/Flow/DesktopWorkflow，activation结果为合成；没有自动任务拆解或跨重启恢复 |
+| V-CLIENT      | [client-bridge.test.mjs](../tests/client-bridge.test.mjs) | 10项桥验证：同源/指定iframe、纯文本、已有内容保留、部分导航失败、取消/关闭/卸载、过期与timer竞态拒绝晚写                                                       | DOM为最小合成模型；官方客户端路径另见下节                                          |
+
+2026-10-20，主代理在 bundled Node **24.21.0** 下提供 `DSH_UNLIMIT_RUNTIME` 完整运行 `node --test tests/*.test.mjs`，结果为 **220通过、0失败、0跳过**；包含合成测试及下述官方模块隔离用例，不是220项桌面验收。JavaScript 语法检查67/67通过。最终格式、构建与离线打包结果应与本次提交一并复核。
 
 [controller.test.mjs](../tests/controller.test.mjs) 验证未知版本的回退、工作流/继续变更拒绝；活动执行者不能经普通角色/绑定/释放接口提前释放槽位。[plugin.test.mjs](../tests/plugin.test.mjs) 新增同项目不同父会话的模型工具隔离：只列自己的收据、拒绝读取/停止他人收据、拒绝替他人委派，合法调用补全当前父会话；该用例的执行者为假服务，不重复计算成实际 spawn 证据。
 
@@ -54,17 +63,23 @@
 | V-LOG      | [extensions.test.mjs](../tests/extensions.test.mjs) 的官方模块用例                                                     | 真实官方日志插件持有的 config 引用通过临时替换动态读为 false，原引用保持不变，撤销精确恢复；不写 profile                                                                                                                                                                                                                                                           | 仅指定会话日志插件 `enabled`，不扩张成全应用隐私保证                                                                              |
 | V-PROTOCOL | [verify-protocols.mjs](../scripts/verify-protocols.mjs)、[protocol-acceptance.json](evidence/protocol-acceptance.json) | 官方 AgentLoop→LlmRuntime→实际适配器/SDK 序列化→本地假 SSE fetch；四协议首轮、第二轮修改、官方创建的子会话首轮、503 后官方重试改正文；20 次传输捕获均与持久会话完整 messages 相等，重试新正文存在真实 `system/message` 事件；当前文本不进入人工 user 槽                                                                                                            | 合成密钥/文本和假 SSE；没有真实模型输出质量或服务端接纳证据；子会话为进程内官方所有权，未验外部代理进程                           |
 
-新增官方模块隔离证据（同属上述170项运行）：
+新增官方模块隔离证据（同属上述220项运行）：
 
 | 证据编号       | 入口                                                              | 实际接口及观察                                                                                                                                                             | 边界                                                                       |
 | -------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| V-SESSION-HOST | [sessions-host.test.mjs](../tests/sessions-host.test.mjs)         | 官方 SessionController、SessionQuery、WorkspaceRegistry、AgentLoop、JSON/JSONL；精确前缀分支、首轮空分支、工作区绑定、原会话归档、排队输入停止及持久读回                   | 临时合成会话；没有官方 composer 桥、附件/任务恢复、真实桌面输入            |
+| V-SESSION-HOST | [sessions-host.test.mjs](../tests/sessions-host.test.mjs)         | 官方 SessionController、SessionQuery、WorkspaceRegistry、AgentLoop、JSON/JSONL；精确前缀分支、首轮空分支、工作区绑定、原会话归档、排队输入停止及持久读回                   | 临时合成会话；客户端桥另见 V-CLIENT，附件/任务恢复、真实桌面输入未验       |
 | V-RETRY        | [retry-host.test.mjs](../tests/retry-host.test.mjs)               | 官方 AgentLoop/LlmRuntime/llm-retry：0次重试只请求1次，2次重试最多请求3次；永久错误不扩张、Retry-After、用户取消、关闭/撤销；13个临时会话的完整 JSONL 事件读回             | 假 LLM 传输，无真实提供方；不将重试当新一轮继续                            |
 | V-CONTINUE     | [continuation-host.test.mjs](../tests/continuation-host.test.mjs) | 官方 AgentLoop/followup 与消息构造；当前提示词与继续用语、真实人工计数1、插件来源、默认关闭、有界自动链、停止/关闭/新人工输入竞争、子代理拒绝；11个临时 JSONL 会话完整读回 | 原生入口要求 role:user，但 source 明确属于插件；无桌面 UI 或真实提供方验收 |
 | V-WORKFLOW     | [workflow-host.test.mjs](../tests/workflow-host.test.mjs)         | 官方 SubagentRuntime、进程内 spawn、AgentLoop、WorkingDirectory、AgentPresetRegistry/Loader 及 JSONL；真实创建、收据返回/取消/释放；原创预设挂载和保留合成用户预设         | 任务明确传入，LLM 为合成流；不含自主任务拆解、外部代理进程或持久预设迁移   |
 | V-CATALOG      | [catalog-host.test.mjs](../tests/catalog-host.test.mjs)           | 官方 SkillRegistry/ToolRuntime 的会话层、受限可见性、覆盖顺序和正文；官方 MCP 桥注册 schema 可观察，依赖声明保持显式                                                       | 没有连接 MCP 服务或调用其工具；已登记不意味着连接健康                      |
 
 初始基线的独立专项记录仍只支持其限定断言：主代理执行 `verify-host.mjs` 为 **14/14通过**，只读doctor确认 `0.2.1-rc.2 / darwin / arm64`。协议 artifact 的 `passed` 为 true、`networkRequests` 为 0、`blockedNetworkAttempts` 为 0，21 个直接导入入口（含延迟协议 SDK）摘要匹配清单。此结果不能推论未加载的模块干净，也不代表整个本机安装未被修改；不匹配模块不能用作官方原始证据。
+
+官方客户端隔离新增4项测试见 [client-bridge-host.test.mjs](../tests/client-bridge-host.test.mjs)：核对6个实际加载入口的官方清单摘要，在独立VM加载真实客户端 Session Controller、InputHub/Lexical 与 Workspace 导航。使用内存存储、合成远端投影与快照，禁止网络；验证 `applied` 后输入状态的原始文本、既有草稿/附件的 `preserved`、绑定保留以及同步导航请求。没有启动应用、安装插件、真实可见界面切换或发送消息，因此导航结果仍是 `requested/navigationConfirmed:false`。
+
+桌面 scheme 另做了已安装程序的静态核对：`dsh-app` 注册为标准、安全协议，`dsh-app://app` 的非保留路径会转发到官方 Host，包含本项目的 UI/API 相对路径；官方 iframe 通道也使用精确的 scheme `targetOrigin`。这些主进程/preload 文件不在本项目的模块摘要清单中，只作为当前安装的静态观察。尚未运行 renderer 读取实际 `location.origin` 和 `MessageEvent.origin`，因此 HTTP 预览不能证明桌面消息桥通过，也没有放宽为 `"null"` 或 `"*"`。
+
+V-PLUGIN 另验证新模块的真实 ToolRuntime schema/执行与受控HTTP入口：未确认时工作区操作拒绝，模型不能调用确认或环境秘密action；秘密实际值不出现在公开读回、通用settings或status。计划工具强制调用者父会话与项目，不能用自填参数接管其他父会话。该计划入口测试使用合成coordinator；队列算法证据仍归V-PLAN。
 
 四协议原生槽观察：
 
@@ -103,6 +118,17 @@
 | V-TEMPLATES              | 正文标记命中160字节 YAML，全文与 SHA-256 读回；整理成知识条目保留来源摘要且读回未验证                                   | 不执行模板；修复并复验新条目不再误报撤回历史验证 |
 | V-WORKFLOW / V-CONTINUE  | 预览缺官方服务与绑定父会话时，分派/预设按钮禁用；自动继续默认关闭、上限3、相关设置禁用且说明不生效                      | 只验证缺服务页面，实际执行 UI 未验               |
 | SESSIONS                 | 无真实宿主会话时显示空状态，明确无 composer 桥且回退禁用                                                                | 不替代官方桌面回退验收                           |
+
+本轮入口与环境页面补测（1280×820，全部为临时合成数据）：
+
+| 对照行为                 | 操作与读回                                                                                                                                         | 边界                                                     |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| AUTH-ONBOARD/PERSIST     | 5秒初始禁用、滚动到底才开放已读、缺一个勾选不可进入、全部完成进入原项目；刷新保留确认；诊断撤销后再次要求确认，普通设置仍可进入                    | 无真实安装/卸载；清理失败的重试由合成服务测试覆盖        |
+| ENV-ONBOARD/SECRETS      | 明确跳过、保存合成秘密后password清空、留空保留、显式清空及重新设置；普通变量读回、主机列表保存、跨页重读秘密不回填；双页面旧修订拒绝覆盖并清空输入 | 没有真实凭据、进程消费或连接；配置未加密                 |
+| ENV-SECRETS              | 登记自建39字节普通文件，只读回权限600与元信息；结束后确认该文件仍存在，再清理测试文件                                                              | 文件不是密钥，不证明密钥有效                             |
+| FLOW-DISPATCH / V-DRAFTS | 明确计划示例JSON可校验，非法JSON有错误；跨页保留同一编辑，显式放弃后清除；缺官方执行服务时提交按钮禁用                                             | 预览没有实际计划执行；状态/结果/停止由模块与入口测试覆盖 |
+
+新截图见 [admission-preview.png](admission-preview.png) 与 [environment-preview.png](environment-preview.png)。预览结束已关闭两个临时页、重置尺寸、停止服务并核对无端口监听；临时库和元信息样本已核对为本次合成数据后清理。
 
 本轮浏览器控制台未观察到 warning/error。新目录截图见 [catalog-preview.png](catalog-preview.png)，材料恢复截图见 [materials-preview.png](materials-preview.png)。初始基线合成预览截图见 [ui-preview.png](ui-preview.png)。截图证明该视口的最终渲染；上述保存、筛选和下载结论来自实际操作与读回，不能仅由截图推断。
 
@@ -151,3 +177,9 @@ JS
 ```
 
 浏览 `http://127.0.0.1:4177/dsh-unlimit/ui/`，使用 1280×820 视口复验上述步骤。离线打包可执行 `"$NODE_BIN" scripts/pack.mjs`，会构建并调用本机 npm 离线生成包；包生成不等于已安装、可启动或桌面验收。后续完整结果应同时记录工作树修订、环境、命令退出码、失败/跳过和新增交互证据。
+
+## 来源与包内容边界
+
+本轮只读比较当前 `src/web/scripts/tests` 中69个实现/样式文件与参照仓库61个非空源码/素材摘要，未发现整文件字节相同项；参照仓库工作树保持未修改。这个检查不覆盖片段复制或变形相似，不能据此作法律上的权利结论。开发接触既有实现的事实仍按 [NOTICE.md](../NOTICE.md) 披露；旧项目的版权和许可证未被删除或改写。
+
+新包只包含本项目源码、界面和文档，运行时不分发官方程序、Node.js、其他插件或真实profile。打包和导入验证不执行 mount；本轮未安装到桌面。

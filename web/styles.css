@@ -967,3 +967,30 @@ dialog::backdrop {
   margin: 8px 0 0;
   overflow-wrap: anywhere;
 }
+.admission-card {
+  max-width: 780px;
+  margin: 24px auto;
+}
+.admission-notice {
+  height: 220px;
+  overflow-y: auto;
+  padding: 0 16px 0 0;
+  margin-bottom: 16px;
+  line-height: 1.9;
+}
+.admission-notice p {
+  margin: 0 0 18px;
+}
+.admission-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 18px 0;
+  line-height: 1.6;
+}
+.admission-check input {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  flex-shrink: 0;
+}

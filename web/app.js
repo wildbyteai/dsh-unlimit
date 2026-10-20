@@ -1,4 +1,7 @@
 import { MemoryDrafts } from "./drafts.js";
+import { admissionPage } from "./admission.js";
+import { environmentSettings } from "./environment-settings.js";
+import { workflowPlans } from "./workflow-plans.js";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,6 +13,7 @@ const esc = (value) =>
 const state = {
   page: "overview",
   status: null,
+  admission: null,
   workspaces: [],
   workspaceId: "",
   settings: null,
@@ -35,6 +39,7 @@ const state = {
 };
 const drafts = new MemoryDrafts();
 let mountedDrafts = [];
+let disposePage;
 let editorDraft = null;
 const draftScope = (objectId, context = state) => ({
   workspaceId: context.workspaceId || "",
@@ -589,25 +594,57 @@ window.addEventListener("message", (event) => {
   if (response.ok) pending.resolve(response);
   else {
     const error = new Error(response.error || "宿主草稿桥调用失败");
-    error.draftStatus = response.draftStatus;
+    for (const key of ["draftStatus", "openStatus", "navigationConfirmed", "newSessionId", "code"])
+      error[key] = response[key];
     pending.reject(error);
   }
+});
+function cancelBridge(id) {
+  if (window.parent === window) return;
+  window.parent.postMessage(
+    {
+      type: "dsh-unlimit:draft-bridge-request",
+      id: `cancel-${Date.now()}-${++bridgeCounter}`,
+      operation: "cancel",
+      payload: { requestId: id },
+    },
+    location.origin,
+  );
+}
+window.addEventListener("pagehide", () => {
+  for (const [id, pending] of bridgePending) {
+    cancelBridge(id);
+    clearTimeout(pending.timer);
+    pending.reject(
+      Object.assign(new Error("工作台已离开，草稿恢复已请求取消"), { code: "CANCELLED" }),
+    );
+  }
+  bridgePending.clear();
 });
 function bridgeRequest(operation, payload = {}) {
   if (window.parent === window) return Promise.reject(new Error("独立预览中没有宿主草稿桥"));
   return new Promise((resolve, reject) => {
     const id = `bridge-${Date.now()}-${++bridgeCounter}`;
-    const timer = setTimeout(
-      () => {
-        bridgePending.delete(id);
-        reject(new Error("宿主草稿桥未响应"));
-      },
-      operation === "probe" ? 2000 : 15000,
-    );
+    const timeout = operation === "probe" ? 2000 : 15000;
+    const timer = setTimeout(() => {
+      bridgePending.delete(id);
+      cancelBridge(id);
+      reject(
+        Object.assign(new Error("宿主草稿桥未响应，已请求取消；恢复状态未确认"), {
+          code: "BRIDGE_TIMEOUT",
+        }),
+      );
+    }, timeout);
     bridgePending.set(id, { resolve, reject, timer });
     try {
       window.parent.postMessage(
-        { type: "dsh-unlimit:draft-bridge-request", id, operation, payload },
+        {
+          type: "dsh-unlimit:draft-bridge-request",
+          id,
+          operation,
+          payload,
+          expiresAt: Date.now() + timeout,
+        },
         location.origin,
       );
     } catch (error) {
@@ -671,6 +708,13 @@ function shell() {
   );
 }
 async function refreshProjects() {
+  state.admission = await api("admission.status");
+  if (!state.admission.accepted) {
+    state.workspaces = [];
+    state.workspaceId = "";
+    $("#workspace-select").innerHTML = '<option value="">演练入口待确认</option>';
+    return;
+  }
   const data = await api("workspaces.list");
   state.workspaces = data.items || [];
   state.workspaceId = data.activeId || "";
@@ -679,6 +723,7 @@ async function refreshProjects() {
 }
 async function refreshStatus() {
   state.status = await api("status");
+  state.admission = state.status.admission;
   if (state.status.settings) state.settings = state.status.settings;
   $("#instance-label").textContent =
     state.status.host?.kind === "synthetic-preview" ? "合成预览" : "桌面实例";
@@ -700,12 +745,38 @@ function navigate(page) {
 async function render() {
   captureMountedDrafts();
   mountedDrafts = [];
+  disposePage?.();
+  disposePage = undefined;
   const serial = ++state.request;
   const content = $("#content");
   content.innerHTML = skeleton();
   try {
     let result;
-    if (schemas[state.page]) result = await collectionPage(state.page);
+    const protectedPages = [
+      "workspaces",
+      "assets",
+      "findings",
+      "evidence",
+      "files",
+      "graph",
+      "progress",
+      "knowledge",
+      "roles",
+      "reports",
+    ];
+    if (protectedPages.includes(state.page)) state.admission = await api("admission.status");
+    if (protectedPages.includes(state.page) && !state.admission.accepted)
+      result = await admissionPage({
+        api,
+        esc,
+        panel,
+        accepted: async () => {
+          await refreshProjects();
+          await render();
+        },
+        later: () => navigate("control"),
+      });
+    else if (schemas[state.page]) result = await collectionPage(state.page);
     else
       result = await {
         overview: overviewPage,
@@ -721,13 +792,17 @@ async function render() {
         environment: environmentPage,
         diagnostics: diagnosticsPage,
       }[state.page]();
-    if (serial !== state.request) return;
+    if (serial !== state.request) {
+      result.dispose?.();
+      return;
+    }
     content.innerHTML =
       `<div id="draft-notice"></div>` +
       result.html +
       `<div class="footerline"><span>DSH UNLIMIT · 本地工作台</span><span>数据保存在当前本地实例中</span></div>`;
     result.bind?.();
-    for (const form of $$("#content form"))
+    disposePage = result.dispose;
+    for (const form of $$('#content form:not([data-draft="off"])'))
       mountedDrafts.push(bindMemoryDraft(form, draftScope(`inline:${form.id}`)));
     const search = $("#search");
     if (search) mountedDrafts.push(bindMemoryDraft(search, draftScope("inline:search")));
@@ -1336,6 +1411,17 @@ async function collectionPage(name) {
 }
 async function overviewPage() {
   await refreshStatus();
+  if (!state.admission?.accepted)
+    return {
+      html:
+        heading() +
+        `<div class="statushero"><span class="herosymbol">⌘</span><div><strong>桌面工作台已连接</strong><p>运行控制与演练数据分开配置。进入演练区前，请完成当前安装的使用确认。</p></div></div>` +
+        `<div class="grid2">${panel("演练工作区", '<p class="info">确认后可管理项目、资产、证据和执行计划。尚未读取演练数据。</p><button class="primary" id="open-admission">进入演练工作区</button>')}${panel("运行控制", `<p class="info">${state.status.enabled ? "运行控制已启用，可查看当前配置或还原。" : "提示词、规则、技能与运行控制可独立配置。"}</p><button id="open-control">打开运行控制</button>`)}</div>`,
+      bind() {
+        $("#open-admission").onclick = () => navigate("workspaces");
+        $("#open-control").onclick = () => navigate("control");
+      },
+    };
   const data = state.workspaceId
     ? await Promise.all([
         api("assets.list", workspacePayload()),
@@ -2665,6 +2751,18 @@ async function rolesPage() {
   };
   const sessions = state.status.sessions;
   const bound = sessions.filter((item) => item.workspaceId === state.workspaceId);
+  const plansView = await workflowPlans({
+    api,
+    esc,
+    panel,
+    table,
+    empty,
+    toast,
+    run,
+    workspaceId: payload.workspaceId,
+    sessions,
+    roles: items,
+  });
   const flow = flowResult.status === "fulfilled" ? flowResult.value : null;
   const runs = workflowResult.status === "fulfilled" ? workflowResult.value.items : [];
   const preset = presetResult.status === "fulfilled" ? presetResult.value : null;
@@ -2733,9 +2831,14 @@ async function rolesPage() {
     html:
       heading('<button id="reset-roles" class="danger">重置角色提示词</button>') +
       panel("执行任务", workflowBody) +
+      plansView.html +
       panel("本地槽位管理", flowBody) +
       `<div class="grid2 equal">${items.map((item) => panel(roleNames[item.role] || item.role, `<div class="eyebrow">${esc(item.role.toUpperCase())}${["analyst", "reviewer"].includes(item.role) ? " · COMPATIBILITY" : ""}</div><p class="info" style="white-space:pre-wrap;max-height:210px;overflow:auto;min-height:100px">${esc(redactCell(item.content || "尚未配置提示词。", "content"))}</p><button data-role="${esc(item.role)}" class="small">编辑提示词</button>`)).join("")}</div>`,
     bind() {
+      plansView.bind();
+      $("#workflow-plan-create-form")?.addEventListener("workflow-plan:saved", () => {
+        commitInlineDraft("workflow-plan-create-form");
+      });
       $("#refresh-workflow").onclick = render;
       $("#register-workflow-preset").onclick = () =>
         confirmAction(
@@ -2944,6 +3047,7 @@ async function rolesPage() {
           }),
       );
     },
+    dispose: () => plansView.dispose?.(),
   };
 }
 function download(filename, content, type = "text/markdown;charset=utf-8") {
@@ -2987,11 +3091,17 @@ function rewindSummary(outcome) {
     outcome.draftStatus === "host-partial"
       ? "宿主回退尚未完成"
       : restored
-        ? "回退分支已创建，草稿已恢复"
+        ? "回退分支已创建，草稿已恢复到新会话"
         : outcome.draftStatus === "pending-client"
           ? "新会话已创建，草稿恢复待确认"
           : "新会话已创建，草稿未恢复";
-  return `<div class="${restored ? "note" : "error"}"><strong>${title}</strong><br>${archived}${outcome.newSessionId ? `新会话：<span class="mono">${esc(outcome.newSessionId)}</span>` : ""}<br>${restored ? "草稿已放入输入框，没有自动发送。" : ""}${outcome.error ? esc(outcome.error) : restored ? "" : "等待宿主恢复草稿。"}</div>`;
+  const navigation =
+    outcome.openStatus === "requested"
+      ? "已向宿主请求打开新会话；可见页面切换尚无完成回执。"
+      : outcome.openStatus === "failed"
+        ? "打开新会话失败，可在宿主中按编号查找。"
+        : "";
+  return `<div class="${restored ? "note" : "error"}"><strong>${title}</strong><br>${archived}${outcome.newSessionId ? `新会话：<span class="mono">${esc(outcome.newSessionId)}</span>` : ""}<br>${restored ? "纯文本草稿恢复已读回，没有自动发送。" : ""}${esc(navigation)}${outcome.error ? esc(outcome.error) : restored ? "" : "等待宿主恢复草稿。"}</div>`;
 }
 function openRewind(item) {
   if (!canLeaveEditor()) return;
@@ -3045,13 +3155,20 @@ function openRewind(item) {
             newSessionId: fork.newSessionId,
             draft: fork.draft,
           });
-          state.rewindOutcome = { ...fork, draftStatus: restored.draftStatus };
+          state.rewindOutcome = {
+            ...fork,
+            draftStatus: restored.draftStatus,
+            openStatus: restored.openStatus,
+            navigationConfirmed: restored.navigationConfirmed,
+          };
         } catch (error) {
           state.rewindOutcome = {
             ...fork,
             draftStatus:
               error.draftStatus || (error.message.includes("未响应") ? "pending-client" : "failed"),
             error: error.message,
+            openStatus: error.openStatus,
+            navigationConfirmed: error.navigationConfirmed,
           };
           throw error;
         }
@@ -3070,9 +3187,13 @@ function openRewind(item) {
           $("#cancel-rewind").textContent = "关闭";
         } else if (fork) {
           $("#rewind-result").innerHTML = rewindSummary(state.rewindOutcome);
-          setTimeout(() => {
-            if (button.isConnected) button.textContent = "重试恢复同一分支草稿";
-          }, 0);
+          if (state.rewindOutcome?.draftStatus === "restored") {
+            button.hidden = true;
+            $("#cancel-rewind").textContent = "关闭";
+          } else
+            setTimeout(() => {
+              if (button.isConnected) button.textContent = "重试恢复同一分支草稿";
+            }, 0);
         } else $("#rewind-error").textContent = error.message;
         throw error;
       } finally {
@@ -3106,7 +3227,7 @@ async function sessionsPage() {
                   ["workspaceName", "演练项目"],
                 ],
                 (item, index) =>
-                  `<button class="small" data-bind-session="${index}" ${state.workspaceId ? "" : 'disabled title="请先激活演练项目"'}>绑定项目</button><button class="small" data-rewind="${index}" ${can("sessions.rewind") && state.bridgeReady ? "" : 'disabled title="宿主回退能力与草稿桥都就绪后方可使用"'}>回退 / 分支</button><button class="small" data-continuation="${index}" ${can("continuation.status") ? "" : "disabled"}>继续状态</button>`,
+                  `<button class="small" data-bind-session="${index}" ${state.workspaceId && state.admission?.accepted ? "" : 'disabled title="请先完成演练入口确认并激活项目"'}>绑定项目</button><button class="small" data-rewind="${index}" ${can("sessions.rewind") && state.bridgeReady ? "" : 'disabled title="宿主回退能力与草稿桥都就绪后方可使用"'}>回退 / 分支</button><button class="small" data-continuation="${index}" ${can("continuation.status") ? "" : "disabled"}>继续状态</button>`,
               )
             : empty("没有可读取的宿主会话", "会话由当前宿主提供，独立预览不包含真实宿主会话。")
         }`,
@@ -3162,6 +3283,7 @@ async function sessionsPage() {
 }
 async function environmentPage() {
   await refreshStatus();
+  const localEnvironment = await environmentSettings({ api, esc, panel, toast, run });
   const workspaceId = state.workspaceId;
   environmentPage.views ||= new Map();
   const view = environmentPage.views.get(workspaceId) || {
@@ -3307,6 +3429,7 @@ async function environmentPage() {
   return {
     html:
       heading(capabilityButton("toolkit.adapt", "离线适配建议", 'id="adapt-tools"')) +
+      localEnvironment.html +
       (feedback
         ? `<div class="${feedback.error ? "error" : "note"}" role="status">${esc(feedback.message)}</div>`
         : "") +
@@ -3338,6 +3461,7 @@ async function environmentPage() {
       catalogHTML +
       `<div id="environment-preflight-result">${preflightHTML(view.preflight)}</div>`,
     bind() {
+      localEnvironment.bind();
       const inContext = () =>
         state.page === "environment" &&
         state.workspaceId === workspaceId &&
@@ -3497,14 +3621,20 @@ async function environmentPage() {
             })),
       );
     },
+    dispose: () => localEnvironment.dispose?.(),
   };
 }
 async function diagnosticsPage() {
   const maintenance = await api("maintenance.info");
+  const admission = await api("admission.status");
   const caps = state.status?.capabilities || [];
   return {
     html:
       heading('<button class="primary" id="run-diagnostics">运行诊断</button>') +
+      panel(
+        "演练入口确认",
+        `<p class="info">${admission.accepted ? `当前安装已确认 · ${esc(admission.acceptedAt)}` : "当前安装尚未确认演练区使用说明。"}撤销会阻止新的演练任务，并尝试停止本项目管理的执行者；普通聊天和运行控制继续可用。若停止未确认，可再次执行撤销以重试清理。</p><button id="revoke-admission" class="danger">撤销确认 / 重试清理</button><button id="enter-admission">查看演练入口</button>`,
+      ) +
       `<div class="grid2"><div>${panel(
         "能力检测",
         caps.length
@@ -3521,6 +3651,21 @@ async function diagnosticsPage() {
           : empty("未返回能力列表", "运行诊断，检查当前宿主适配状态。"),
       )}<div id="diagnostic-result"></div></div><div>${panel("离线维护", `<div class="eyebrow">OFFLINE MAINTENANCE</div><div class="twocoltext"><span>当前版本</span><span>${esc(maintenance.version || state.status?.version || "未知")}</span></div><div class="twocoltext"><span>更新模式</span><span>离线本地包</span></div><p class="info" style="white-space:pre-wrap">${esc(Array.isArray(maintenance.instructions) ? maintenance.instructions.join("\n") : maintenance.instructions || "准备经过可信来源验证的本地更新包，然后通过宿主提供的安装接口维护。")}</p>${capabilityButton("maintenance.install", "选择本地安装包路径", 'id="install-offline"')}<div class="note" style="margin:18px 0 0">安装能力取决于宿主支持。没有可信安装接口时，此操作保持禁用。</div>`)}${panel("诊断说明", `<p class="info">诊断结果描述当前环境中的已检测能力。某项不可用时，对应操作会拒绝执行。</p><p class="info">离线工作台不会连接其他插件的发行或更新服务。</p>`)}</div></div>`,
     bind() {
+      $("#enter-admission").onclick = () => navigate("workspaces");
+      $("#revoke-admission").onclick = () =>
+        confirmAction(
+          "撤销演练确认",
+          "将停止本项目管理的待调度计划，并尝试停止所属执行者；只有确认清理完成的执行槽才会释放。已保存的项目资料保留。",
+          async () => {
+            try {
+              await api("admission.revoke", { revision: admission.revision });
+            } finally {
+              await refreshProjects();
+              await refreshStatus();
+              Object.assign(admission, state.admission);
+            }
+          },
+        );
       $("#run-diagnostics").onclick = (e) =>
         run(e.target, async () => {
           const result = await api("diagnostics.run");

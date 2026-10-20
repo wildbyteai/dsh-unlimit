@@ -8,6 +8,12 @@ const ASSETS = new Map([
   ["/dsh-unlimit/ui/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/dsh-unlimit/ui/app.js", ["app.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/drafts.js", ["drafts.js", "text/javascript; charset=utf-8"]],
+  ["/dsh-unlimit/ui/admission.js", ["admission.js", "text/javascript; charset=utf-8"]],
+  [
+    "/dsh-unlimit/ui/environment-settings.js",
+    ["environment-settings.js", "text/javascript; charset=utf-8"],
+  ],
+  ["/dsh-unlimit/ui/workflow-plans.js", ["workflow-plans.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/styles.css", ["styles.css", "text/css; charset=utf-8"]],
 ]);
 
@@ -115,6 +121,7 @@ export function createHandler(controller, getOrigin, { rejectRequest } = {}) {
             "WORKFLOW_START_FAILED",
             "WORKFLOW_STOP_FAILED",
             "SETTINGS_APPLIED_PARTIAL",
+            "ADMISSION_REVOKED_PARTIAL",
           ].includes(error.code) && error.partial
             ? { partial: error.partial }
             : {}),

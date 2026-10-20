@@ -42,6 +42,9 @@ const DATA_ACTIONS = [
   "workflow.dispatch",
   "workflow.status",
   "workflow.stop",
+  "workflow.plan.create",
+  "workflow.plan.status",
+  "workflow.plan.stop",
   "files.list",
   "files.read",
   "files.write",
@@ -82,18 +85,19 @@ export async function installTools(ctx, controller, host) {
         defineTool({
           name: "unlimit_workspace",
           description:
-            "读写本会话绑定的本地演练工作区。先 workspaces.list，再按用户选择 workspaces.bind。台账登记不执行扫描或登录；workflow.dispatch 会真正创建执行者，只分派用户明确授权的任务。catalog 可先检查当前会话可见能力。失败不代表操作成功。",
+            "读写本会话绑定的本地演练工作区，需由使用者在工作台完成演练入口确认。先 workspaces.list，再按用户选择 workspaces.bind。台账登记不执行扫描或登录；workflow.dispatch 和 workflow.plan.create 会真正创建执行者，只分派用户明确授权的任务。catalog 可先检查当前会话可见能力。失败不代表操作成功。",
           parameters: {
             action: { type: "string", required: true, enum: DATA_ACTIONS },
             payload: {
               type: "json",
               required: true,
               description:
-                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id，父会话限定为调用者。templates.read 使用相对 path。",
+                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id。workflow.plan.create 使用 tasks:[{id,role,task,requirements:[],dependsOn?:[]}]，plan.status/stop 使用计划 id，父会话均强制为调用者。依赖结果保持未验证，超限明确阻断。templates.read 使用相对 path。",
             },
           },
           output,
           async execute({ action, payload }, execution) {
+            if (!DATA_ACTIONS.includes(action)) throw new Error("此 action 不开放给模型工具");
             if (!payload || typeof payload !== "object" || Array.isArray(payload))
               throw new Error("payload 必须是对象");
             const agent = execution.agent;
@@ -124,6 +128,11 @@ export async function installTools(ctx, controller, host) {
             if (action === "workflow.dispatch") {
               if (data.parentSessionId && data.parentSessionId !== agent.session.id)
                 throw new Error("只能从当前会话分派执行者");
+              data.parentSessionId = agent.session.id;
+            }
+            if (action.startsWith("workflow.plan.")) {
+              if (data.parentSessionId && data.parentSessionId !== agent.session.id)
+                throw new Error("只能操作当前父会话提交的计划");
               data.parentSessionId = agent.session.id;
             }
             if (["workflow.stop", "workflow.status"].includes(action)) {
