@@ -16,7 +16,10 @@ import { fail, object, string } from "./validation.js";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 256 * 1024;
-const MAX_FILES = 512;
+const MAX_FILES = 200;
+const MAX_STORED_FILES = 512;
+// Directory entries count toward this parser bound, but not the imported file limit.
+const MAX_ARCHIVE_ENTRIES = 512;
 const MAX_ARCHIVE_BYTES = 12 * 1024 * 1024;
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const crcTable = Array.from({ length: 256 }, (_, index) => {
@@ -139,9 +142,9 @@ function metadata(content) {
     },
   };
 }
-function checkFiles(files) {
+function checkFiles(files, maxFiles = MAX_FILES) {
   if (!files.length) fail("INVALID_SKILL", "Import contains no files");
-  if (files.length > MAX_FILES) fail("LIMIT_EXCEEDED", `At most ${MAX_FILES} files are allowed`);
+  if (files.length > maxFiles) fail("LIMIT_EXCEEDED", `At most ${maxFiles} files are allowed`);
   const names = new Set();
   let total = 0;
   for (const file of files) {
@@ -200,7 +203,7 @@ function unzip(buffer) {
     fail("INVALID_ZIP", "Multi-disk ZIP is not supported");
   if (count === 0xffff || size === 0xffffffff || start === 0xffffffff)
     fail("INVALID_ZIP", "ZIP64 is not supported");
-  if (count > MAX_FILES || size > MAX_ARCHIVE_BYTES || start + size !== end)
+  if (count > MAX_ARCHIVE_ENTRIES || size > MAX_ARCHIVE_BYTES || start + size !== end)
     fail("INVALID_ZIP", "Invalid ZIP central directory bounds or file count");
   const files = [];
   const names = new Set();
@@ -358,14 +361,14 @@ export class SkillLibrary {
         if (stat.isDirectory()) walk(child, `${relative}/`);
         else if (stat.isFile()) {
           bytes += stat.size;
-          if (bytes > MAX_BYTES || files.length >= MAX_FILES)
+          if (bytes > MAX_BYTES || files.length >= MAX_STORED_FILES)
             fail("LIMIT_EXCEEDED", "Skill exceeds the library size limit");
           files.push({ path: relative, content: readFileSync(child) });
         } else fail("INVALID_PATH", "Skill contains a special file");
       }
     };
     walk(path);
-    return checkFiles(files);
+    return checkFiles(files, MAX_STORED_FILES);
   }
   item(skillId, files, includeFiles = false) {
     const skill = files.find((file) => file.path === "SKILL.md");

@@ -7,6 +7,8 @@ const unavailable = (message) => {
 };
 
 export class Controller {
+  #pending = new Set();
+
   constructor({
     store,
     runtime,
@@ -27,6 +29,7 @@ export class Controller {
     admission,
     plans,
     environment,
+    maintenance,
     onSkillsChanged,
   }) {
     Object.assign(this, {
@@ -49,6 +52,7 @@ export class Controller {
       admission,
       plans,
       environment,
+      maintenance,
       onSkillsChanged,
     });
   }
@@ -82,6 +86,7 @@ export class Controller {
     };
     const runtimeCapabilities = this.runtime.capabilities();
     const workflowCapabilities = this.workflow?.capabilities() ?? {};
+    const maintenance = await this.maintenance?.info();
     const canApply =
       this.host.supported &&
       runtimeCapabilities
@@ -120,6 +125,7 @@ export class Controller {
       ["continuation.status", this.host.supported && Boolean(this.continuation)],
       ["continuation.stop", this.host.supported && Boolean(this.continuation)],
       ["maintenance.install", false],
+      ["maintenance.uninstall", maintenance?.available === true],
     ];
     return {
       version: manifest.version,
@@ -158,6 +164,104 @@ export class Controller {
     };
   }
   async dispatch(action, payload = {}) {
+    if (action === "maintenance.uninstall") {
+      if (!this.maintenance) return unavailable("当前未提供可验证的官方卸载接口");
+      return this.maintenance.uninstall(payload, () => this.prepareUninstall());
+    }
+    if (action === "maintenance.info") {
+      return {
+        mode: "offline",
+        version: manifest.version,
+        instructions:
+          "在源码目录运行 npm run build 和 npm run pack:local。通过桌面端插件管理器安装生成的本地包；本插件不自动访问发布服务器。",
+        uninstall: this.maintenance
+          ? await this.maintenance.info()
+          : {
+              available: false,
+              phase: "unsupported",
+              detail: "当前未提供可验证的官方卸载接口",
+              data: "preserved",
+              automaticRestart: false,
+            },
+      };
+    }
+    if (this.maintenance?.busy)
+      throw Object.assign(new Error("正在卸载或已经移除本插件，请在宿主插件管理器查看状态"), {
+        code: "MAINTENANCE_BUSY",
+      });
+    const pending = this.route(action, payload);
+    this.#pending.add(pending);
+    try {
+      return await pending;
+    } finally {
+      this.#pending.delete(pending);
+    }
+  }
+
+  async prepareUninstall() {
+    // Let already accepted actions finish; no new action enters while the
+    // maintenance operation is active. This also covers an awaited apply/save.
+    await Promise.allSettled([...this.#pending]);
+    const prepared = {
+      controlsDisabled: false,
+      admissionRevoked: false,
+      steps: [],
+      data: "preserved",
+    };
+    const step = async (id, operation) => {
+      try {
+        await operation();
+        prepared.steps.push({ id, status: "completed" });
+      } catch {
+        prepared.steps.push({ id, status: "failed" });
+      }
+    };
+    await step("settings", () => {
+      const current = this.store.dispatch("settings.get", {});
+      const saved = current.value.enabled
+        ? this.store.dispatch("settings.save", {
+            revision: current.revision,
+            value: { ...current.value, enabled: false },
+          })
+        : current;
+      prepared.settingsRevision = saved.revision;
+    });
+    await step("admission", () => {
+      if (this.admission) {
+        const result = this.admission.dispatch("admission.revoke", {
+          revision: this.admission.status().revision,
+        });
+        prepared.admissionRevision = result.revision;
+      }
+      prepared.admissionRevoked = true;
+    });
+    for (const id of ["plans", "workflow"])
+      await step(id, async () => {
+        const result = await this[id]?.stopAll();
+        if (result?.stopped === false) throw new Error("Owned tasks remain active");
+      });
+    await step("presets", () => this.workflow?.presets({ operation: "unregister" }));
+    await step("controls", async () => {
+      await this.revertControls();
+      prepared.controlsDisabled =
+        prepared.steps.find((item) => item.id === "settings").status === "completed";
+    });
+    await step("probes", async () => {
+      const result = await this.toolkit?.cancelProbes();
+      if (result?.stopped === false) throw new Error("Owned probes remain active");
+    });
+    if (prepared.steps.some((item) => item.status === "failed"))
+      throw Object.assign(
+        new Error("卸载准备未完成，未调用官方移除；已完成的还原与撤销保留，请核对失败步骤后重试"),
+        {
+          code: "UNINSTALL_PREPARATION_FAILED",
+          partial: { prepared, removed: false, managerCalled: false },
+        },
+      );
+    return prepared;
+  }
+
+  async route(action, payload = {}) {
     const cleanupOrStatus =
       [
         "workflow.status",
@@ -344,13 +448,6 @@ export class Controller {
             ok: item.state !== "unsupported",
             detail: item.detail,
           })),
-        };
-      case "maintenance.info":
-        return {
-          mode: "offline",
-          version: manifest.version,
-          instructions:
-            "在源码目录运行 npm run build 和 npm run pack:local。通过桌面端插件管理器安装生成的本地包；本插件不自动访问发布服务器。",
         };
       case "maintenance.install":
         return unavailable("此版尚未验证桌面端的本地包安装接口，请使用宿主插件管理器");

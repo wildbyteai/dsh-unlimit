@@ -23,6 +23,7 @@ import { LocalEnvironment } from "../core/environment.js";
 import { DesktopWorkflowPlan } from "./workflow-plan.js";
 import { RepeatReminder } from "./repeat-reminder.js";
 import { ReadLimits } from "./read-limits.js";
+import { DesktopMaintenance } from "./maintenance.js";
 
 export const name = "dsh-unlimit";
 export const inject = ["webServer", "connection"];
@@ -71,6 +72,7 @@ export function mount(ctx, host) {
     plans,
     environment,
     host,
+    maintenance: new DesktopMaintenance(ctx, host),
     onSkillsChanged: () => skillConnection?.changed(),
   });
   ctx.effect(() => async () => {

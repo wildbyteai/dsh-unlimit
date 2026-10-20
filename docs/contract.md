@@ -88,6 +88,10 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 提示词 replace 仅替换三个人设槽及当前 scope 的明确 complete 定义；工具、模式、SDK 和未知功能段保持原序与正文。complete 元数据使用固定版本只读适配，详见 [提示词功能段合同](prompt-sections-contract.md)。
 
+`maintenance.info` 返回离线维护说明与卸载能力、阶段和禁用原因。`maintenance.uninstall` 仅接受 `{bundle:"dsh-unlimit",confirmed:true}`，不向模型工具开放。先排空已接纳动作、持久禁用和撤销入场、停止所属任务并还原控制，再用官方管理器移除和读回。准备失败不移除，未知结果不自动重试；成功后只返回普通回执，不再读取已经释放的数据服务。资料保留、所有权、失败字段和真实未验边界见 [卸载合同](maintenance-contract.md)。
+
+技能新导入或保存最多200个普通文件，正文256KiB、ZIP12MiB、展开总量50MiB；ZIP目录项与文件合计另有512条解析上限。既存技能保留最多512文件的读取能力，超200文件的编辑保存明确拒绝，不截断原文件；需要先由用户整理到当前导入规模。
+
 ## 发布边界
 
 公开 GitHub 只包含独立源码、合成测试、文档和工作流。宿主程序、用户 profile、真实会话、数据库、密钥、工具库和本机诊断原始路径不提交。检查结果必须区分实现、合成测试、真实宿主接口、桌面端交互验收。
@@ -206,7 +210,7 @@ PNG/JPEG/WebP/GIF 的预览先检查格式结构与尺寸，最长边 16384 像�
 
 `begin` 返回 15 分钟有效的 `challengeId`、服务端 `readyAt`、说明和三个勾选项。`read` 接收 `{challengeId}` 记录已读确认，页面只在滚动至说明末尾后开放按钮。`confirm` 使用 `{challengeId,checks:{scope:true,permissions:true,evidence:true}}`，服务端必须已过 5 秒、收到已读确认且逐项为 true。已读与勾选是用户操作声明，不是人类实际阅读的技术证明，也不是目标授权或法律协议。成功、撤销或过期使旧 challenge 失效。
 
-确认按数据安装根和说明版本保存于本地 meta；替换插件包不清空同一数据安装，复制数据库到另一根会重新要求确认。`revoke` 使用最新 `{revision}`，先持久撤销，再停止本实例计划和所属执行者；`ADMISSION_REVOKED_PARTIAL` 明确 `partial.accepted:false`。状态/停止接口仍开放，诊断页在已撤销时也能再次请求清理。没有实现官方卸载事件与确认状态清理的联动。
+确认按数据安装根和说明版本保存于本地 meta；替换插件包不清空同一数据安装，复制数据库到另一根会重新要求确认。`revoke` 使用最新 `{revision}`，先持久撤销，再停止本实例计划和所属执行者；`ADMISSION_REVOKED_PARTIAL` 明确 `partial.accepted:false`。状态/停止接口仍开放，诊断页在已撤销时也能再次请求清理。工作台卸载入口先撤销当前安装确认；直接从官方插件管理器卸载会绕过准备入口，该路径联动仍未覆盖。
 
 ## 本地环境与多任务计划
 

@@ -311,6 +311,32 @@ test(
 );
 
 test(
+  "pre-uninstall probe cancellation stops the owned process without closing the toolkit",
+  executableTests,
+  async (t) => {
+    const { directory, root, call, tool, toolkit } = fixture(t);
+    const pidFile = join(directory, "uninstall-probe-pid");
+    const path = tool(
+      "nmap",
+      `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000);`,
+    );
+    call("toolkit.save", { root });
+    const probe = call("toolkit.probe", { tool: "nmap" });
+    const cancelled = assert.rejects(probe, code("CANCELLED"));
+    for (let attempt = 0; attempt < 100 && !existsSync(pidFile); attempt++)
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(existsSync(pidFile), true, "synthetic process must have started");
+    assert.deepEqual(await toolkit.cancelProbes(), { stopped: true });
+    await cancelled;
+    assert.throws(() => process.kill(Number(readFileSync(pidFile, "utf8")), 0), code("ESRCH"));
+    assert.equal(toolkit.closed, false);
+    const original = readFileSync(path, "utf8").split("\n")[0];
+    writeFileSync(path, `${original}\nprocess.stdout.write('synthetic next probe');\n`);
+    assert.equal((await call("toolkit.probe", { tool: "nmap" })).stdout, "synthetic next probe");
+  },
+);
+
+test(
   "configuration rejects invalid directories, unknown overrides and nonexecutable aliases without partial writes",
   executableTests,
   (t) => {

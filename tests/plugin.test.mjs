@@ -563,6 +563,7 @@ test(
       "environment.variables.save",
       "sessions.attachment",
       "sessions.releaseAttachments",
+      "maintenance.uninstall",
     ])
       assert.equal((await f.execute(parent, action, {})).isError, true);
     let result = await f.request({
@@ -594,6 +595,7 @@ test(
       "workflow-plans.js",
       "workspace-rules.js",
       "rewind.js",
+      "maintenance.js",
     ]) {
       const resource = await f.request({ method: "GET", url: `/dsh-unlimit/ui/${file}` });
       assert.equal(resource.status, 200);

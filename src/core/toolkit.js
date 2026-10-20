@@ -429,9 +429,14 @@ export class Toolkit {
   async close() {
     this.closed = true;
     this.identities.clear();
+    await this.cancelProbes();
+  }
+
+  async cancelProbes() {
     const tasks = [...this.pending.values()];
     for (const cancellation of this.pending.keys()) cancellation.abort();
     await Promise.allSettled(tasks);
+    return { stopped: this.pending.size === 0 };
   }
 
   dispatch(action, payload = {}, options = {}) {

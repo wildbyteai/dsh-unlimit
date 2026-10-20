@@ -4,6 +4,7 @@ import { admissionPage } from "./admission.js";
 import { environmentSettings } from "./environment-settings.js";
 import { workflowPlans } from "./workflow-plans.js";
 import { openWorkspaceRules } from "./workspace-rules.js";
+import { uninstallSection, uninstallFlow, renderReceipt } from "./maintenance.js";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -39,6 +40,8 @@ const state = {
   fileFeedback: new Map(),
   fileBackups: new Map(),
   graphPaths: new Map(),
+  uninstallPending: false,
+  uninstallOutcome: null,
 };
 const drafts = new MemoryDrafts();
 let mountedDrafts = [];
@@ -541,6 +544,8 @@ function time(value) {
   return Number.isNaN(+d) ? String(value) : d.toLocaleString("zh-CN", { hour12: false });
 }
 async function api(action, payload = {}) {
+  if (state.uninstallOutcome || (state.uninstallPending && action !== "maintenance.uninstall"))
+    throw new Error("卸载操作已开始，请在回执或宿主插件管理器核对状态。");
   const res = await fetch("/dsh-unlimit/api", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-DSH-Unlimit": "1" },
@@ -758,6 +763,7 @@ async function refreshStatus() {
     `v${state.status.version || "—"} · ${state.status.host?.platform || "Desktop"}`;
 }
 function navigate(page) {
+  if (state.uninstallPending || state.uninstallOutcome) return;
   if (!canLeaveEditor()) return;
   state.page = page;
   state.query = "";
@@ -766,6 +772,11 @@ function navigate(page) {
   render();
 }
 async function render() {
+  if (state.uninstallOutcome) {
+    showUninstallOutcome();
+    return;
+  }
+  if (state.uninstallPending) return;
   captureMountedDrafts();
   mountedDrafts = [];
   disposePage?.();
@@ -1916,7 +1927,7 @@ async function skillsPage() {
       `<div id="skill-catalog-read-result">${readHTML(view.read)}</div><div id="skill-catalog-preflight-result">${preflightHTML(view.preflight)}</div>` +
       panel(
         "本地技能",
-        `<div class="note">可导入技能文件夹、ZIP 或 Markdown。文件夹最多 512 个文件 / 50 MiB，SKILL.md 最大 256 KiB，ZIP 最大 12 MiB。名称与说明以 SKILL.md 的 YAML 元信息为准。</div>${
+        `<div class="note">可导入技能文件夹、ZIP 或 Markdown。文件夹或 ZIP 最多 200 个普通文件 / 展开 50 MiB，SKILL.md 最大 256 KiB，ZIP 最大 12 MiB。名称与说明以 SKILL.md 的 YAML 元信息为准。</div>${
           items.length
             ? table(
                 items,
@@ -2066,7 +2077,7 @@ async function skillsPage() {
         try {
           let payload;
           if (folder) {
-            if (files.length > 512) throw new Error("文件夹超过 512 个文件，请缩小导入范围");
+            if (files.length > 200) throw new Error("文件夹超过 200 个文件，请缩小导入范围");
             if (files.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024)
               throw new Error("文件夹内容超过 50 MiB");
             if (!files.some((file) => file.name === "SKILL.md"))
@@ -3780,6 +3791,36 @@ async function environmentPage() {
     dispose: () => localEnvironment.dispose?.(),
   };
 }
+function confirmUninstall(message) {
+  if (!canLeaveEditor()) return Promise.resolve(false);
+  const dialog = $("#editor");
+  dialog.innerHTML = `<div class="dialoghead"><h2>卸载本插件（保留资料）</h2></div><p class="info">${esc(message)}</p><div class="dialogfoot"><button type="button" id="cancel-uninstall">取消</button><button type="button" class="danger" id="accept-uninstall">确认卸载本插件</button></div>`;
+  dialog.oncancel = null;
+  return new Promise((resolve) => {
+    dialog.addEventListener("close", () => resolve(false), { once: true });
+    $("#cancel-uninstall").onclick = () => dialog.close();
+    $("#accept-uninstall").onclick = (event) => {
+      event.target.disabled = true;
+      resolve(true);
+      dialog.close();
+    };
+    dialog.showModal();
+  });
+}
+function lockUninstallPage() {
+  state.request++;
+  disposePage?.();
+  disposePage = undefined;
+  mountedDrafts = [];
+  $$(".navitem, #workspace-select").forEach((input) => (input.disabled = true));
+}
+function showUninstallOutcome() {
+  $("#content").innerHTML = heading() + renderReceipt(state.uninstallOutcome);
+  $("#connection-label").textContent = state.uninstallOutcome.error
+    ? "卸载状态待核对"
+    : "本插件已卸载";
+  $("#connection-dot").classList.add("off");
+}
 async function diagnosticsPage() {
   const maintenance = await api("maintenance.info");
   const admission = await api("admission.status");
@@ -3805,8 +3846,28 @@ async function diagnosticsPage() {
               ],
             )
           : empty("未返回能力列表", "运行诊断，检查当前宿主适配状态。"),
-      )}<div id="diagnostic-result"></div></div><div>${panel("离线维护", `<div class="eyebrow">OFFLINE MAINTENANCE</div><div class="twocoltext"><span>当前版本</span><span>${esc(maintenance.version || state.status?.version || "未知")}</span></div><div class="twocoltext"><span>更新模式</span><span>离线本地包</span></div><p class="info" style="white-space:pre-wrap">${esc(Array.isArray(maintenance.instructions) ? maintenance.instructions.join("\n") : maintenance.instructions || "准备经过可信来源验证的本地更新包，然后通过宿主提供的安装接口维护。")}</p>${capabilityButton("maintenance.install", "选择本地安装包路径", 'id="install-offline"')}<div class="note" style="margin:18px 0 0">安装能力取决于宿主支持。没有可信安装接口时，此操作保持禁用。</div>`)}${panel("诊断说明", `<p class="info">诊断结果描述当前环境中的已检测能力。某项不可用时，对应操作会拒绝执行。</p><p class="info">离线工作台不会连接其他插件的发行或更新服务。</p>`)}</div></div>`,
+      )}<div id="diagnostic-result"></div></div><div>${panel("离线维护", `<div class="eyebrow">OFFLINE MAINTENANCE</div><div class="twocoltext"><span>当前版本</span><span>${esc(maintenance.version || state.status?.version || "未知")}</span></div><div class="twocoltext"><span>更新模式</span><span>离线本地包</span></div><p class="info" style="white-space:pre-wrap">${esc(Array.isArray(maintenance.instructions) ? maintenance.instructions.join("\n") : maintenance.instructions || "准备经过可信来源验证的本地更新包，然后通过宿主提供的安装接口维护。")}</p>${capabilityButton("maintenance.install", "选择本地安装包路径", 'id="install-offline"')}<div class="note" style="margin:18px 0 0">安装能力取决于宿主支持。没有可信安装接口时，此操作保持禁用。</div>`)}${panel("卸载与资料保留", uninstallSection(maintenance.uninstall))}${panel("诊断说明", `<p class="info">诊断结果描述当前环境中的已检测能力。某项不可用时，对应操作会拒绝执行。</p><p class="info">离线工作台不会连接其他插件的发行或更新服务。</p>`)}</div></div>`,
     bind() {
+      if (maintenance.uninstall?.available === true)
+        $("#uninstall-plugin").onclick = uninstallFlow({
+          api,
+          confirm: confirmUninstall,
+          pending() {
+            state.uninstallPending = true;
+            lockUninstallPage();
+            $("#content").innerHTML =
+              heading() +
+              panel(
+                "正在卸载本插件",
+                '<p class="info" role="status">正在撤销运行控制与演练确认、停止所属任务和探测，并等待官方管理器的卸载回执。请勿重复操作。</p>',
+              );
+          },
+          outcome(result) {
+            state.uninstallOutcome = result;
+            state.uninstallPending = false;
+            showUninstallOutcome();
+          },
+        });
       $("#enter-admission").onclick = () => navigate("workspaces");
       $("#revoke-admission").onclick = () =>
         confirmAction(

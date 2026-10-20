@@ -345,9 +345,111 @@ test("root-only actions reject symlinks and never modify external fixture files"
   assert.throws(() => new SkillLibrary(join(root, "linked")), code("INVALID_PATH"));
 });
 
+for (const format of ["folder", "ZIP"]) {
+  test(`${format} import accepts 200 regular files and rejects 201 without changing existing data`, (t) => {
+    const { call, directory, root } = fixture(t);
+    const sentinel = join(directory, "outside-sentinel.bin");
+    const sentinelContent = Buffer.from([0, 255, 42]);
+    writeFileSync(sentinel, sentinelContent);
+    const original = doc("fixture", "Original body before overwrite");
+    call("skills.save", { id: "fixture", content: original });
+    const entries = [
+      { path: "fixture/SKILL.md", content: doc("fixture", "Accepted 200-file import") },
+      ...Array.from({ length: 199 }, (_, index) => ({
+        path: `fixture/assets/file-${index}.bin`,
+        content: Buffer.from([index, 0, 255]),
+      })),
+    ];
+    const importEntries = (files) => {
+      if (format === "ZIP")
+        return importZip(call, [
+          { path: "fixture/", mode: 0x4000 },
+          { path: "fixture/assets/", mode: 0x4000 },
+          ...files,
+        ]);
+      return call("skills.import", {
+        files: files.map((file) => encoded(file.path, file.content)),
+      });
+    };
+
+    // The ZIP contains 202 central-directory entries, but only 200 regular files.
+    const imported = importEntries(entries);
+    assert.equal(imported.items.length, 1);
+    const accepted = call("skills.read", { id: "fixture" }).item;
+    assert.equal(accepted.files.length, 200);
+    assert.deepEqual(
+      new Map(accepted.files.map((file) => [file.path, file.contentBase64])),
+      new Map(
+        entries.map((file) => [
+          file.path.slice("fixture/".length),
+          Buffer.from(file.content).toString("base64"),
+        ]),
+      ),
+    );
+    const backups = readdirSync(join(root, ".backups"));
+    assert.equal(backups.length, 1);
+    assert.equal(readFileSync(join(root, ".backups", backups[0], "SKILL.md"), "utf8"), original);
+    const libraryEntries = readdirSync(root).sort();
+
+    const rejected = [
+      { path: "fixture/SKILL.md", content: doc("fixture", "Rejected replacement") },
+      ...entries.slice(1),
+      { path: "fixture/assets/one-too-many.bin", content: "Not installed" },
+    ];
+    assert.equal(rejected.length, 201);
+    assert.throws(() => importEntries(rejected), code("LIMIT_EXCEEDED"));
+    assert.deepEqual(call("skills.read", { id: "fixture" }).item, accepted);
+    assert.deepEqual(readdirSync(root).sort(), libraryEntries);
+    assert.deepEqual(readdirSync(join(root, ".backups")), backups);
+    assert.equal(readFileSync(join(root, ".backups", backups[0], "SKILL.md"), "utf8"), original);
+    assert.deepEqual(readFileSync(sentinel), sentinelContent);
+  });
+}
+
+test("existing 201-file skills remain readable while oversized saves preserve the original", (t) => {
+  const { call, directory, root } = fixture(t);
+  const skillRoot = join(root, "legacy");
+  mkdirSync(join(skillRoot, "assets"), { recursive: true });
+  writeFileSync(join(skillRoot, "SKILL.md"), doc("legacy", "Existing synthetic library"));
+  for (let index = 0; index < 200; index++)
+    writeFileSync(join(skillRoot, "assets", `file-${index}.txt`), `Synthetic ${index}`);
+  const sentinel = join(directory, "outside-sentinel.txt");
+  writeFileSync(sentinel, "Unchanged external fixture");
+  const original = call("skills.read", { id: "legacy" }).item;
+  assert.equal(original.files.length, 201);
+  assert.equal(call("skills.list").items[0].id, "legacy");
+
+  assert.throws(
+    () => call("skills.save", { id: "legacy", content: doc("legacy", "Rejected edit") }),
+    code("LIMIT_EXCEEDED"),
+  );
+  assert.deepEqual(call("skills.read", { id: "legacy" }).item, original);
+  assert.deepEqual(readdirSync(root), ["legacy"]);
+  assert.equal(readFileSync(sentinel, "utf8"), "Unchanged external fixture");
+});
+
+test("ZIP central directory retains a separate 512-entry bound including folders", (t) => {
+  const { call } = fixture(t);
+  const entries = [
+    { path: "fixture/SKILL.md", content: doc() },
+    ...Array.from({ length: 511 }, (_, index) => ({
+      path: `fixture/empty-${index}/`,
+      mode: 0x4000,
+    })),
+  ];
+  importZip(call, entries);
+  const original = call("skills.read", { id: "fixture" }).item;
+  assert.equal(original.files.length, 1);
+  assert.throws(
+    () => importZip(call, [...entries, { path: "fixture/extra/", mode: 0x4000 }]),
+    code("INVALID_ZIP"),
+  );
+  assert.deepEqual(call("skills.read", { id: "fixture" }).item, original);
+});
+
 test("imports reject file and decompressed-byte limits without visible partial skills", (t) => {
   const { call } = fixture(t);
-  const tooMany = Array.from({ length: 513 }, (_, n) => encoded(`x/${n}.txt`, "x"));
+  const tooMany = Array.from({ length: 201 }, (_, n) => encoded(`x/${n}.txt`, "x"));
   assert.throws(() => call("skills.import", { files: tooMany }), code("LIMIT_EXCEEDED"));
   const large = Buffer.alloc(50 * 1024 * 1024, 65);
   assert.throws(
