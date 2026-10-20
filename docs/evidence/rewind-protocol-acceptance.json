@@ -1,0 +1,280 @@
+{
+  "baseRevision": "2afb6976ddec92c4323928911d10c350064a8fd1",
+  "node": "24.21.0",
+  "hostVersion": "0.2.1-rc.2",
+  "syntheticFetchRequests": 20,
+  "realNetworkRequests": 0,
+  "realProfileLoaded": false,
+  "modules": [
+    {
+      "name": "@deepseek-ai/cordis",
+      "entrySha256": "6a9394c0877ff45218818c6e815edd038f8057e1a1deb390a8d43ec81c57691e",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-storage",
+      "entrySha256": "1289574c24ecfa5b134e2750d578c00ae59654de7d00133e117c4cc34095f3a3",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-storage-json",
+      "entrySha256": "0a6b75d5569db3379edd93e863570170e1f4121b6c9fabd856f5b476cffe8df4",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-storage-domain",
+      "entrySha256": "a54f7664d2f64fe04a08c7058ca5bff4fc69ed6a0d30c2bc11561b620698ef16",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-session-persistence-jsonl",
+      "entrySha256": "973dd78679b2661d6f492343bc22b124ae958aa597d3b36c698a2c650f909984",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-session",
+      "entrySha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-session/fork",
+      "entrySha256": "72ca7ae2cce506eb607e565f2e6b15fc6e3c2663de8403f79e37fc3a469e34cf",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-session-projection",
+      "entrySha256": "7dc2b212819baf4fc292751054d30b97afcbdee0a4733230abf92c6722e6550c",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-session-query",
+      "entrySha256": "76ce2944e561c12f48b5e240d68cafe54ce6d667b1d20722e6939ed834489939",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-workspace",
+      "entrySha256": "931ca0cb10c5102066c7723690a887f0e6e8e7ab0ffdee1a782686745b0b934f",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-agent",
+      "entrySha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-agent-loop",
+      "entrySha256": "cf57e3ecd487ac5c2553455aaa5cef2c6fb41e6bd61be5aa455675d1d7193033",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-system-prompt",
+      "entrySha256": "7be9f7aafbf345d01ddcc12fd297b16e9a1d41283a6a04073b867becca0bf020",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-tools",
+      "entrySha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-typert-registry",
+      "entrySha256": "ea5e3beb6ddd09a7b77e6fc79933f71ba93382d0ec1caa70bd1f92c904caccdd",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-api-session-controller",
+      "entrySha256": "a9801acb577b03053c5d5a3191ff555c5f1d791d0acddec113bea4511e33b386",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-llm",
+      "entrySha256": "d18d8ae4c8d961e628708c1e4698e09716a0ebb80e55a672e0bde1029bec1155",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-user-approval",
+      "entrySha256": "6a5ad1ba3c3dc3abbbae52e6c8c4463970ee0c1c8988cebb0d5cf2acd17ee90b",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-sandbox-policy",
+      "entrySha256": "772ca58f0f786d6cb4d839deb621634c31097c13228d81b14e3f3153d0524924",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-llm-deepseek",
+      "entrySha256": "eba35025ed1eedda89c51f2da46a3a968f7be1d59719f2ceeadfc4518dff37d6",
+      "matchesManifest": true
+    },
+    {
+      "name": "@deepseek-ai/dsh-llm-pi-ai",
+      "entrySha256": "99b5c20830a52f69641df8a18a39206079b0c725201958cce2c4a934f1d4f7cd",
+      "matchesManifest": true
+    },
+    {
+      "name": "@earendil-works/pi-ai/api/openai-completions.lazy",
+      "entrySha256": "a3d37d272ed600ddae2a9b05884e1c11c65487c1d8aa30d0b19ba571ffc7ea76",
+      "matchesManifest": true
+    },
+    {
+      "name": "@earendil-works/pi-ai/api/openai-responses.lazy",
+      "entrySha256": "ff6755b78f76a83ab50aee5603eb8f5efd8b9608be449a535847d49c0be0f0ca",
+      "matchesManifest": true
+    },
+    {
+      "name": "@earendil-works/pi-ai/api/anthropic-messages.lazy",
+      "entrySha256": "8915ff69b112469fa7bf48f59eeae87bb3d82ce49d3fbddbb2acb1da9675cb39",
+      "matchesManifest": true
+    },
+    {
+      "name": "@earendil-works/pi-ai/api/openai-completions",
+      "entrySha256": "fba125cffc926f44bbbad10ecb6301516cff027a3ef526cefe25076a96c5c8fb",
+      "matchesManifest": true
+    },
+    {
+      "name": "@earendil-works/pi-ai/api/openai-responses",
+      "entrySha256": "8de25051531f131c4ae3d730f371fa0e15559ed7f865765a744c64d5edd2e067",
+      "matchesManifest": true
+    },
+    {
+      "name": "@earendil-works/pi-ai/api/openai-responses-shared",
+      "entrySha256": "21fb0ec9278949ff00cb7af59849e5e3a8c278c807fedd1d7d6e27a024153bda",
+      "matchesManifest": true
+    },
+    {
+      "name": "@earendil-works/pi-ai/api/anthropic-messages",
+      "entrySha256": "320ae8d5d8f459f9f0e01c83a0da8990196363d9fac071497ed27f21fdfbb1ca",
+      "matchesManifest": true
+    }
+  ],
+  "protocols": [
+    {
+      "provider": "deepseek-official",
+      "protocol": "deepseek native messages",
+      "hostVersion": "0.2.1-rc.2",
+      "status": "verified",
+      "stages": [
+        "two-real-loop-turns",
+        "official-fork",
+        "no-automatic-send",
+        "edited-explicit-followup",
+        "durable-readback",
+        "permanent-error",
+        "user-cancel"
+      ],
+      "syntheticFetchRequests": 5,
+      "realNetworkRequests": 0,
+      "realProfileLoaded": false,
+      "requestsMatchingDurableSessionProjection": 5,
+      "resend": {
+        "endpoint": "/default/v1/messages",
+        "currentSystemLocations": ["messages:system"],
+        "earlierInputPresent": true,
+        "editedInputPresent": true,
+        "withdrawnInputAbsent": true,
+        "internalMarkersAbsent": true
+      },
+      "moduleIntegrity": {
+        "scope": "imported entry files and lazy serializers; not exhaustive transitive audit",
+        "count": 28
+      },
+      "limitations": "Official adapters and SSE parsers with synthetic fetch responses and credentials; no real provider, desktop UI, profile, tool calls, subprocesses or live model quality are tested."
+    },
+    {
+      "provider": "synthetic-chat",
+      "protocol": "openai-completions",
+      "hostVersion": "0.2.1-rc.2",
+      "status": "verified",
+      "stages": [
+        "two-real-loop-turns",
+        "official-fork",
+        "no-automatic-send",
+        "edited-explicit-followup",
+        "durable-readback",
+        "permanent-error",
+        "user-cancel"
+      ],
+      "syntheticFetchRequests": 5,
+      "realNetworkRequests": 0,
+      "realProfileLoaded": false,
+      "requestsMatchingDurableSessionProjection": 5,
+      "resend": {
+        "endpoint": "/chat/chat/completions",
+        "currentSystemLocations": ["messages:system"],
+        "earlierInputPresent": true,
+        "editedInputPresent": true,
+        "withdrawnInputAbsent": true,
+        "internalMarkersAbsent": true
+      },
+      "moduleIntegrity": {
+        "scope": "imported entry files and lazy serializers; not exhaustive transitive audit",
+        "count": 28
+      },
+      "limitations": "Official adapters and SSE parsers with synthetic fetch responses and credentials; no real provider, desktop UI, profile, tool calls, subprocesses or live model quality are tested."
+    },
+    {
+      "provider": "synthetic-responses",
+      "protocol": "openai-responses",
+      "hostVersion": "0.2.1-rc.2",
+      "status": "verified",
+      "stages": [
+        "two-real-loop-turns",
+        "official-fork",
+        "no-automatic-send",
+        "edited-explicit-followup",
+        "durable-readback",
+        "permanent-error",
+        "user-cancel"
+      ],
+      "syntheticFetchRequests": 5,
+      "realNetworkRequests": 0,
+      "realProfileLoaded": false,
+      "requestsMatchingDurableSessionProjection": 5,
+      "resend": {
+        "endpoint": "/responses/responses",
+        "currentSystemLocations": ["input:system"],
+        "earlierInputPresent": true,
+        "editedInputPresent": true,
+        "withdrawnInputAbsent": true,
+        "internalMarkersAbsent": true
+      },
+      "moduleIntegrity": {
+        "scope": "imported entry files and lazy serializers; not exhaustive transitive audit",
+        "count": 28
+      },
+      "limitations": "Official adapters and SSE parsers with synthetic fetch responses and credentials; no real provider, desktop UI, profile, tool calls, subprocesses or live model quality are tested."
+    },
+    {
+      "provider": "synthetic-messages",
+      "protocol": "anthropic-messages",
+      "hostVersion": "0.2.1-rc.2",
+      "status": "verified",
+      "stages": [
+        "two-real-loop-turns",
+        "official-fork",
+        "no-automatic-send",
+        "edited-explicit-followup",
+        "durable-readback",
+        "permanent-error",
+        "user-cancel"
+      ],
+      "syntheticFetchRequests": 5,
+      "realNetworkRequests": 0,
+      "realProfileLoaded": false,
+      "requestsMatchingDurableSessionProjection": 5,
+      "resend": {
+        "endpoint": "/messages/v1/messages",
+        "currentSystemLocations": ["system"],
+        "earlierInputPresent": true,
+        "editedInputPresent": true,
+        "withdrawnInputAbsent": true,
+        "internalMarkersAbsent": true
+      },
+      "moduleIntegrity": {
+        "scope": "imported entry files and lazy serializers; not exhaustive transitive audit",
+        "count": 28
+      },
+      "limitations": "Official adapters and SSE parsers with synthetic fetch responses and credentials; no real provider, desktop UI, profile, tool calls, subprocesses or live model quality are tested."
+    }
+  ]
+}

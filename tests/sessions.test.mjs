@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DesktopSessions, SessionOperationError } from "../src/host/sessions.js";
 import { WorkspaceStore } from "../src/core/store.js";
+import { rewindSummary } from "../web/rewind.js";
 
 const human = (text) => ({
   role: "user",
@@ -115,17 +116,19 @@ function fixture(t) {
     },
     async fork(request) {
       trace.push(["fork", request]);
+      agents.push(agent("new-fork"));
       return { sessionId: "new-fork" };
     },
     async create(request) {
       trace.push(["create", request]);
+      agents.push(agent("new-empty"));
       return { sessionId: "new-empty" };
     },
   };
   const services = {
     sessionController: controller,
     workspaceRegistry: registry,
-    agents: { list: () => agents },
+    agents: { list: () => agents, get: (id) => agents.find((item) => item.id === id) },
   };
   const adapter = new DesktopSessions({ get: (name) => services[name] }, store);
   t.after(() => adapter.close());
@@ -166,6 +169,11 @@ test("rewind forks, inherits workspace binding and archives while waiting for so
   assert.equal(result.archived, true);
   assert.equal(result.archive.verified, true);
   assert.equal(result.binding.inherited, true);
+  assert.deepEqual(result.newSessionStop, {
+    requested: true,
+    settledIds: ["new-fork"],
+    pendingIds: [],
+  });
   assert.equal(
     store.dispatch("workspaces.forSession", { sessionId: result.newSessionId }).item.id,
     workspace.id,
@@ -237,6 +245,7 @@ test("missing official interfaces or client handshake refuse before any write", 
     [controller, "fork"],
     [registry, "archiveSession"],
     [services.agents, "list"],
+    [services.agents, "get"],
   ]) {
     const previous = target[property];
     delete target[property];
@@ -252,7 +261,7 @@ test("missing official interfaces or client handshake refuse before any write", 
   assert.deepEqual(writes(trace), []);
 });
 
-test("bad event streams, subagent origin, non-human input and unacknowledged attachments refuse before writes", async (t) => {
+test("bad event streams, missing subagent lineage, non-human input and unacknowledged attachments refuse before writes", async (t) => {
   const { adapter, original, trace } = fixture(t);
   const valid = structuredClone(original);
   original.events[1].seq = 999;
@@ -264,7 +273,7 @@ test("bad event streams, subagent origin, non-human input and unacknowledged att
   original.meta.origin = "subagent";
   await assert.rejects(
     adapter.rewind({ sessionId: "original", draftBridgeReady: true }),
-    code("UNSUPPORTED_CAPABILITY"),
+    code("INVALID_HOST_RESULT"),
   );
   delete original.meta.origin;
   original.events = events([
@@ -387,6 +396,234 @@ test("concurrent rewinds of one source are serialized by rejection and cannot do
   resume();
   await first;
   assert.equal(trace.filter(([name]) => name === "fork").length, 1);
+});
+
+function lineageFixture(t) {
+  const f = fixture(t);
+  f.original.inheritedEventCount = 0;
+  f.original.meta.createdAt = 10;
+  const rootEntries = f.original.events.map((event) => [event.type, event.data]);
+  rootEntries.splice(15, 0, [
+    "subagent/catalog",
+    { version: 0, childId: "child", childCreatedAt: 20, mode: "continuable" },
+  ]);
+  rootEntries.push(
+    ["turn/start", { turn: 3 }],
+    ["step/start", { turn: 3, step: 1 }],
+    ["user/message", human("Later unrelated human turn")],
+    ["step/end"],
+    ["turn/end"],
+  );
+  f.original.events = events(rootEntries);
+  const child = {
+    meta: { id: "child", origin: "subagent", parentSession: "original", createdAt: 20 },
+    inheritedEventCount: 0,
+    events: events([
+      [
+        "subagent/descriptor",
+        { version: 3, mode: "continuable", provider: "spawn", label: "child" },
+      ],
+      ["turn/start", { turn: 1 }],
+      ["step/start", { turn: 1, step: 1 }],
+      ["user/message", human("Synthetic delegated task")],
+      [
+        "subagent/catalog",
+        { version: 0, childId: "grandchild", childCreatedAt: 30, mode: "one-shot" },
+      ],
+      ["step/end"],
+      ["turn/end"],
+    ]),
+  };
+  const grandchild = {
+    meta: { id: "grandchild", origin: "subagent", parentSession: "child", createdAt: 30 },
+    inheritedEventCount: 0,
+    events: events([["subagent/descriptor", { version: 3, mode: "one-shot", provider: "spawn" }]]),
+  };
+  const records = new Map([
+    ["original", f.original],
+    ["child", child],
+    ["grandchild", grandchild],
+  ]);
+  f.controller.inspect = async (id) => {
+    f.trace.push(["inspect", id]);
+    return structuredClone(records.get(id));
+  };
+  return { ...f, child, grandchild, records };
+}
+
+test("a child's creation maps to its parent turn or step rather than the parent's latest input", async (t) => {
+  const { adapter, trace, original } = lineageFixture(t);
+  const before = structuredClone(original);
+  const turn = await adapter.prepare({ sessionId: "child" });
+  assert.equal(turn.sessionId, "original");
+  assert.equal(turn.atSeq, 6);
+  assert.equal(turn.draft, "Original second input\nPreserve exact text.");
+  assert.equal(turn.mapping.basis, "creation");
+  assert.equal(turn.mapping.requestedSessionId, "child");
+  assert.equal(turn.mapping.links[0].catalogSeq, 15);
+  const step = await adapter.prepare({ sessionId: "child", mode: "step" });
+  assert.equal(step.atSeq, 12);
+  assert.equal(step.draft, "Later unrelated human turn");
+  // A step cut retains the original human input; only the later removed input
+  // becomes a draft, never the synthetic delegated child task.
+  assert.deepEqual(original, before);
+  assert.deepEqual(writes(trace), []);
+  await assert.rejects(
+    adapter.prepare({ sessionId: "child", atSeq: 5 }),
+    code("INVALID_REWIND_BOUNDARY"),
+  );
+});
+
+test("nested creation follows only exact owned catalog links and inherits the root workspace", async (t) => {
+  const { adapter, trace, workspace } = lineageFixture(t);
+  const result = await adapter.rewind({ sessionId: "grandchild", draftBridgeReady: true });
+  assert.equal(result.sessionId, "original");
+  assert.equal(result.workspaceId, workspace.id);
+  assert.equal(result.mapping.links.length, 2);
+  assert.equal(result.mapping.targetSessionId, "original");
+  assert.deepEqual(result.stop.settledIds, ["original", "child", "grandchild"]);
+  assert.deepEqual(trace.find(([name]) => name === "fork")[1], { sessionId: "original", atSeq: 6 });
+  assert.deepEqual(trace.find(([name]) => name === "archive").slice(1), [
+    "original",
+    { stopActivity: true },
+  ]);
+});
+
+test("ambiguous, inherited, mismatched, cyclic or unassociated lineage never creates a branch", async (t) => {
+  const cases = [
+    (f) => {
+      f.original.inheritedEventCount = 16;
+    },
+    (f) => {
+      f.original.events[15].data.childCreatedAt++;
+    },
+    (f) => {
+      f.original.events[15].data.version = 9;
+    },
+    (f) => {
+      f.child.events[0].data.mode = "one-shot";
+    },
+    (f) => {
+      f.child.meta.parentSession = "child";
+    },
+    (f) => {
+      f.child.meta.parentSession = "missing";
+    },
+    (f) => {
+      f.original.events.splice(15, 0, {
+        type: "subagent/catalog",
+        data: { ...f.original.events[15].data },
+      });
+    },
+    (f) => {
+      f.original.events.splice(15, 0, { type: "step/end", data: {} });
+    },
+  ];
+  for (const change of cases) {
+    const f = lineageFixture(t);
+    change(f);
+    f.original.events.forEach((event, seq) => {
+      event.seq = seq;
+    });
+    await assert.rejects(
+      f.adapter.rewind({ sessionId: "child", draftBridgeReady: true }),
+      (error) =>
+        ["INVALID_HOST_RESULT", "AMBIGUOUS_REWIND_SOURCE", "NO_REWIND_BOUNDARY"].includes(
+          error.code,
+        ),
+    );
+    assert.deepEqual(writes(f.trace), []);
+  }
+});
+
+test("later or steered nested parents cannot falsely attribute a descendant to the root creation turn", async (t) => {
+  for (const extra of [
+    ["turn/start", { turn: 2 }],
+    [
+      "user/message",
+      { ...human("Later parent direction"), source: { kind: "agent-message", form: "relay" } },
+    ],
+    ["user/message", human("Later child human input")],
+  ]) {
+    const f = lineageFixture(t);
+    const entries = f.child.events.map((event) => [event.type, event.data]);
+    entries.splice(4, 0, extra);
+    f.child.events = events(entries);
+    await assert.rejects(
+      f.adapter.rewind({ sessionId: "grandchild", draftBridgeReady: true }),
+      (error) => ["AMBIGUOUS_REWIND_SOURCE", "NO_REWIND_BOUNDARY"].includes(error.code),
+    );
+    assert.deepEqual(writes(f.trace), []);
+  }
+});
+
+test("shared ancestor locks prevent concurrent child and parent rewinds and are released after completion", async (t) => {
+  const f = lineageFixture(t);
+  const started = Promise.withResolvers();
+  const resume = Promise.withResolvers();
+  const fork = f.controller.fork;
+  f.controller.fork = async (request) => {
+    started.resolve();
+    await resume.promise;
+    return fork(request);
+  };
+  const first = f.adapter.rewind({ sessionId: "child", draftBridgeReady: true });
+  await started.promise;
+  for (const sessionId of ["original", "grandchild"])
+    await assert.rejects(f.adapter.rewind({ sessionId, draftBridgeReady: true }), code("CONFLICT"));
+  resume.resolve();
+  await first;
+  assert.equal(f.adapter.inFlight.size, 0);
+  assert.equal(f.trace.filter(([name]) => name === "fork").length, 1);
+});
+
+test("new branch inbox must be cleared and observed before the original is archived", async (t) => {
+  const f = fixture(t);
+  const result = await f.adapter.rewind({ sessionId: "original", draftBridgeReady: true });
+  assert.equal(f.services.agents.get(result.newSessionId).inbox.nextTurn.length, 0);
+  assert.ok(
+    f.trace.findIndex(([name, id]) => name === "cancel" && id === "new-fork") <
+      f.trace.findIndex(([name]) => name === "archive"),
+  );
+  const broken = fixture(t);
+  broken.services.agents.get = () => undefined;
+  await assert.rejects(
+    broken.adapter.rewind({ sessionId: "original", draftBridgeReady: true }),
+    (error) =>
+      error.partial?.failedAt === "settle-new" &&
+      error.partial.newSessionId === "new-fork" &&
+      error.partial.archived === false,
+  );
+  assert.deepEqual(broken.registry.archivedSessionIds, []);
+});
+
+test("rewind result displays the mapped source and queue evidence without claiming navigation or hiding partial failure", () => {
+  const outcome = {
+    archived: true,
+    newSessionId: "synthetic-new",
+    atSeq: 6,
+    mapping: { basis: "creation", requestedSessionId: "<child>", targetSessionId: "root" },
+    draftStatus: "restored",
+    openStatus: "requested",
+    newSessionStop: { requested: true, settledIds: ["synthetic-new"], pendingIds: [] },
+  };
+  const html = rewindSummary(outcome);
+  assert.ok(html.includes("&lt;child&gt;"));
+  assert.ok(html.includes("保留到事件 6"));
+  assert.ok(html.includes("新分支待处理输入已清空"));
+  assert.ok(html.includes("页面切换尚无完成回执"));
+  assert.ok(html.includes("没有自动发送"));
+  const partial = rewindSummary({
+    ...outcome,
+    archived: false,
+    draftStatus: "host-partial",
+    newSessionStop: { requested: true, settledIds: [], pendingIds: ["synthetic-new"] },
+    error: "<synthetic error>",
+  });
+  assert.ok(partial.includes("宿主回退尚未完成"));
+  assert.ok(partial.includes("清理未确认"));
+  assert.ok(partial.includes("&lt;synthetic error&gt;"));
+  assert.ok(!partial.includes("文字草稿已恢复"));
 });
 
 function withAttachments(f) {

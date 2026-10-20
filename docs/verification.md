@@ -21,7 +21,7 @@
 | V-STORE      | [store.test.mjs](../tests/store.test.mjs)           | 设置修订冲突；规则 CRUD/UTF-8 限额；工作区与会话绑定；资产/服务归一合并、来源与首次发现；组合筛选；事务导入结果与失败回滚；发现/各类记录；角色隔离/重置；知识全文/过滤/证据验证/复用；按点、资产和服务去重计分及报告脱敏 | 真实采集、连接及桌面交互；材料文件由 V-FILES 单独验证                                               |
 | V-RUNTIME    | [runtime.test.mjs](../tests/runtime.test.mjs)       | 关闭时原样返回；完整提示词替换保留工具/上下文；逐步读取新值与模型规则优先；strict 策略；审批审计与取消；明确会话限制/用户审批优先；默认沙箱、子代理动态值；重复注册、回滚、精确撤销与版本拒绝                            | 各模式实机执行；文件/终端/浏览器权限端到端；全局 Hook；读取窗口另见 V-READ-LIMITS、重试另见 V-RETRY |
 | V-SKILLS     | [skills.test.mjs](../tests/skills.test.mjs)         | 自写技能 CRUD、覆盖备份/删除；文件夹与多技能 ZIP；引用/二进制附属文件；调用标志；CRC/长度/路径/链接/资源限制；中途失败恢复                                                                                               | 桌面斜杠调用和真实技能执行；会话目录另见 V-CATALOG                                                  |
-| V-SESSIONS   | [sessions.test.mjs](../tests/sessions.test.mjs)     | 合成事件切点、prepare、人工文本/附件选择、fork/空会话、继承与归档；附件能力/原事件绑定/索引/期限/读取取消/部分失败；父子停止和并发拒绝                                                                                   | 原生 todo 与真实附件见 V-SESSION-HOST；子代理映射与外部任务恢复仍缺                                 |
+| V-SESSIONS   | [sessions.test.mjs](../tests/sessions.test.mjs)     | 合成事件切点、prepare、人工文本/附件选择、fork/空会话、继承与归档；附件能力/原事件绑定/索引/期限/读取取消/部分失败；父子停止和并发拒绝                                                                                   | 原生 todo 与真实附件见 V-SESSION-HOST；创建来源映射另见子代理合同；再次激活与外部任务恢复仍缺       |
 | V-FLOW       | [flow.test.mjs](../tests/flow.test.mjs)             | 默认 3 槽/1–10 配额、显式角色分配、会话绑定与跨区拒绝、槽幂等/满额拒绝、降低配额限制、动态角色正文、撤销/重绑/关闭释放                                                                                                   | 自主任务拆解、所有官方代理强制领取本地槽；明确任务的官方执行另见 V-WORKFLOW                         |
 | V-TOOLKIT    | [toolkit.test.mjs](../tests/toolkit.test.mjs)       | 逐工具路径→工具根→有序目录优先级；原子配置与空值清除；拒绝失效精确路径静默回退和 PATH 扩张；httpx 版本/帮助产品识别及指纹变化失效；固定参数、总超时/64KiB/取消/临时 HOME 清理                                            | 真正工具扫描、联网安装、任意命令运行；Windows 原生探测及进程树实机验证                              |
 | V-EXTENSIONS | [extensions.test.mjs](../tests/extensions.test.mjs) | 日志动态引用不可变而外层字段可替换时的关闭/禁用/精确还原；接口缺失、冲突和失败回滚；对无接口能力明确报告 unsupported                                                                                                     | 关闭所有遥测或已在途上传；Hook/记忆/全局字节读取；重试策略另见 V-RETRY                              |
@@ -48,7 +48,7 @@
 | V-PLAN        | [workflow-plan.test.mjs](../tests/workflow-plan.test.mjs) | 16项合成收据检查：单槽排队、目录及环境依赖、原始结果只传直接依赖、上下文超限阻断、失败及清理保槽、父/项目隔离、停止/撤销/启动竞态 | 真实Store/Flow/DesktopWorkflow，activation结果为合成；官方计划执行另见 V-WORKFLOW，无自动拆解或跨重启恢复 |
 | V-CLIENT      | [client-bridge.test.mjs](../tests/client-bridge.test.mjs) | 13项桥验证：同源/指定iframe、文字/图片/文件草稿、字节与元信息、已有输入保护、部分失败、取消/关闭/过期、晚写拒绝、批次释放         | DOM为最小合成模型；官方客户端路径另见下节                                                                 |
 
-2026-10-20，在 `1f737ea` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，完整运行 `node --expose-internals --test tests/*.test.mjs`，退出码0，结果为 **316通过、0失败、0跳过**。JavaScript 语法检查 **86/86通过**。这些是合成、官方模块隔离和入口集成测试，不是316项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。
+2026-10-21，在 `2afb697` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，完整运行 `node --expose-internals --test tests/*.test.mjs`，退出码0，结果为 **334通过、0失败、0跳过**。JavaScript 语法检查 **91/91通过**。这些是合成、官方模块隔离和入口集成测试，不是334项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。
 
 新增凭据与环境预检：
 
@@ -229,3 +229,15 @@ JS
 新包只包含本项目源码、界面和文档，运行时不分发官方程序、Node.js、其他插件或真实profile。打包和导入验证不执行 mount；本轮未安装到桌面。
 
 本轮运行控制预览为1280×720，使用项目临时SQLite：缺官方服务时新会话默认和重复提醒下拉框禁用、原因可见，应用按钮禁用。提示词保存revision 0→1，随后重新载入逐字读回（含字面花括号）；保存后刷新状态。截图 [control-defaults-preview.png](control-defaults-preview.png) 仅含合成数据。临时服务、浏览器标签和数据已清理；不等于真实桌面可用目录选择或启用验收。
+
+## 本轮回退与报告补齐
+
+**V-REWIND-PROTOCOL**：[rewind-protocols-host.test.mjs](../tests/rewind-protocols-host.test.mjs) 在真实官方 SessionController、AgentLoop、JSONL 与四个协议适配器下，从两轮实际合成执行回退第二轮，再显式编辑重发。20 次假 SSE fetch 均与请求时 Session 派生内容一致；较早输入与当前系统正文保留，撤回输入和内部标记不进入请求，HTTP400 为 error、用户取消为 aborted。28 个官方入口和 lazy SDK 摘要匹配；假凭据/传输，不代表提供方接纳或真实桌面操作。摘要见 [协议证据](evidence/rewind-protocol-acceptance.json) 与 [合同](rewind-protocol-contract.md)。
+
+此测试发现官方 fork 的精确前缀可继承被撤回轮次的入队事件。实现现在先用公开 cancel/whenIdle 清理新分支队列再归档原会话；保留审计事件，不让撤回文本重新入场。失败返回 settle-new 部分结果与新分支编号。
+
+**V-SESSION-HOST** 本轮增加4项真实 startActivation/catalog 用例：主会话第二轮创建后又有第三轮仍正确定位第二轮、首轮空分支、重复 catalog 写前拒绝、调度轮次不能借用前轮人工输入。该文件9项通过；子代理停在可取消的 pre-step，未调用模型。合成层另验嵌套来源、被插话后拒绝、祖先并发锁、队列清理失败与结果转义；后续激活的普遍来源映射仍缺，见 [子代理合同](child-rewind-contract.md)。
+
+**V-REPORT**：[report.test.mjs](../tests/report.test.mjs) 的3项用例覆盖空库、完整现有字段与12类记录、17条证据记录、计分去重/阶段归属、关联与来源、凭据整条隐藏及嵌套脱敏、跨区拒绝。query_only 下报告前后所有 entries/metadata 逐行一致，重复构建结果一致。保留 stats 原字段并增加记录分类/评估/测试/关系/事件计数；未执行引用文件或网络。详见 [报告合同](report-contract.md)。
+
+1280×720 回环预览核对报告完整正文，合成3资产、2关系、1发现、15分读回一致，页面无控制台错误；导出点击出现下载提示，本轮未取得对应下载文件，因此不把提示当作文件验收。截图见 [报告预览](report-preview.png)。同尺寸独立组件预览使用实际 web/rewind.js 与 styles.css，核对创建来源与切点、队列清空、草稿未发送、导航未确认及部分失败提示，见 [回退结果预览](rewind-result-preview.png)；这不是实际宿主回退窗口的交互验收。两个回环进程均已停止，合成临时库按本轮工作区ID核验后清理。

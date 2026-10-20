@@ -1,3 +1,4 @@
+import { rewindSummary, rewindNotice } from "./rewind.js";
 import { MemoryDrafts } from "./drafts.js";
 import { admissionPage } from "./admission.js";
 import { environmentSettings } from "./environment-settings.js";
@@ -3236,57 +3237,14 @@ async function reportsPage() {
     },
   };
 }
-function rewindSummary(outcome) {
-  if (!outcome) return "";
-  const archived = outcome.archived ? "原记录已保留并归档。" : "原会话归档未确认。";
-  const restored = outcome.draftStatus === "restored";
-  const textRestored = outcome.textStatus === "restored" || restored;
-  const title =
-    outcome.draftStatus === "host-partial"
-      ? "宿主回退尚未完成"
-      : restored
-        ? "回退分支已创建，草稿已恢复到新会话"
-        : outcome.draftStatus === "partial"
-          ? "文字已恢复，附件恢复未完成"
-          : outcome.draftStatus === "pending-client"
-            ? "新会话已创建，草稿恢复待确认"
-            : "新会话已创建，草稿未恢复";
-  const navigation =
-    outcome.openStatus === "requested"
-      ? "已向宿主请求打开新会话；可见页面切换尚无完成回执。"
-      : outcome.openStatus === "failed"
-        ? "打开新会话失败，可在宿主中按编号查找。"
-        : "";
-  const attachmentLabels = {
-    "not-required": "无附件",
-    pending: "待处理",
-    reading: "读取中",
-    staged: "已重建草稿",
-    restored: "已加入输入框",
-    failed: "未完成",
-    cancelled: "已取消",
-  };
-  const uploadLabels = {
-    "not-required": "无需上传",
-    "not-requested": "未开始",
-    uploading: "上传中",
-    ready: "上传已就绪",
-    failed: "未完成",
-    cancelled: "已取消",
-  };
-  const attachmentInfo = outcome.attachmentBatch
-    ? ` 附件：${attachmentLabels[outcome.attachmentStatus] || "未确认"}；文件上传：${uploadLabels[outcome.uploadStatus] || "未确认"}。`
-    : "";
-  return `<div class="${restored ? "note" : "error"}"><strong>${title}</strong><br>${archived}${outcome.newSessionId ? `新会话：<span class="mono">${esc(outcome.newSessionId)}</span>` : ""}<br>${textRestored ? "文字草稿已恢复，没有自动发送。" : ""}${esc(attachmentInfo)}${esc(navigation)}${outcome.error ? esc(outcome.error) : restored ? "" : "等待宿主恢复草稿。"}</div>`;
-}
 function openRewind(item) {
   if (!canLeaveEditor()) return;
   const dialog = $("#editor");
   let fork = null;
-  dialog.innerHTML = `<form id="rewind-form"><div class="dialoghead"><h2>会话回退</h2><button class="quiet small" type="button" id="close-rewind">关闭</button></div><div class="note">将通过官方 fork 路径创建新会话，保留并归档原记录，再把被移除的用户输入恢复到新会话草稿。不会自动发送。</div>${renderField(
+  dialog.innerHTML = `<form id="rewind-form"><div class="dialoghead"><h2>会话回退</h2><button class="quiet small" type="button" id="close-rewind">关闭</button></div><div class="note">${esc(rewindNotice)}</div>${renderField(
     field("mode", "回退方式", "select", {
       options: [
-        ["turn", "回退整轮 · 移除最近人工输入及后续事件"],
+        ["turn", "回退整轮 · 子代理定位到创建来源"],
         ["step", "回退一步 · 回到前一步结束"],
       ],
     }),

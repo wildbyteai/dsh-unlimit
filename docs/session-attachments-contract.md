@@ -6,6 +6,8 @@
 
 `sessions.prepare` / `sessions.rewind` 原有字段保持不变。若被移除的第一条人工 `user/message` 包含图片或文件，调用方必须先获取客户端 bridge 的 `probe.supports.attachments === true`，并传 `draftBridgeSupports: {attachments: true}`。原有 `draftBridgeReady: true` 仍为 rewind 必需。
 
+创建新分支后先清理官方继承的待处理队列；来源映射到根会话时，附件与草稿取自该根会话实际被移除的人工消息。清理失败不会进入附件绑定或客户端恢复。详见 [子代理回退合同](child-rewind-contract.md)，四协议显式重发证据见 [回退协议合同](rewind-protocol-contract.md)。
+
 仅接受原事件中 `source.kind === 'user'` 且 `surfaceOp === 'append'` 的内容。文本按原文本块顺序合并；图片和文件按原附件块顺序恢复。文本中的路径或 `@file` 引用保持文本，绝不据此打开本机文件。未知内容块、缺官方读取 API、超过当前官方图片准入限制，均在 fork/归档前拒绝。
 
 含附件的结果增加：

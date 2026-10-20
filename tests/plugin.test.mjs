@@ -593,6 +593,7 @@ test(
       "environment-settings.js",
       "workflow-plans.js",
       "workspace-rules.js",
+      "rewind.js",
     ]) {
       const resource = await f.request({ method: "GET", url: `/dsh-unlimit/ui/${file}` });
       assert.equal(resource.status, 200);

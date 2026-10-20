@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import net from "node:net";
 import dgram from "node:dgram";
@@ -83,6 +83,9 @@ async function loadOfficial() {
       llm: "@deepseek-ai/dsh-llm",
       attachmentLocal: "@deepseek-ai/dsh-attachment-local",
       todo: "@deepseek-ai/dsh-tool-todo",
+      subagents: "@deepseek-ai/dsh-subagent",
+      spawn: "@deepseek-ai/dsh-subagent-spawn-in-process",
+      directories: "@deepseek-ai/dsh-working-directory",
     };
     return Object.fromEntries(
       await Promise.all(Object.entries(names).map(async ([key, name]) => [key, await load(name)])),
@@ -91,13 +94,23 @@ async function loadOfficial() {
   return official;
 }
 
-async function fixture(t, { attachments: useAttachments = false, todo: useTodo = false } = {}) {
+async function fixture(
+  t,
+  {
+    attachments: useAttachments = false,
+    todo: useTodo = false,
+    subagents: useSubagents = false,
+  } = {},
+) {
   denyExternalExecution(t);
   const api = await loadOfficial();
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "dsh-unlimit-real-controller-")));
   const ctx = new api.cordis.Context();
   const fibers = [];
   const unusedCalls = [];
+  const project = join(directory, "project");
+  if (useSubagents) mkdirSync(project);
+  const preStepEntered = Promise.withResolvers();
   const store = new WorkspaceStore(join(directory, "plugin-synthetic.sqlite"));
   const workspaceId = store.dispatch("workspaces.save", {
     name: "Synthetic official-service workspace",
@@ -115,7 +128,7 @@ async function fixture(t, { attachments: useAttachments = false, todo: useTodo =
       assert.deepEqual(
         unusedCalls,
         [],
-        "No synthetic LLM, attachment, filesystem or upload implementation may be exercised",
+        "No unexpected LLM, attachment, filesystem or upload calls may occur",
       );
     } finally {
       store.close();
@@ -151,6 +164,31 @@ async function fixture(t, { attachments: useAttachments = false, todo: useTodo =
       llm.resolveCallConfig = unused("llm.resolveCallConfig");
       const fs = new api.cordis.Service(scope, "fs");
       fs.resolve = unused("fs.resolve");
+      if (useSubagents) {
+        fs.resolve = async (path, options = {}) => {
+          const target = resolve(options.cwd ?? project, path);
+          assert.ok(
+            target === project || target.startsWith(project + sep),
+            "Only the disposable synthetic project is visible",
+          );
+          return target;
+        };
+        fs.stat = async (target) => {
+          assert.ok(target === project || target.startsWith(project + sep));
+          return { type: statSync(target).isDirectory() ? "directory" : "file" };
+        };
+        fs.processPath = (target) => target;
+        // Keep the real child inside its first pre-step until public cancel
+        // aborts it. No LLM preparation or transport is allowed to run.
+        scope.on("agent/pre-step", async ({ signal }) => {
+          preStepEntered.resolve();
+          if (!signal.aborted)
+            await new Promise((resolveAbort) =>
+              signal.addEventListener("abort", resolveAbort, { once: true }),
+            );
+          return { kind: "reject" };
+        });
+      }
       if (!useAttachments) {
         const attachments = new api.cordis.Service(scope, "attachments");
         attachments.imageLimits = {
@@ -184,14 +222,19 @@ async function fixture(t, { attachments: useAttachments = false, todo: useTodo =
   await mount(api.query.SessionQueryEngine);
   await mount(api.loop.AgentLoop, { agents: [], maxParallelToolCalls: 1 });
   await mount(api.controller.SessionController, { nativeOpen: false, listWorkSliceMs: 16 });
+  if (useSubagents) {
+    await mount(api.directories.WorkingDirectoryService, { defaultDirectory: project });
+    await mount(api.subagents.SubagentRuntime, { maxDepth: 2, maxActiveSubagents: 8 });
+    await mount(api.spawn, { providerName: "spawn" });
+  }
   const adapter = new DesktopSessions(ctx, store);
   t.after(() => adapter.close());
   const create = async () => {
-    const created = await ctx.sessionController.create({ cwd: join(directory, "project") });
+    const created = await ctx.sessionController.create({ cwd: project });
     store.dispatch("workspaces.bind", { id: workspaceId, sessionId: created.sessionId });
     return ctx.agents.get(created.sessionId);
   };
-  const appendTurn = (agent, turn, prompt) => {
+  const beginTurn = (agent, turn, prompt) => {
     agent.session.append("turn/start", { turn });
     agent.session.append("step/start", { turn, step: 1 });
     agent.session.append(
@@ -202,11 +245,244 @@ async function fixture(t, { attachments: useAttachments = false, todo: useTodo =
       }),
       { surfaceOp: "append" },
     );
+  };
+  const endTurn = (agent, turn) => {
     agent.session.append("step/end", { turn, step: 1, reason: { kind: "completed" } });
     agent.session.append("turn/end", { turn, reason: { kind: "completed" } });
   };
-  return { api, ctx, adapter, store, workspaceId, directory, create, appendTurn };
+  const appendTurn = (agent, turn, prompt) => {
+    beginTurn(agent, turn, prompt);
+    endTurn(agent, turn);
+  };
+  const startChild = async (parent) => {
+    const receipt = await ctx.subagents.startActivation({
+      provider: "spawn",
+      label: "Synthetic child creation",
+      request: {
+        parent,
+        prompt: [{ type: "text", text: "Synthetic child input is never sent to a model" }],
+        maxDepth: 2,
+      },
+      signal: new AbortController().signal,
+      delivery: "caller",
+    });
+    const child = ctx.agents.get(receipt.childId);
+    assert.ok(child, "The official activation must own a resident child");
+    await preStepEntered.promise;
+    assert.equal(child.status, "running");
+    return { child, receipt };
+  };
+  return {
+    api,
+    ctx,
+    adapter,
+    store,
+    workspaceId,
+    directory,
+    create,
+    beginTurn,
+    endTurn,
+    appendTurn,
+    startChild,
+  };
 }
+
+test(
+  "real managed child creation rewinds its root creation turn despite later root input",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t, { subagents: true });
+    const root = await f.create();
+    f.appendTurn(root, 1, "Retained first root input");
+    const retained = await f.ctx.sessionController.inspect(root.id);
+    f.beginTurn(root, 2, "Root input that created the child\nRestore this exact draft.");
+    const { child, receipt } = await f.startChild(root);
+    f.endTurn(root, 2);
+    f.appendTurn(root, 3, "Later root input must not select the rewind boundary");
+    const notice = (text) =>
+      f.api.llm.createUserMessage({
+        source: { kind: "runtime-context" },
+        content: [{ type: "text", text }],
+      });
+    root.inject(notice("Synthetic pending root input"));
+    child.inject(notice("Synthetic pending child input"));
+    assert.equal(root.inbox.nextStep.length, 1);
+    assert.equal(child.inbox.nextStep.length, 1);
+    const before = await f.ctx.sessionController.inspect(root.id);
+    const childBefore = await f.ctx.sessionController.inspect(child.id);
+    const catalog = before.events.filter(
+      (event) => event.type === "subagent/catalog" && event.data.childId === child.id,
+    );
+    assert.equal(catalog.length, 1);
+    assert.equal(catalog[0].data.childCreatedAt, childBefore.meta.createdAt);
+    assert.equal(childBefore.meta.origin, "subagent");
+    assert.equal(childBefore.meta.parentSession, root.id);
+    const descriptor = f.api.subagents.foldSubagentDescriptor(
+      childBefore.events.slice(childBefore.inheritedEventCount),
+    );
+    assert.equal(descriptor.mode, "continuable");
+    assert.equal(descriptor.provider, "spawn");
+    const plan = await f.adapter.prepare({ sessionId: child.id });
+    assert.equal(plan.sessionId, root.id);
+    assert.equal(plan.atSeq, retained.events.length - 1);
+    assert.equal(plan.mapping.basis, "creation");
+    assert.equal(plan.mapping.links[0].catalogSeq, catalog[0].seq);
+    const result = await f.adapter.rewind({ sessionId: child.id, draftBridgeReady: true });
+    assert.equal(result.sessionId, root.id);
+    assert.equal(result.mapping.requestedSessionId, child.id);
+    assert.equal(result.mapping.targetSessionId, root.id);
+    assert.equal(result.strategy, "fork");
+    assert.equal(result.draft, "Root input that created the child\nRestore this exact draft.");
+    assert.equal(result.archived, true);
+    assert.equal(result.binding.workspaceId, f.workspaceId);
+    assert.deepEqual(result.stop.pendingIds, []);
+    assert.ok(result.stop.settledIds.includes(root.id));
+    assert.deepEqual(result.newSessionStop.pendingIds, []);
+    assert.equal(root.status, "idle");
+    assert.equal(child.status, "idle");
+    for (const agent of [root, child, f.ctx.agents.get(result.newSessionId)]) {
+      assert.equal(agent.inbox.nextStep.length, 0);
+      assert.equal(agent.inbox.nextTurn.length, 0);
+    }
+    await receipt.result;
+    const continuation = await f.ctx.sessionController.inspect(result.newSessionId);
+    assert.equal(continuation.meta.parentSession, root.id);
+    assert.equal(continuation.meta.origin, undefined);
+    assert.equal(continuation.inheritedEventCount, retained.events.length);
+    assert.deepEqual(continuation.events.slice(0, retained.events.length), retained.events);
+    assert.equal(
+      continuation.events.some(
+        (event) => event.type === "subagent/catalog" && event.data.childId === child.id,
+      ),
+      false,
+    );
+    assert.deepEqual(
+      (await f.ctx.sessionController.inspect(root.id)).events.slice(0, before.events.length),
+      before.events,
+      "The original root log remains an unchanged prefix",
+    );
+    assert.deepEqual(
+      (await f.ctx.sessionController.inspect(child.id)).events.slice(0, childBefore.events.length),
+      childBefore.events,
+      "The original child log remains an unchanged prefix",
+    );
+    assert.equal(
+      f.store.dispatch("workspaces.forSession", { sessionId: result.newSessionId }).item.id,
+      f.workspaceId,
+    );
+    assert.ok(f.ctx.workspaceRegistry.archivedSessionIds.includes(root.id));
+    await f.ctx.sessionPersistence.flush();
+    const reader = await f.ctx.sessionPersistence.open(result.newSessionId, "read");
+    try {
+      assert.deepEqual((await reader.read()).events, continuation.events);
+    } finally {
+      await reader.close();
+    }
+  },
+);
+
+test(
+  "real managed child from its root first turn rewinds to an empty ordinary continuation",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t, { subagents: true });
+    const root = await f.create();
+    f.beginTurn(root, 1, "First root input that created a real managed child");
+    const { child, receipt } = await f.startChild(root);
+    f.endTurn(root, 1);
+    const result = await f.adapter.rewind({ sessionId: child.id, draftBridgeReady: true });
+    assert.equal(result.sessionId, root.id);
+    assert.equal(result.mapping.basis, "creation");
+    assert.equal(result.strategy, "empty");
+    assert.equal(result.draft, "First root input that created a real managed child");
+    assert.equal(result.archived, true);
+    assert.deepEqual(result.stop.pendingIds, []);
+    assert.deepEqual(result.newSessionStop.pendingIds, []);
+    await receipt.result;
+    const continuation = await f.ctx.sessionController.inspect(result.newSessionId);
+    assert.equal(continuation.meta.cwd, join(f.directory, "project"));
+    assert.equal(continuation.meta.parentSession, undefined);
+    assert.equal(continuation.meta.origin, undefined);
+    assert.equal(
+      continuation.events.some((event) =>
+        ["turn/start", "user/message", "subagent/catalog"].includes(event.type),
+      ),
+      false,
+    );
+    for (const agent of [root, child, f.ctx.agents.get(result.newSessionId)]) {
+      assert.equal(agent.status, "idle");
+      assert.equal(agent.inbox.nextStep.length, 0);
+      assert.equal(agent.inbox.nextTurn.length, 0);
+    }
+    assert.equal(
+      f.store.dispatch("workspaces.forSession", { sessionId: result.newSessionId }).item.id,
+      f.workspaceId,
+    );
+  },
+);
+
+test(
+  "duplicate own creation facts in a real managed parent reject before fork or archive",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t, { subagents: true });
+    const root = await f.create();
+    f.beginTurn(root, 1, "Synthetic root input");
+    const { child, receipt } = await f.startChild(root);
+    const catalog = root.session
+      .snapshotEvents()
+      .find((event) => event.type === "subagent/catalog" && event.data.childId === child.id);
+    root.session.append("subagent/catalog", catalog.data);
+    f.endTurn(root, 1);
+    const beforeIds = f.ctx.sessions.list().map((session) => session.id);
+    const before = await f.ctx.sessionController.inspect(root.id);
+    await assert.rejects(
+      f.adapter.rewind({ sessionId: child.id, draftBridgeReady: true }),
+      (error) => error.code === "AMBIGUOUS_REWIND_SOURCE",
+    );
+    assert.deepEqual(
+      f.ctx.sessions.list().map((session) => session.id),
+      beforeIds,
+    );
+    assert.deepEqual((await f.ctx.sessionController.inspect(root.id)).events, before.events);
+    assert.equal(f.ctx.workspaceRegistry.archivedSessionIds.length, 0);
+    assert.equal(child.status, "running", "Rejected preparation must not cancel original work");
+    await receipt.dispose();
+  },
+);
+
+test(
+  "a real managed child from a schedule-only root turn cannot rewind an earlier human turn",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t, { subagents: true });
+    const root = await f.create();
+    f.appendTurn(root, 1, "Earlier human input does not own a later reminder turn");
+    root.session.append("turn/start", { turn: 2 });
+    root.session.append("step/start", { turn: 2, step: 1 });
+    root.session.append(
+      "user/message",
+      f.api.llm.createUserMessage({
+        source: { kind: "schedule" },
+        content: [{ type: "text", text: "Synthetic automatic reminder" }],
+      }),
+      { surfaceOp: "append" },
+    );
+    const { child, receipt } = await f.startChild(root);
+    f.endTurn(root, 2);
+    const beforeIds = f.ctx.sessions.list().map((session) => session.id);
+    await assert.rejects(
+      f.adapter.prepare({ sessionId: child.id }),
+      (error) => error.code === "NO_REWIND_BOUNDARY",
+    );
+    assert.deepEqual(
+      f.ctx.sessions.list().map((session) => session.id),
+      beforeIds,
+    );
+    assert.equal(f.ctx.workspaceRegistry.archivedSessionIds.length, 0);
+    await receipt.dispose();
+  },
+);
 
 test(
   "real official controller forks an exact synthetic prefix and durably archives the original",

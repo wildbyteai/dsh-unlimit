@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { isIP } from "node:net";
 import { credentialUpdate, credentialView } from "./credentials.js";
+import { buildReport } from "./report.js";
 import {
   DEFAULT_SETTINGS,
   RECORD_KINDS,
@@ -35,35 +36,6 @@ const DEFAULT_ROLES = Object.freeze({
   reporter:
     "根据已有发现与证据编写简明报告，列出影响、验证状态、整改建议和限制。不得将本地记录描述成已经执行的远程操作。",
 });
-
-function redact(value, key = "") {
-  if (
-    /pass(word|phrase)?|secret|token|cookie|authorization|private.?key|api.?key|credential/i.test(
-      key,
-    )
-  )
-    return "[REDACTED]";
-  if (Array.isArray(value)) return value.map((item) => redact(item));
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value).map(([name, item]) => [name, redact(item, name)]),
-    );
-  if (typeof value === "string")
-    return value
-      .replace(/\b(Bearer\s+)[^\s]+/gi, "$1[REDACTED]")
-      .replace(
-        /\b(password|passwd|secret|token|api[_-]?key|cookie)\s*[:=]\s*[^\s,;]+/gi,
-        "$1=[REDACTED]",
-      )
-      .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1[REDACTED]@");
-  return value;
-}
-
-function markdown(value) {
-  return String(value)
-    .replace(/[\\`*_{}\[\]<>#|]/g, "\\$&")
-    .replace(/\r?\n/g, " ");
-}
 
 function address(value) {
   const input = string(value, "address").trim();
@@ -900,89 +872,19 @@ export class WorkspaceStore {
   }
 
   report(workspace) {
-    const info = this.get("workspaces", workspace);
-    const assets = this.list("assets", workspace);
-    const findings = this.list("findings", workspace);
-    const records = Object.fromEntries(
-      RECORD_KINDS.map((kind) => [kind, this.list("records", workspace, kind)]),
+    return buildReport(
+      {
+        info: this.get("workspaces", workspace),
+        assets: this.list("assets", workspace),
+        findings: this.list("findings", workspace),
+        records: Object.fromEntries(
+          RECORD_KINDS.map((kind) => [kind, this.list("records", workspace, kind)]),
+        ),
+        links: this.list("links", workspace),
+        events: this.list("events", workspace),
+      },
+      (data) => this.scoreTarget(data, workspace),
     );
-    const points = records["score-point"];
-    const hits = records["score-hit"];
-    const covered = new Set();
-    const scoreByStage = new Map();
-    let scoreEarned = 0;
-    for (const hit of hits) {
-      if (hit.data.awarded === false) continue;
-      const point = points.find((item) => item.id === hit.data.pointId);
-      if (!point) fail("INVALID_DATA", "Scoring evidence references a missing score point");
-      const key = JSON.stringify([
-        point.id,
-        hit.data.assetId ?? null,
-        this.scoreTarget(hit.data, workspace),
-      ]);
-      if (covered.has(key)) continue;
-      covered.add(key);
-      const earned = point.data.points ?? 0;
-      scoreEarned += earned;
-      const stage = point.data.stageId ?? point.data.stage ?? "unassigned";
-      if (typeof stage !== "string") fail("INVALID_DATA", "Score point stage must be a string");
-      const entry = scoreByStage.get(stage) ?? { stage, earned: 0, uniqueHits: 0 };
-      entry.earned += earned;
-      entry.uniqueHits++;
-      scoreByStage.set(stage, entry);
-    }
-    const stats = {
-      assets: assets.length,
-      services: assets.reduce((sum, item) => sum + (item.services?.length ?? 0), 0),
-      findings: findings.length,
-      records: Object.values(records).reduce((sum, items) => sum + items.length, 0),
-      severities: Object.fromEntries(
-        ["critical", "high", "medium", "low", "info"].map((severity) => [
-          severity,
-          findings.filter((item) => item.severity === severity).length,
-        ]),
-      ),
-      scorePoints: points.length,
-      scoreHits: hits.length,
-      scoreUniqueHits: covered.size,
-      scoreByStage: [...scoreByStage.values()],
-      scoreTotal: points.reduce((sum, item) => sum + (item.data.points ?? 0), 0),
-      scoreEarned,
-    };
-    const lines = [
-      `# ${markdown(redact(info.name))} 演练报告`,
-      "",
-      `授权范围：${markdown(redact(info.scope))}`,
-      "",
-      "本报告汇总本地记录；记录存在不表示已执行远程验证。凭据记录内容默认隐藏。",
-      "",
-      `资产 ${stats.assets}；服务 ${stats.services}；发现 ${stats.findings}；证据记录 ${stats.records}；评分累计 ${stats.scoreEarned}；计分点基准总分 ${stats.scoreTotal}（每资产/服务分别累计）。`,
-      "",
-      "## 资产",
-      ...assets.map(
-        (item) =>
-          `- ${markdown(redact(item.name))} · ${markdown(redact(item.address))} (${markdown(item.type)})`,
-      ),
-      "",
-      "## 发现",
-      ...findings.flatMap((item) => [
-        `### ${markdown(redact(item.title))}`,
-        `严重性：${item.severity}；状态：${item.status}；关联资产：${item.assetId ?? "无"}`,
-        "",
-        markdown(JSON.stringify(redact(item.evidence))),
-        "",
-      ]),
-      "## 证据记录",
-    ];
-    for (const [kind, items] of Object.entries(records)) {
-      if (!items.length) continue;
-      lines.push(`### ${kind}`);
-      for (const item of items)
-        lines.push(
-          `- ${item.id}: ${kind === "credential" ? "[REDACTED]" : markdown(JSON.stringify(redact(item.data)))}`,
-        );
-    }
-    return { markdown: lines.join("\n"), stats };
   }
 }
 
