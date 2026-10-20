@@ -1,0 +1,50 @@
+{
+  "name": "dsh-unlimit",
+  "version": "0.1.0",
+  "description": "Independent desktop runtime controls and assessment workspace for DeepSeek Harness.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=24.13.0"
+  },
+  "main": "./src/host/plugin.js",
+  "exports": {
+    ".": "./src/host/plugin.js",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "dsh-unlimit": "./src/cli.js"
+  },
+  "files": [
+    "src",
+    "web",
+    "dist",
+    "cordis.patch.yml",
+    "README.md",
+    "NOTICE.md",
+    "docs"
+  ],
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "format": "prettier --write src web scripts tests docs README.md NOTICE.md package.json .github",
+    "format:check": "prettier --check src web scripts tests docs README.md NOTICE.md package.json .github",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "pack:local": "node scripts/pack.mjs",
+    "preview": "node scripts/preview.mjs",
+    "doctor": "node src/cli.js doctor"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}

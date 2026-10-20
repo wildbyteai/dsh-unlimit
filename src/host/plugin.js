@@ -1,0 +1,145 @@
+import { chmodSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { WorkspaceStore } from "../core/store.js";
+import { SkillLibrary } from "../core/skills.js";
+import { Toolkit } from "../core/toolkit.js";
+import { Flow } from "../core/flow.js";
+import { Controller } from "../server/controller.js";
+import { createHandler } from "../server/http.js";
+import { desktopContext } from "./desktop.js";
+import { DesktopRuntime } from "./runtime.js";
+import { connectSkills } from "./skills.js";
+import { installTools } from "./tools.js";
+import { DesktopSessions } from "./sessions.js";
+import { HostExtensions } from "./extensions.js";
+
+export const name = "dsh-unlimit";
+export const inject = ["webServer", "connection"];
+
+// An explicit host argument is used only by isolated tests. The actual loader passes no such value.
+export function mount(ctx, host) {
+  mkdirSync(host.dataRoot, { recursive: true, mode: 0o700 });
+  const databasePath = join(host.dataRoot, "workspace.sqlite");
+  const store = new WorkspaceStore(databasePath);
+  chmodSync(databasePath, 0o600);
+  const skills = new SkillLibrary(join(host.dataRoot, "skills"));
+  const toolkit = new Toolkit(store);
+  const flow = new Flow(store);
+  const runtime = new DesktopRuntime(ctx, store, host);
+  runtime.rolePrompt = (sessionId) => flow.rolePrompt(sessionId);
+  const extensions = new HostExtensions(ctx, store);
+  const sessions = new DesktopSessions(ctx, store);
+  let skillConnection;
+  const controller = new Controller({
+    store,
+    skills,
+    toolkit,
+    runtime,
+    sessions,
+    extensions,
+    flow,
+    host,
+    onSkillsChanged: () => skillConnection?.changed(),
+  });
+  ctx.effect(() => async () => {
+    const errors = [];
+    for (const cleanup of [
+      () => extensions.revert(),
+      () => runtime.revert(),
+      () => toolkit.close(),
+      () => flow.close(),
+      () => store.close(),
+    ]) {
+      try {
+        await cleanup();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length) throw new AggregateError(errors, "插件已尝试释放全部资源，部分还原步骤失败");
+  });
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: "prefix",
+      path: "/dsh-unlimit",
+      handler: createHandler(controller, () => ctx.webServer.getOrigin(), {
+        rejectRequest: (request) => ctx.connection.requestRejection(request),
+      }),
+    }),
+  );
+  ctx.on("agent/created", ({ agent }) => {
+    if (!agent.session.header.parentSession) return;
+    const parent = store.dispatch("workspaces.forSession", {
+      sessionId: agent.session.header.parentSession,
+    }).item;
+    const own = store.dispatch("workspaces.forSession", { sessionId: agent.session.id }).item;
+    if (parent && !own)
+      store.dispatch("workspaces.bind", { id: parent.id, sessionId: agent.session.id });
+  });
+  const releaseSlot = (sessionId) => {
+    const workspace = store.dispatch("workspaces.forSession", { sessionId }).item;
+    if (workspace) flow.dispatch("flow.release", { workspaceId: workspace.id, sessionId });
+  };
+  ctx.on("agent/disposed", ({ agent }) => releaseSlot(agent.session.id));
+  ctx.on("session/event", (session, event) => {
+    if (event.type === "turn/end") releaseSlot(session.id);
+  });
+  ctx.inject(["skills"], (scope) => {
+    skillConnection = connectSkills(scope, skills);
+    scope.effect(() => () => {
+      skillConnection = undefined;
+    });
+  });
+  ctx.inject(["tools"], async (scope) => {
+    const dispose = await installTools(scope, controller, host);
+    scope.effect(() => dispose);
+  });
+  ctx.inject(["commands"], (scope) => {
+    scope.commands.register({
+      name: "unlimit",
+      definitionId: "dsh-unlimit/command",
+      description: "桌面运行控制：status / apply / revert",
+      input: { hint: "status | apply | revert" },
+      async handler({ rawInput }) {
+        const command = rawInput.trim() || "status";
+        const action = { status: "status", apply: "control.apply", revert: "control.revert" }[
+          command
+        ];
+        if (!action) return { kind: "error", text: "用法：/unlimit status | apply | revert" };
+        try {
+          const value = await controller.dispatch(action);
+          return {
+            kind: "success",
+            text: JSON.stringify(
+              { version: value.version, enabled: value.enabled, capabilities: value.capabilities },
+              null,
+              2,
+            ),
+          };
+        } catch (error) {
+          return { kind: "error", text: error.message };
+        }
+      },
+    });
+  });
+  ctx.inject(["systemPrompt", "approval", "sandboxPolicy"], (scope) => {
+    runtime.ctx = scope;
+    scope.effect(() => () => {
+      try {
+        extensions.revert();
+      } finally {
+        runtime.revert();
+      }
+    });
+    const settings = store.dispatch("settings.get").value;
+    if (settings.enabled && settings.autoReapply && host.supported) {
+      runtime.apply();
+      extensions.apply();
+    }
+  });
+  return controller;
+}
+
+export function apply(ctx) {
+  mount(ctx, desktopContext());
+}
