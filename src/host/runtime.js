@@ -1,5 +1,6 @@
 import { composePrompt, selectedInstructions } from "../core/prompts.js";
 import { connectPromptRefresh } from "./prompt-refresh.js";
+import { PermissionDefaults } from "./permission-defaults.js";
 
 function replace(target, key, create) {
   const descriptor = Object.getOwnPropertyDescriptor(target, key);
@@ -27,12 +28,23 @@ function replaceReference(config, key, read) {
   };
 }
 
+// 0.2.1-rc.2 omits `complete` from rendered sections. Read the same scoped
+// registration snapshot as assemble; never mutate definitions or registry maps.
+function completeSectionNames(systemPrompt, scope) {
+  if (typeof systemPrompt.layers?.merge !== "function") return new Set();
+  const definitions = systemPrompt.layers.merge(scope, (layer) => layer.sections);
+  return new Set(
+    [...definitions].filter(([, definition]) => definition.complete === true).map(([name]) => name),
+  );
+}
+
 export class DesktopRuntime {
   #undo = [];
   constructor(ctx, store, host) {
     this.ctx = ctx;
     this.store = store;
     this.host = host;
+    this.permissionDefaults = new PermissionDefaults(ctx, store, host);
   }
   settings() {
     return this.store.dispatch("settings.get", {}).value;
@@ -44,6 +56,7 @@ export class DesktopRuntime {
     return this.#undo.length > 0;
   }
   capabilities() {
+    this.permissionDefaults.ctx = this.ctx;
     const candidates = [
       ["prompt", "系统提示词替换", typeof this.service("systemPrompt")?.assemble === "function"],
       [
@@ -63,17 +76,20 @@ export class DesktopRuntime {
         typeof this.service("subagents")?.config?.maxDepth?.get === "function",
       ],
     ];
-    return candidates.map(([id, label, present]) => ({
-      id,
-      label,
-      state:
-        !this.host.supported || !present ? "unsupported" : this.enabled ? "active" : "available",
-      detail: !this.host.supported
-        ? "此宿主版本尚未通过适配验收"
-        : present
-          ? "运行时适配；还原后恢复宿主接口"
-          : "当前组合未提供所需接口",
-    }));
+    return [
+      ...candidates.map(([id, label, present]) => ({
+        id,
+        label,
+        state:
+          !this.host.supported || !present ? "unsupported" : this.enabled ? "active" : "available",
+        detail: !this.host.supported
+          ? "此宿主版本尚未通过适配验收"
+          : present
+            ? "运行时适配；还原后恢复宿主接口"
+            : "当前组合未提供所需接口",
+      })),
+      ...this.permissionDefaults.capabilities(),
+    ];
   }
   apply() {
     if (this.enabled) return;
@@ -86,16 +102,22 @@ export class DesktopRuntime {
     const runtime = this;
     const pending = [];
     try {
+      this.permissionDefaults.apply();
+      pending.push(() => this.permissionDefaults.revert());
       pending.push(
         replace(
           this.service("systemPrompt"),
           "assemble",
           (original) =>
             async function (...args) {
-              const output = await original.apply(this, args);
               const config = runtime.settings();
-              if (!config.enabled) return output;
               const context = args[0] ?? {};
+              const completeNames =
+                config.enabled && config.promptMode === "replace"
+                  ? completeSectionNames(this, context.scope)
+                  : new Set();
+              const output = await original.apply(this, args);
+              if (!config.enabled) return output;
               const library = runtime.store.dispatch("rules.list", {});
               const model = context.model ?? context.agent?.options?.model;
               const rule =
@@ -106,7 +128,11 @@ export class DesktopRuntime {
                 config.workspacePolicy === "strict"
                   ? ""
                   : selectedInstructions(directory, config.workspaceFiles);
-              const composed = composePrompt(output, config, { rule, workspaceText });
+              const composed = composePrompt(output, config, {
+                rule,
+                workspaceText,
+                completeSectionNames: completeNames,
+              });
               const sessionId = context.agent?.session?.id;
               const role = sessionId ? runtime.rolePrompt?.(sessionId) : null;
               return role
@@ -171,7 +197,16 @@ export class DesktopRuntime {
       }
       this.#undo = pending;
     } catch (error) {
-      for (const undo of pending.reverse()) undo();
+      const cleanup = [];
+      for (const undo of pending.reverse()) {
+        try {
+          undo();
+        } catch (failure) {
+          cleanup.push(failure);
+        }
+      }
+      if (cleanup.length)
+        throw new AggregateError([error, ...cleanup], "运行控制应用失败，部分接口撤销未完成");
       throw error;
     }
   }

@@ -18,6 +18,7 @@ export class Controller {
     flow,
     files,
     retry,
+    repeat,
     templates,
     catalog,
     workflow,
@@ -38,6 +39,7 @@ export class Controller {
       flow,
       files,
       retry,
+      repeat,
       templates,
       catalog,
       workflow,
@@ -50,7 +52,13 @@ export class Controller {
   }
   async revertControls() {
     const errors = [];
-    for (const service of [this.continuation, this.extensions, this.retry, this.runtime]) {
+    for (const service of [
+      this.continuation,
+      this.repeat,
+      this.extensions,
+      this.retry,
+      this.runtime,
+    ]) {
       try {
         await service?.revert();
       } catch (error) {
@@ -116,6 +124,7 @@ export class Controller {
       enabled: this.runtime.enabled,
       capabilities: [
         ...runtimeCapabilities,
+        ...(this.repeat?.capabilities() ?? []),
         ...(this.continuation?.capabilities() ?? []),
         ...(this.retry?.capabilities() ?? []).map((item) =>
           this.host.supported
@@ -131,6 +140,7 @@ export class Controller {
         })),
       ],
       settings: this.store.dispatch("settings.get", {}),
+      permissionDefaults: this.runtime.permissionDefaults?.status(),
       admission: this.admission?.status(),
       sessions: sessionCapabilities.list ? await this.sessions.list() : [],
       sessionCapabilities,
@@ -202,6 +212,7 @@ export class Controller {
           if (this.continuation?.capabilities().some((item) => item.state !== "unsupported"))
             await this.continuation.apply();
           this.extensions?.apply();
+          await this.repeat?.apply();
           this.store.dispatch("settings.save", {
             revision: current.revision,
             value: { ...current.value, enabled: true },
@@ -213,6 +224,14 @@ export class Controller {
             throw new AggregateError([error, cleanup], "运行控制应用失败，部分撤销未完成");
           }
           throw error;
+        }
+        try {
+          this.runtime.permissionDefaults?.changed();
+        } catch (error) {
+          throw Object.assign(
+            new Error(`运行控制已启用，但权限目录变更通知未确认：${error.message}`),
+            { code: "CONTROLS_APPLIED_PARTIAL", partial: { enabled: true } },
+          );
         }
         return this.status();
       }
@@ -233,12 +252,33 @@ export class Controller {
         ) {
           throw new Error("启用状态请通过应用或还原操作更改");
         }
+        if (
+          payload.value?.permissionDefault !== undefined &&
+          payload.value.permissionDefault !== current.value.permissionDefault
+        ) {
+          if (!this.runtime.permissionDefaults && payload.value.permissionDefault !== "")
+            return unavailable("当前宿主没有已验证的新会话权限预设接口");
+          this.runtime.permissionDefaults?.validate(payload.value.permissionDefault);
+        }
         const result = this.store.dispatch(action, payload);
-        try {
-          await this.continuation?.changed();
-        } catch (error) {
+        const errors = [];
+        for (const change of [
+          () => this.continuation?.changed(),
+          ...(this.runtime.enabled
+            ? [() => this.runtime.permissionDefaults?.changed(), () => this.repeat?.changed()]
+            : []),
+        ]) {
+          try {
+            await change();
+          } catch (error) {
+            errors.push(error);
+          }
+        }
+        if (errors.length) {
           throw Object.assign(
-            new Error(`配置已保存，但自动继续停止未确认：${error.message}。请刷新后检查当前会话。`),
+            new Error(
+              `配置已保存，但部分运行控制未更新：${errors.map((error) => error.message).join("；")}。请刷新诊断状态。`,
+            ),
             {
               code: "SETTINGS_APPLIED_PARTIAL",
               partial: { savedRevision: result.revision },

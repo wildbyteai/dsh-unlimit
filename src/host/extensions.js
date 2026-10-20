@@ -65,13 +65,14 @@ export class HostExtensions {
         label: "Hook处理策略",
         state: "unsupported",
         detail:
-          "当前官方桌面运行时未提供可配置的Claude/Codex Hook服务；保存开关不改变宿主拒绝结果。",
+          "尚未验证Claude/Codex Hook策略配置器；宿主通用事件与拒绝结果保留，保存此开关不改变它们。",
       },
       {
         id: "memory",
         label: "第三方记忆段策略",
         state: "unsupported",
-        detail: "当前官方运行时没有第三方记忆段策略服务；不根据名称猜测来源或删除人工消息。",
+        detail:
+          "尚未验证第三方记忆策略配置器；具名MCP段不等于来源证明，不按名称猜删段落或人工消息。",
       },
       {
         id: "sessionLogUpload",

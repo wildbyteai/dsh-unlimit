@@ -9,7 +9,7 @@
 | 源码实现         | 当前源码有入口、校验和实际处理路径                                                   | 已运行、已接入官方桌面                 |
 | 合成验证         | 临时目录、原创数据及受控假服务下验证功能/失败路径                                    | 真实宿主接口或真实设备通过             |
 | 官方模块隔离验证 | 从已安装运行时只读加载官方模块，独立 Cordis 上下文、临时数据、假传输，无用户 profile | 已安装本插件、实际桌面 UI/模型联网通过 |
-| 预览交互         | 回环 HTTP 上的独立工作台，1280×820 浏览器实看和操作读回                              | 官方桌面嵌入、真实会话/草稿桥通过      |
+| 预览交互         | 回环 HTTP 上的独立工作台，1280×820 / 1280×720 浏览器实看和操作读回                   | 官方桌面嵌入、真实会话/草稿桥通过      |
 | 桌面实机验收     | 实际安装后，以授权范围内的桌面操作记录结果                                           | 本轮尚无此级证据                       |
 
 本轮未实际安装插件、未修改真实 profile、未发真实模型联网请求，未执行扫描、登录或远程连接。Windows 未实机验证。所有未验的层级保持未验；`available` 仅表示当前接口条件可用，`active` 才表示本插件拥有的运行时适配已注册，两者均不能代替用户操作验收。
@@ -48,7 +48,7 @@
 | V-PLAN        | [workflow-plan.test.mjs](../tests/workflow-plan.test.mjs) | 16项合成收据检查：单槽排队、目录及环境依赖、原始结果只传直接依赖、上下文超限阻断、失败及清理保槽、父/项目隔离、停止/撤销/启动竞态 | 真实Store/Flow/DesktopWorkflow，activation结果为合成；官方计划执行另见 V-WORKFLOW，无自动拆解或跨重启恢复 |
 | V-CLIENT      | [client-bridge.test.mjs](../tests/client-bridge.test.mjs) | 13项桥验证：同源/指定iframe、文字/图片/文件草稿、字节与元信息、已有输入保护、部分失败、取消/关闭/过期、晚写拒绝、批次释放         | DOM为最小合成模型；官方客户端路径另见下节                                                                 |
 
-2026-10-20，在 `30b3c61` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 完整运行 `node --test tests/*.test.mjs`，退出码0，结果为 **251通过、0失败、0跳过**。JavaScript 语法检查 **70/70通过**。这些是合成、官方模块隔离和入口集成测试，不是251项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。
+2026-10-20，在 `1d37c01` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 完整运行 `node --test tests/*.test.mjs`，退出码0，结果为 **286通过、0失败、0跳过**。JavaScript 语法检查 **78/78通过**。这些是合成、官方模块隔离和入口集成测试，不是286项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。
 
 新增凭据与环境预检：
 
@@ -70,7 +70,7 @@
 | V-LOG      | [extensions.test.mjs](../tests/extensions.test.mjs) 的官方模块用例                                                     | 真实官方日志插件持有的 config 引用通过临时替换动态读为 false，原引用保持不变，撤销精确恢复；不写 profile                                                                                                                                                                                                                                                           | 仅指定会话日志插件 `enabled`，不扩张成全应用隐私保证                                                                              |
 | V-PROTOCOL | [verify-protocols.mjs](../scripts/verify-protocols.mjs)、[protocol-acceptance.json](evidence/protocol-acceptance.json) | 官方 AgentLoop→LlmRuntime→实际适配器/SDK 序列化→本地假 SSE fetch；四协议首轮、第二轮修改、官方创建的子会话首轮、503 后官方重试改正文；20 次传输捕获均与持久会话完整 messages 相等，重试新正文存在真实 `system/message` 事件；当前文本不进入人工 user 槽                                                                                                            | 合成密钥/文本和假 SSE；没有真实模型输出质量或服务端接纳证据；子会话为进程内官方所有权，未验外部代理进程                           |
 
-新增官方模块隔离证据（同属上述251项运行）：
+新增官方模块隔离证据（同属上述286项运行）：
 
 | 证据编号       | 入口                                                              | 实际接口及观察                                                                                                                                                                                             | 边界                                                                       |
 | -------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -79,6 +79,19 @@
 | V-CONTINUE     | [continuation-host.test.mjs](../tests/continuation-host.test.mjs) | 官方 AgentLoop/followup 与消息构造；当前提示词与继续用语、真实人工计数1、插件来源、默认关闭、有界自动链、停止/关闭/新人工输入竞争、子代理拒绝；11个临时 JSONL 会话完整读回                                 | 原生入口要求 role:user，但 source 明确属于插件；无桌面 UI 或真实提供方验收 |
 | V-WORKFLOW     | [workflow-host.test.mjs](../tests/workflow-host.test.mjs)         | 官方SubagentRuntime/spawn/AgentLoop/WorkingDirectory/预设与JSONL；创建/取消/释放；单槽两任务计划、原始收据传给后继、未验证标记保持、取消运行任务且排队依赖不启动、父会话保留                               | 明确任务与合成LLM流；不含自主拆解、外部代理进程、真实执行UI或持久预设迁移  |
 | V-CATALOG      | [catalog-host.test.mjs](../tests/catalog-host.test.mjs)           | 官方 SkillRegistry/ToolRuntime 的会话层、受限可见性、覆盖顺序和正文；官方 MCP 桥注册 schema 可观察，依赖声明保持显式                                                                                       | 没有连接 MCP 服务或调用其工具；已登记不意味着连接健康                      |
+
+本轮核心运行差距的新增证据：
+
+| 证据编号          | 入口                                                                                                                     | 实际接口及观察                                                                                                                               | 剩余边界                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| V-PROMPT-SECTIONS | [prompt-sections-host.test.mjs](../tests/prompt-sections-host.test.mjs)、[合同](prompt-sections-contract.md)             | 5项官方组装测试：真实native/PTC、SDK renderer、plan状态；scope complete覆盖与撤销、disabled/append；功能段、tools/contexts/variables引用保持 | PTC后端仅合成描述服务，未执行工具；MCP/交付等段为合成注册；原生workspace历史基线不在该修复内   |
+| V-PERMISSION      | [permission-defaults-host.test.mjs](../tests/permission-defaults-host.test.mjs)、[合同](permission-defaults-contract.md) | 8项合成+2项官方：17会话的新默认canonical事件、existing/seeded保留、官方set有效、never真实拒绝、volatile更新/重挂载/所有权与通知              | 活动目录为内存合成目录，JSONL经公开persistence句柄主动写后读回；未验证实际文件权限或桌面选择器 |
+| V-REPEAT          | [repeat-reminder-host.test.mjs](../tests/repeat-reminder-host.test.mjs)、[合同](repeat-reminder-contract.md)             | 6项合成+5项官方Loader/Cordis/ToolRuntime/HMR：三次临时文件调用、提醒关闭/恢复、拒绝/反馈保持；noSave不写配置，async/veto/失败/取消/冲突      | 只控制建议；重挂载重置计数，在途旧监听器可能完成一条提醒；不等于桌面三入口验收                 |
+| V-STEERING        | [steering-host.test.mjs](../tests/steering-host.test.mjs)、[合同](steering-contract.md)                                  | 3项官方AgentLoop：steer在下一步、followup在下一轮、cancel清队列与inject不唤醒；插件提示词启用，7次完整messages与物理JSONL重建一致            | 慢工具只等待内存gate，LLM合成；未验真实composer按钮、快捷键、UI传输                            |
+
+根集成新增4项Controller检查：非法默认选择在落盘前拒绝、重复配置异步完成后才enabled、失败回滚、保存部分成功披露revision并继续独立更新、目录通知失败保留已启用事实。全量运行曾发现真实Cordis缺少hmr时的属性读取错误，已改为只读ctx.get；V-PLUGIN完整mount保留缺可选服务仍能应用和卸载的回归断言。
+
+当前本机 `dsh-tool-fs` 与 `dsh-agent-instructions` 的入口摘要不匹配发行清单，因此未加载它们验证新功能，也未读取或恢复其他工具留下的备份。匹配的README、投影/迁移及消费端仅支持限定观察：原生工作区基线来自带agent-instructions来源的历史消息，不能由section过滤解决。Hook通用事件存在，但尚未验证Claude/Codex/Mnemon专用策略配置器；不凭段名猜测来源。
 
 初始基线的独立专项记录仍只支持其限定断言：主代理执行 `verify-host.mjs` 为 **14/14通过**，只读doctor确认 `0.2.1-rc.2 / darwin / arm64`。协议 artifact 的 `passed` 为 true、`networkRequests` 为 0、`blockedNetworkAttempts` 为 0，21 个直接导入入口（含延迟协议 SDK）摘要匹配清单。此结果不能推论未加载的模块干净，也不代表整个本机安装未被修改；不匹配模块不能用作官方原始证据。
 
@@ -199,3 +212,5 @@ JS
 `30b3c61` 批次只读比较当时 `src/web/scripts/tests` 中69个实现/样式文件与参照仓库61个非空源码/素材摘要，未发现整文件字节相同项；该计数不是新增文件的复验结果。这个检查不覆盖片段复制或变形相似，不能据此作法律上的权利结论。开发接触既有实现的事实仍按 [NOTICE.md](../NOTICE.md) 披露；旧项目的版权和许可证未被删除或改写。
 
 新包只包含本项目源码、界面和文档，运行时不分发官方程序、Node.js、其他插件或真实profile。打包和导入验证不执行 mount；本轮未安装到桌面。
+
+本轮运行控制预览为1280×720，使用项目临时SQLite：缺官方服务时新会话默认和重复提醒下拉框禁用、原因可见，应用按钮禁用。提示词保存revision 0→1，随后重新载入逐字读回（含字面花括号）；保存后刷新状态。截图 [control-defaults-preview.png](control-defaults-preview.png) 仅含合成数据。临时服务、浏览器标签和数据已清理；不等于真实桌面可用目录选择或启用验收。

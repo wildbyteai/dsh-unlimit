@@ -122,6 +122,71 @@ test("enabled assembly replaces host complete section and preserves tool schemas
     assert.equal(result[key], f.assembly[key], key);
 });
 
+test("replacement preserves functional and unknown sections without changing their text or order", (t) => {
+  const f = fixture(t, { enabled: true });
+  const persona = ["harness:identity", "deployment:persona-prefix", "deployment:persona-suffix"];
+  const functional = [
+    "tool:synthetic",
+    "plan:policy",
+    "tools:ptc-only",
+    "tools:sdk",
+    "mcp:synthetic",
+    "mcp-resource-servers",
+    "team:policy",
+    "context:file-reference",
+    "ui:deliverable-file-references",
+    "synthetic:unknown",
+  ].map((name, index) => ({ name, text: `Function ${index}: {{literal}}`, interpolate: false }));
+  f.assembly.sections = [...persona.map((name) => ({ name, text: "Host persona" })), ...functional];
+  const result = composePrompt(f.assembly, f.settings);
+  assert.equal(result.sections[0].text, "Synthetic operator");
+  assert.deepEqual(result.sections.slice(1), functional);
+  functional.forEach((section, index) => assert.equal(result.sections[index + 1], section));
+  for (const key of ["tools", "contexts", "variables", "metadata"])
+    assert.equal(result[key], f.assembly[key], key);
+  assert.equal(f.assembly.sections.length, 13);
+  f.settings.promptMode = "append";
+  const appended = composePrompt(f.assembly, f.settings);
+  assert.deepEqual(appended.sections.slice(0, -1), f.assembly.sections);
+  assert.equal(appended.sections.at(-1).text, "Synthetic operator");
+});
+
+test("runtime snapshots scoped complete metadata before assembly and skips the registry when disabled or appending", async (t) => {
+  const f = fixture(t, { enabled: true });
+  const scope = {};
+  const definition = { name: "synthetic-complete", text: "Host", complete: true };
+  const definitions = new Map([[definition.name, definition]]);
+  const layer = { sections: {} };
+  const calls = [];
+  f.assembly.sections = [{ name: definition.name, text: definition.text }];
+  f.ctx.systemPrompt.layers = {
+    merge(key, select) {
+      assert.equal(key, scope);
+      assert.equal(select(layer), layer.sections);
+      calls.push("metadata");
+      return definitions;
+    },
+  };
+  f.ctx.systemPrompt.assemble = async () => {
+    calls.push("assemble");
+    return f.assembly;
+  };
+  f.runtime.apply();
+  const result = await f.ctx.systemPrompt.assemble({ scope });
+  assert.deepEqual(calls, ["metadata", "assemble"]);
+  assert.deepEqual(
+    result.sections.map((section) => section.text),
+    ["Synthetic operator"],
+  );
+  assert.equal(definitions.get(definition.name), definition);
+  f.settings.enabled = false;
+  assert.equal(await f.ctx.systemPrompt.assemble({ scope }), f.assembly);
+  f.settings.enabled = true;
+  f.settings.promptMode = "append";
+  assert.equal((await f.ctx.systemPrompt.assemble({ scope })).sections[0], f.assembly.sections[0]);
+  assert.deepEqual(calls, ["metadata", "assemble", "assemble", "assemble"]);
+});
+
 test("every model step rereads active rules, operator prompt and selected workspace instruction content", async (t) => {
   const f = fixture(t, { enabled: true });
   const path = join(f.directory, "AGENTS.md");

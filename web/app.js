@@ -244,6 +244,8 @@ const defaults = {
   workspaceFiles: [],
   fullAccess: true,
   autoApprove: true,
+  permissionDefault: "",
+  repeatReminder: "host",
   hooksDeny: false,
   maxSubagents: 16,
   maxDepth: 10,
@@ -1519,6 +1521,38 @@ async function controlPage() {
   const settings = await api("settings.get");
   state.settings = settings;
   const v = { ...defaults, ...settings.value };
+  const permission = state.status.permissionDefaults;
+  const permissionOptions = [
+    ["", "跟随宿主默认"],
+    ...(permission?.options ?? []).map((option) => [option.value, option.label ?? option.value]),
+  ];
+  if (v.permissionDefault && !permissionOptions.some(([value]) => value === v.permissionDefault))
+    permissionOptions.push([v.permissionDefault, `${v.permissionDefault} · 当前不可用`]);
+  const sessionDefaults = panel(
+    "新会话与重复提醒",
+    `<div class="fields">${renderField(
+      field("permissionDefault", "新会话默认权限", "select", {
+        options: permissionOptions,
+        disabled: !can("permissionDefault"),
+        help: can("permissionDefault")
+          ? `当前有效默认：${permission?.effective ?? "未知"}。只影响未来全新会话，已有会话和显式选择保持不变。`
+          : "尚未取得可用的宿主权限预设目录。",
+      }),
+      v.permissionDefault,
+    )}${renderField(
+      field("repeatReminder", "重复调用提醒", "select", {
+        options: [
+          ["host", "沿用宿主提醒"],
+          ["off", "关闭重复建议提醒"],
+        ],
+        disabled: !can("repeatReminder"),
+        help: can("repeatReminder")
+          ? "仅控制建议提醒，工具拒绝结果保持有效。切换会重置提醒计数，历史消息保留。"
+          : "尚未取得已验证的重复提醒配置入口。",
+      }),
+      v.repeatReminder,
+    )}</div><p class="info">新会话权限采用宿主提供的完整预设。“不询问”策略会拒绝需要确认的请求，不代表自动批准。</p>`,
+  );
   const switchRow = (key, title, desc) => {
     const ids = {
       fullAccess: "sandbox",
@@ -1559,7 +1593,7 @@ async function controlPage() {
           }),
           v.workspacePolicy,
         )}<div class="field wide"><label for="workspace-files">规则文件路径 · 每行一个</label><textarea name="workspaceFiles" id="workspace-files" rows="4">${esc(v.workspaceFiles.join("\n"))}</textarea><small>此策略仅控制本插件主动选取的规则文件；宿主原生工作区指令的运行上下文会保留。</small></div></div><div class="toolbar" style="margin-bottom:0"><button type="button" id="scan-rules">扫描工作区规则</button><button type="button" id="select-rule-paths">设置选定文件</button></div>`,
-      )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>可填写 IP、完整主机名或 user@host；不要填写密码、URL、网段、端口或通配符。此清单仍不是出口访问控制。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "请求宿主支持的完整访问策略。")}${switchRow("autoApprove", "自动审批", "开启后可减少执行前的人工审批。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "设置变更后重新应用", "启用时按运行时生命周期重新注册控制。")}${switchRow("retryOverride", "接管请求重试次数", "关闭时沿用提供方；开启且运行控制已启用后按 0—20 次设置，0 表示不重试。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${panel(
+      )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>可填写 IP、完整主机名或 user@host；不要填写密码、URL、网段、端口或通配符。此清单仍不是出口访问控制。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "仅在会话未明确选择权限时请求完整访问；新会话采用下方默认预设。")}${switchRow("autoApprove", "自动审批", "仅处理未明确指定审批策略的会话；显式选择仍由宿主执行。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "设置变更后重新应用", "启用时按运行时生命周期重新注册控制。")}${switchRow("retryOverride", "接管请求重试次数", "关闭时沿用提供方；开启且运行控制已启用后按 0—20 次设置，0 表示不重试。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${sessionDefaults}${panel(
         "执行限额",
         `<div class="fields">${[
           field("maxSubagents", "最大子代理数", "number", { min: 1, max: 128 }),
@@ -1629,7 +1663,11 @@ async function controlPage() {
       };
       $("#settings-form").onsubmit = (e) => {
         e.preventDefault();
-        run($("button[type=submit]", e.target), save);
+        run($("button[type=submit]", e.target), async () => {
+          await save();
+          await refreshStatus();
+          await render();
+        });
       };
       $("#apply-control").onclick = () =>
         confirmAction(

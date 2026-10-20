@@ -645,8 +645,12 @@ test(
     const status = await f.request();
     assert.equal(status.status, 200);
     assert.equal(status.json.data.host.version, "0.2.1-rc.2");
+    assert.equal(
+      status.json.data.capabilities.find((item) => item.id === "repeatReminder").state,
+      "unsupported",
+    );
     const enabled = await f.request({ action: "control.apply" });
-    assert.equal(enabled.status, 200);
+    assert.equal(enabled.status, 200, enabled.body);
     assert.equal(enabled.json.data.enabled, true);
     await f.dispose();
     assert.equal(f.plugin.uid, null);

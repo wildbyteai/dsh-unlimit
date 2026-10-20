@@ -83,6 +83,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   workspaceFiles: [],
   fullAccess: true,
   autoApprove: true,
+  permissionDefault: "",
+  repeatReminder: "host",
   hooksDeny: false,
   maxSubagents: 16,
   maxDepth: 10,
@@ -114,6 +116,8 @@ export function settings(value) {
     fail("LIMIT_EXCEEDED", "Prompt exceeds 256 KiB");
   enumValue(result.promptMode, "promptMode", ["replace", "append"]);
   enumValue(result.workspacePolicy, "workspacePolicy", ["fallback", "strict", "always"]);
+  string(result.permissionDefault, "permissionDefault", { empty: true });
+  enumValue(result.repeatReminder, "repeatReminder", ["host", "off"]);
   for (const key of ["maxSubagents", "maxDepth", "readLimit", "retryLimit", "continueLimit"]) {
     if (!Number.isSafeInteger(result[key]) || result[key] < 0)
       fail("INVALID_INPUT", `${key} must be a non-negative integer`);

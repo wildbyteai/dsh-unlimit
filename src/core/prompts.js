@@ -9,6 +9,11 @@ export const DEFAULT_PROMPT = `你是使用者自行配置的桌面工作助理�
 
 const INSTRUCTION_NAMES = new Set(["AGENTS.md", "CLAUDE.md"]);
 const MAX_INSTRUCTION_BYTES = 256 * 1024;
+const PERSONA_SECTIONS = new Set([
+  "harness:identity",
+  "deployment:persona-prefix",
+  "deployment:persona-suffix",
+]);
 
 export function workspaceInstructions(directory) {
   let current = realpathSync(directory);
@@ -48,7 +53,11 @@ export function selectedInstructions(directory, selected) {
   return text;
 }
 
-export function composePrompt(assembly, settings, { rule, workspaceText = "" } = {}) {
+export function composePrompt(
+  assembly,
+  settings,
+  { rule, workspaceText = "", completeSectionNames = new Set() } = {},
+) {
   if (!settings.enabled) return assembly;
   const selectedWorkspace = settings.workspacePolicy === "strict" ? "" : workspaceText.trim();
   const chosen = (
@@ -72,7 +81,12 @@ export function composePrompt(assembly, settings, { rule, workspaceText = "" } =
   const retained =
     settings.promptMode === "append"
       ? (assembly.sections ?? [])
-      : (assembly.sections ?? []).filter((section) => section.name.startsWith("tool:"));
+      : (assembly.sections ?? []).filter(
+          (section) =>
+            !PERSONA_SECTIONS.has(section.name) &&
+            !completeSectionNames.has(section.name) &&
+            section.complete !== true,
+        );
   return {
     ...assembly,
     sections: settings.promptMode === "append" ? [...retained, operator] : [operator, ...retained],

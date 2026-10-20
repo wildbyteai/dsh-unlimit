@@ -56,6 +56,8 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
   "workspaceFiles": [],
   "fullAccess": true,
   "autoApprove": true,
+  "permissionDefault": "",
+  "repeatReminder": "host",
   "hooksDeny": false,
   "maxSubagents": 16,
   "maxDepth": 10,
@@ -73,6 +75,14 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 ## 宿主层接口
 
 `status` 返回包版本、宿主版本、平台、启用状态、能力列表、当前设置、会话列表和离线更新模式。`control.apply` / `control.revert` 启用与撤销本插件拥有的运行时注册。`sessions.rewind` 使用官方 fork 路径保留原会话。`skills.*` 仅处理本插件明确选定的技能根目录。`toolkit.*` 管理用户指定的本地工具目录与固定版本探测进程。
+
+`status.permissionDefaults` 读回官方可选默认预设、请求值和实际生效默认；`permissionDefault` 空值跟随宿主，非空值必须属于官方 `defaultOptions`。仅影响未来全新会话，已有、seeded 和显式选择由宿主保留；不会把 `autoApprove` 转换为官方 `never`。见 [权限默认合同](permission-defaults-contract.md)。
+
+`repeatReminder` 为 `host/off`，默认沿用宿主。关闭仅调整官方建议提醒的排除范围，不更改工具拒绝、反馈或取消。应用、保存生效和撤销都等待官方 noSave 生命周期完成。缺服务且设置为 host 不阻止其他运行控制；显式 off 缺接口则拒绝。外部所有权冲突保留其配置。见 [重复提醒合同](repeat-reminder-contract.md)。
+
+运行中保存若已落盘但某个控制未更新，返回 `SETTINGS_APPLIED_PARTIAL` 与 `partial.savedRevision`，仍尝试其他独立控制。首次应用后的目录通知失败返回 `CONTROLS_APPLIED_PARTIAL / {enabled:true}`，不能冒充控制未启用；目录通知本身不承诺每个客户端已刷新。
+
+提示词 replace 仅替换三个人设槽及当前 scope 的明确 complete 定义；工具、模式、SDK 和未知功能段保持原序与正文。complete 元数据使用固定版本只读适配，详见 [提示词功能段合同](prompt-sections-contract.md)。
 
 ## 发布边界
 
