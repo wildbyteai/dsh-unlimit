@@ -218,7 +218,7 @@ export async function presetFixture(
       if (dirname(ancestor) === ancestor) break;
     }
   }
-  if (permissionPresets || shellExecution) {
+  if (permissionPresets || shellExecution || terminalExecution) {
     for (const path of ["/tmp", os.tmpdir()]) {
       platformMetadata.add(path);
       platformMetadata.add(fs.realpathSync(path));

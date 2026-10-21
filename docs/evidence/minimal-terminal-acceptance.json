@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "behaviorId": "CORE-MODES",
   "developmentBasis": "977e019fc477c120ecf44375ed153e980cdc4df0",
-  "generatedAt": "2026-10-21T07:35:18.313Z",
+  "generatedAt": "2026-10-21T14:32:36.844Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2083,6 +2083,7 @@
       "launches": [
         {
           "ordinal": 1,
+          "mode": "read-only",
           "registryOrdinal": 1,
           "file": "sandbox-exec",
           "argv": [
@@ -2124,13 +2125,14 @@
           "sessionId": "pty-1",
           "exited": true,
           "fdClosed": true,
-          "pid": 39061,
+          "pid": 50794,
           "fd": 12,
-          "started": "Wed Oct 21 15:35:10 2026",
+          "started": "Wed Oct 21 22:32:29 2026",
           "exitArguments": [0, 9]
         },
         {
           "ordinal": 2,
+          "mode": "read-only",
           "registryOrdinal": 1,
           "file": "sandbox-exec",
           "argv": [
@@ -2172,9 +2174,9 @@
           "sessionId": "pty-2",
           "exited": true,
           "fdClosed": true,
-          "pid": 39083,
+          "pid": 50830,
           "fd": 16,
-          "started": "Wed Oct 21 15:35:11 2026",
+          "started": "Wed Oct 21 22:32:30 2026",
           "exitArguments": [0, 9]
         }
       ],
@@ -2188,9 +2190,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
@@ -2203,20 +2205,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39061"],
+          "argv": ["-o", "tpgid=", "-p", "50794"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39061
+          "ownedForegroundPgid": 50794
         },
         {
           "executable": "/bin/ps",
@@ -2227,20 +2229,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39061"],
+          "argv": ["-o", "tpgid=", "-p", "50794"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39061
+          "ownedForegroundPgid": 50794
         },
         {
           "executable": "/bin/ps",
@@ -2251,20 +2253,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39061"],
+          "argv": ["-o", "tpgid=", "-p", "50794"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39061
+          "ownedForegroundPgid": 50794
         },
         {
           "executable": "/bin/ps",
@@ -2275,20 +2277,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39061"],
+          "argv": ["-o", "tpgid=", "-p", "50794"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39061
+          "ownedForegroundPgid": 50794
         },
         {
           "executable": "/bin/ps",
@@ -2299,20 +2301,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39061"],
+          "argv": ["-o", "tpgid=", "-p", "50794"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39061
+          "ownedForegroundPgid": 50794
         },
         {
           "executable": "/bin/ps",
@@ -2323,20 +2325,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39061"],
+          "argv": ["-o", "tpgid=", "-p", "50794"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39061
+          "ownedForegroundPgid": 50794
         },
         {
           "executable": "/bin/ps",
@@ -2347,20 +2349,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39061"],
+          "argv": ["-o", "tpgid=", "-p", "50794"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39061
+          "ownedForegroundPgid": 50794
         },
         {
           "executable": "/bin/ps",
@@ -2371,20 +2373,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39061"],
+          "argv": ["-o", "tpgid=", "-p", "50794"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39061
+          "ownedForegroundPgid": 50794
         },
         {
           "executable": "/bin/ps",
@@ -2395,14 +2397,14 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
@@ -2415,25 +2417,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39083"],
+          "argv": ["-o", "tpgid=", "-p", "50830"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39083
+          "ownedForegroundPgid": 50830
         },
         {
           "executable": "/bin/ps",
@@ -2444,25 +2446,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39083"],
+          "argv": ["-o", "tpgid=", "-p", "50830"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39083
+          "ownedForegroundPgid": 50830
         },
         {
           "executable": "/bin/ps",
@@ -2473,25 +2475,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39083"],
+          "argv": ["-o", "tpgid=", "-p", "50830"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39083
+          "ownedForegroundPgid": 50830
         },
         {
           "executable": "/bin/ps",
@@ -2502,25 +2504,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39083"],
+          "argv": ["-o", "tpgid=", "-p", "50830"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39083
+          "ownedForegroundPgid": 50830
         },
         {
           "executable": "/bin/ps",
@@ -2531,25 +2533,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39083"],
+          "argv": ["-o", "tpgid=", "-p", "50830"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39083
+          "ownedForegroundPgid": 50830
         },
         {
           "executable": "/bin/ps",
@@ -2560,25 +2562,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "39083"],
+          "argv": ["-o", "tpgid=", "-p", "50830"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 39083
+          "ownedForegroundPgid": 50830
         },
         {
           "executable": "/bin/ps",
@@ -2589,14 +2591,14 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
@@ -2609,14 +2611,14 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
@@ -2629,14 +2631,14 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             },
             {
-              "pid": 39083,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:11 2026"
+              "pid": 50830,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:30 2026"
             }
           ]
         },
@@ -2649,9 +2651,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
@@ -2664,9 +2666,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
@@ -2679,9 +2681,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
@@ -2694,9 +2696,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
@@ -2709,9 +2711,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
@@ -2724,9 +2726,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 39061,
-              "parentPid": 39037,
-              "started": "Wed Oct 21 15:35:10 2026"
+              "pid": 50794,
+              "parentPid": 50493,
+              "started": "Wed Oct 21 22:32:29 2026"
             }
           ]
         },
@@ -2761,25 +2763,25 @@
       "processSignals": [
         {
           "launch": 2,
-          "pid": 39083,
+          "pid": 50830,
           "target": "owned-process",
           "signal": "SIGTERM"
         },
         {
           "launch": 2,
-          "pid": 39083,
+          "pid": 50830,
           "target": "owned-process",
           "signal": "SIGKILL"
         },
         {
           "launch": 1,
-          "pid": 39061,
+          "pid": 50794,
           "target": "owned-process",
           "signal": "SIGTERM"
         },
         {
           "launch": 1,
-          "pid": 39061,
+          "pid": 50794,
           "target": "owned-process",
           "signal": "SIGKILL"
         }
@@ -2854,15 +2856,15 @@
       "requests": 3,
       "toolCalls": ["bash", "bash"],
       "terminalSessionId": "pty-1",
-      "shellPid": 39061,
+      "shellPid": 50794,
       "onePersistentPty": true,
       "outputs": [
-        "PRIOR:unset\nREAD:SYNTHETIC_COMPLETE_MINIMAL_PRESET_CONTENT\nPID:39061\nHOME:<synthetic-root>/home\nHISTORY:/dev/null:0:0\n[Command finished with exit code 0]",
-        "STATE:SYNTHETIC_COMPLETE_MINIMAL_PRESET_CONTENT\nPID:39061\n[Command finished with exit code 0]"
+        "PRIOR:unset\nREAD:SYNTHETIC_COMPLETE_MINIMAL_PRESET_CONTENT\nPID:50794\nHOME:<synthetic-root>/home\nHISTORY:/dev/null:0:0\n[Command finished with exit code 0]",
+        "STATE:SYNTHETIC_COMPLETE_MINIMAL_PRESET_CONTENT\nPID:50794\n[Command finished with exit code 0]"
       ],
       "persistedEvents": 22,
       "physicalJsonlRows": 23,
-      "jsonlSha256": "9134d50d08375151ee5f69b08ab920651a6fcef09a53d49d54015809188ac8ac",
+      "jsonlSha256": "0b20df80298721f5bd4084bc0a25acc2f51da3afdf7d57dcd682522f906adbb2",
       "actualJsonlEventsEqual": true,
       "nextModelToolResultsEqual": true
     },
@@ -2872,14 +2874,14 @@
       "requests": 2,
       "toolCalls": ["bash"],
       "terminalSessionId": "pty-2",
-      "shellPid": 39083,
+      "shellPid": 50830,
       "onePersistentPty": true,
       "outputs": [
-        "PRIOR:unset\nREAD:SYNTHETIC_COMPLETE_MINIMAL_PRESET_CONTENT\nPID:39083\nHOME:<synthetic-root>/home\nHISTORY:/dev/null:0:0\n[Command finished with exit code 0]"
+        "PRIOR:unset\nREAD:SYNTHETIC_COMPLETE_MINIMAL_PRESET_CONTENT\nPID:50830\nHOME:<synthetic-root>/home\nHISTORY:/dev/null:0:0\n[Command finished with exit code 0]"
       ],
       "persistedEvents": 17,
       "physicalJsonlRows": 18,
-      "jsonlSha256": "3ff664e9857b98c2c2fbc12d9c1f0c7e558941b23fe54528823e7d200d4002dc",
+      "jsonlSha256": "3c1665cfefcc27f887d4363bd364fe0b89c30eb148721813c83453b0406f25c8",
       "actualJsonlEventsEqual": true,
       "nextModelToolResultsEqual": true
     }
@@ -2906,15 +2908,15 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "f019dcf29c1be847ab69d92535a1610aed23a094624082a8e6e19fb9209f22db"
+      "sha256": "e17edb23eeb6e9849ec175725b5dc1588d2a0ff7fdbc0b34a58baaad40e610b9"
     },
     {
       "path": "tests/helpers/minimal-terminal-guard.mjs",
-      "sha256": "531e517450188664343b9cb4066f6765aef65401f5d095a682e98f2afece2e13"
+      "sha256": "eb21d2656a7715fd0b6901dcbd6306148be8ba89d623601bda1e6cbc6b511135"
     },
     {
       "path": "tests/helpers/official-packages.mjs",
-      "sha256": "50ae2fb6580a69e817f3d10adff7ea86a90f46b1cbdea72b797bcfe07230033a"
+      "sha256": "caa96664aaaf1660054ea26b64ca647f7ec93f81ef4dce530e71d82806ec08fc"
     },
     {
       "path": "tests/fixtures/official-preset-packages.json",
@@ -2922,7 +2924,7 @@
     },
     {
       "path": "src/host/runtime.js",
-      "sha256": "05b834cca346499ee7f8297d8d7e14ac3a42a8f11eba4f8f73a2f161aabb19bd"
+      "sha256": "9bc5728c85c1b70884951c32b47c72a4065812f276781ca0befdd6e5d6212309"
     },
     {
       "path": "src/host/native-instructions.js",
@@ -2934,7 +2936,7 @@
     },
     {
       "path": "src/host/prompt-refresh.js",
-      "sha256": "acede7bce069a7fad9a0a27877effdfedacd02e13ac41b1d58f9cd82b26182cd"
+      "sha256": "c01f4d90ddf69b38728cf3855940e2fafbd6b128aa587c91ba80804b465b36d2"
     }
   ],
   "boundaries": {

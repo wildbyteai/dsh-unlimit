@@ -82,6 +82,7 @@ export function createMinimalTerminalGuard(
   files.forEach(verifyFile);
   const [ptyFile, helperFile, systemFile] = files;
   const launches = [],
+    expectedModes = [],
     inspections = [],
     signals = [];
   const known = new Map();
@@ -183,11 +184,27 @@ export function createMinimalTerminalGuard(
       assert.equal(typeof originalFork, "function");
       t.mock.method(module.exports, "open", () => deny("pty.open"));
       t.mock.method(module.exports, "fork", function (...parameters) {
-        if (!running || disposed || launches.length >= 2) return deny("pty.fork.extra");
+        if (!running || disposed || expectedModes.length === 0) return deny("pty.fork.extra");
+        const mode = expectedModes.shift();
         assert.equal(parameters.length, 11);
         const [file, argv, env, cwd, cols, rows, uid, gid, encoding, helper, onexit] = parameters;
-        assert.equal(file, "sandbox-exec");
-        assert.deepEqual(argv, ["-p", SEATBELT, "--", "/bin/bash", "--noprofile", "--norc", "-i"]);
+        if (mode === "danger-full-access") {
+          assert.equal(file, "/bin/bash");
+          assert.deepEqual(argv, ["--noprofile", "--norc", "-i"]);
+        } else {
+          assert.equal(file, "sandbox-exec");
+          assert.deepEqual(
+            [argv[0], ...argv.slice(2)],
+            ["-p", "--", "/bin/bash", "--noprofile", "--norc", "-i"],
+          );
+          if (mode === "read-only") assert.equal(argv[1], SEATBELT);
+          else {
+            assert.equal(mode, "workspace-write");
+            assert.ok(argv[1].startsWith(SEATBELT));
+            assert.ok(argv[1].includes(`(subpath ${JSON.stringify(workspace)})`));
+            assert.ok(!argv[1].includes(`(subpath ${JSON.stringify(directory)})`));
+          }
+        }
         assert.equal(cwd, workspace);
         assert.equal(cols, 160);
         assert.equal(rows, 40);
@@ -250,6 +267,7 @@ export function createMinimalTerminalGuard(
         });
         const launch = {
           ordinal: launches.length + 1,
+          mode,
           registryOrdinal: retained.ordinal,
           file,
           argv: [...argv],
@@ -296,14 +314,17 @@ export function createMinimalTerminalGuard(
       assert.ok(subprocess.terminals instanceof Set);
       assert.ok(subprocess.controlChannels instanceof Set);
     },
-    async run(action) {
+    async run(action, modes = ["read-only"]) {
       assert.equal(running, false);
       assert.equal(disposed, false);
       const before = launches.length;
+      assert.equal(expectedModes.length, 0);
+      expectedModes.push(...modes);
       running = true;
       try {
         const result = await action();
-        assert.equal(launches.length, before + 1, "One native PTY for each AgentLoop scenario");
+        assert.equal(expectedModes.length, 0, "All explicitly expected PTYs were launched");
+        assert.equal(launches.length, before + modes.length, "No extra PTY launch");
         return result;
       } finally {
         running = false;

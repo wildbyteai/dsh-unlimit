@@ -100,3 +100,15 @@ node --expose-internals --test tests/file-permissions-host.test.mjs
 ```
 
 探针独立于 `npm test`，需要本机已核验的官方归档。它不安装或重载插件，不读写真实 profile、会话或配置。
+
+## 持久 PTY 权限切换与撤销缺陷（2026-10-21）
+
+[probe-terminal-permissions.mjs](../scripts/probe-terminal-permissions.mjs) 使用完整 minimal 预设、真实 AgentLoop、TerminalRegistry、node-pty 和 Seatbelt，仅模型输出和文件内容为合成。证据见 [terminal-permissions-acceptance.json](evidence/terminal-permissions-acceptance.json)。该证据的最终结果是 `gap-confirmed`，测试断言通过表示复现稳定，不表示撤销功能已修复。
+
+- **原生显式权限：**workspace-write 下持久终端实际写入工作区，外目录被拒绝。终端打开时，官方 `setSandboxMode(read-only)` 抛错，既不追加权限事件，也不改变原模式。在同一 Agent 用原生 bash 执行 `exit` 后，终端注册为空，切换成功；再次调用启动新的只读 PTY，工作区内外写入都被拒绝。这条关闭→切换→重建路径已验证，不能写成原进程原地降低权限。
+- **插件全访问默认：**没有显式权限覆盖的新 Agent 在插件 fullAccess 下启动真实全访问 PTY，外目录写入成功。撤销插件后 `sandboxPolicy.resolve()` 已返回 read-only，但原 PID 的下一次外目录写入仍成功。随后用 `exit` 关闭，在相同 Agent 再调用时新建只读 PTY，外部写入才被拒绝。当前撤销只还原后续解析器，没有终止或重新约束已经启动的终端。
+- 两个场景共 4 个真实 PTY，所有退出回调与 FD 关闭、注册清理、临时根删除均检查；官方 JSONL reader 与内存完整事件一致。已有原生终端读取与状态保持探针同时复验。禁止修改官方 profile、关闭 Seatbelt、伪造成功或使用假终端。
+
+当前产品修正了能力说明、还原确认及卸载页面/回执中的提示，明确旧终端可能保留全访问；**这只是消除错误承诺，不是权限撤销修复**。自动关闭由插件扩大权限创建的终端将丢失 shell 变量/当前目录并可能中止工作；该处理方式已向用户提出选择，尚未获答复时不引入自动终止行为。不会通过关闭所有终端代替判断所有权。
+
+复验命令与前节一致，脚本改为 `scripts/probe-terminal-permissions.mjs`。它不安装或重载插件，不访问真实 profile。未来的撤销修复需要把缺陷断言替换为真正的权限收回断言，并保留本次历史证据。

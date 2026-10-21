@@ -798,3 +798,14 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 本次前期符号检索曾匹配安装目录既有 `.dshpurge.bak` 的审批相关行；没有执行或复制该备份实现，后续接口检查与加载均使用已校验的官方归档。不能据此次验证声称未曾接触既有材料或严格净室开发。
 
 没有真实模型请求、桌面安装、重载或真实配置/profile/会话变更。预先编排的合成模型重试和合成 answerer 不证明真实模型决策或桌面审批 UI；任意新增目录授权、PowerShell、持久 PTY 权限切换及完整 1:1 仍未完成。117 项原验收目标、NOTICE、开发来源、UNLICENSED 和第三方归属均保留。
+
+## 持久终端权限残留复现与提示修正（2026-10-21）
+
+基于 `8bdbeb8dd7ef2ae4362165a23b22cacb0aa1d8d7`，新增 [PTY 权限探针](../scripts/probe-terminal-permissions.mjs)，结果是 `gap-confirmed`。真实 minimal/AgentLoop/PTY 已证实：原生显式工作区权限必须关闭旧终端后才能切只读；插件全访问默认启动的旧 PTY 在撤销后仍能向外目录写入，只有关闭后新建才拒绝。详见 [权限合同](file-permissions-contract.md#持久-pty-权限切换与撤销缺陷2026-10-21)。
+
+- 第一次执行两个行为场景均复现，但最终守卫发现官方 workspace-write 解析平台临时根时缺少 realpath 元数据许可，因此整体失败且没有发布成功证据。只为已确定的 `/tmp` 和平台临时根增加与既有 shell 场景相同的元数据访问，未开放内容或写入；重跑整体通过。4 个真实 PTY 的退出/FD/registry/subprocess 清理和临时根删除均确认。禁止操作与清理错误为空。
+- 原有 minimal 读取/持久状态/撤销正文探针另行复验通过，2 个真实 PTY 均清理；当前依赖由其更新后的 sourceDigests 绑定，脚本 developmentBasis 仍标原场景开发起点。上述回归通过不能当作旧终端权限已自动收回。
+- 运行能力说明、还原确认、卸载页面/确认/回执加入真实限制。1280×720 回环合成页面实际打开还原确认，核对提示后取消；维护页也显示关闭终端说明，无 console error。截图 `artifacts/terminal-permission-warning.png`；预览服务正常退出并清理临时库。未执行真实撤销、安装或卸载。
+- 全量官方隔离回归 1102 通过、0 失败、0 跳过；194 项语法及 55 模块分层检查通过。构建和离线包通过，77 文件，SHA-256 `2986564b5a7be682f9b11534b709ded912d03af2de7205402ab777f0e3d43d74`。本地日志为 `artifacts/terminal-permissions.log`、`artifacts/terminal-permissions-original.log`、`artifacts/terminal-permissions-full.log`。
+
+本批修复的是错误的完整还原预期；自动收回旧 PTY 权限尚未实现。已询问用户是否在撤销时关闭由插件扩大权限创建的终端（会丢失 shell 状态），或保留并要求手工关闭；该选择未答复前不加入自动终止逻辑。保持 117 项原目标、真实来源、NOTICE、UNLICENSED 和第三方归属，不改真实 DSH 配置/profile/会话。

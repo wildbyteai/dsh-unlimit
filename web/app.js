@@ -1888,7 +1888,7 @@ async function controlPage() {
       $("#revert-control").onclick = () =>
         confirmAction(
           "还原运行控制",
-          "将撤销本插件拥有的运行时注册。已保存配置会保留。",
+          "将撤销本插件拥有的运行时注册，保留已保存配置。已有持久终端不会自动关闭，仍可能保留全访问权限；请先在终端执行 exit，或通过宿主关闭终端，再继续使用恢复后的权限。",
           async () => {
             await api("control.revert");
             await refreshStatus();

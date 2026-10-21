@@ -101,7 +101,9 @@ export class DesktopRuntime {
         detail: !this.host.supported
           ? "此宿主版本尚未通过适配验收"
           : present
-            ? "运行时适配；还原后恢复宿主接口"
+            ? id === "sandbox"
+              ? "还原只恢复权限接口；已开启的持久终端保留启动权限，须关闭后重建才能使用恢复后的权限。"
+              : "运行时适配；还原后恢复宿主接口"
             : "当前组合未提供所需接口",
       })),
       ...this.permissionDefaults.capabilities(),
