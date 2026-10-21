@@ -118,7 +118,21 @@ test(
     const library = new SkillLibrary(join(f.directory, "project-skills"));
     const content =
       "---\nname: evidence-review\ndescription: Original synthetic evidence guidance\ndsh-unlimit-requirements: []\n---\nPROJECT_SKILL_BODY: Only count supplied synthetic records, then report their source.";
-    library.dispatch("skills.save", { id: "evidence-review", content });
+    const resourceText = "SYNTHETIC_REFERENCE_BODY: A and B are exactly two records.\r\n";
+    library.dispatch("skills.import", {
+      id: "evidence-review",
+      files: [
+        { path: "SKILL.md", contentBase64: Buffer.from(content).toString("base64") },
+        {
+          path: "references/count.md",
+          contentBase64: Buffer.from(resourceText).toString("base64"),
+        },
+        {
+          path: "references/unused.md",
+          contentBase64: Buffer.from("UNSELECTED_RESOURCE").toString("base64"),
+        },
+      ],
+    });
     const catalog = new HostCatalog(
       {
         get: (key) =>
@@ -131,7 +145,7 @@ test(
     const plans = new DesktopWorkflowPlan(f.workflow, { catalog });
     try {
       const owner = { workspaceId: f.workspaceId, parentSessionId: parent.id };
-      const ref = { origin: "project", id: "evidence-review" };
+      const ref = { origin: "project", id: "evidence-review", resources: ["references/count.md"] };
       const { item } = await plans.dispatch("workflow.plan.create", {
         ...owner,
         tasks: [
@@ -155,14 +169,21 @@ test(
         (result) => result.item.state === "completed",
       );
       const [selected, sibling] = done.item.tasks;
-      assert.deepEqual(selected.skillContext, [{ ...ref, name: "evidence-review", content }]);
+      const expectedContext = {
+        origin: ref.origin,
+        id: ref.id,
+        name: "evidence-review",
+        content,
+        resources: [{ ...selected.preflight.skills[0].resources[0], content: resourceText }],
+      };
+      assert.deepEqual(selected.skillContext, [expectedContext]);
       assert.equal(selected.preflight.skills[0].declaration.state, "declared");
       assert.equal(selected.preflight.skillBodies, undefined);
       assert.equal(sibling.skillContext, undefined);
       const request = f.requests.find(
         (request) => request.sessionId === selected.receipt.sessionId,
       );
-      const expected = JSON.stringify([{ ...ref, name: "evidence-review", content }]);
+      const expected = JSON.stringify(selected.skillContext);
       assert.ok(
         request.messages.some((message) =>
           message.content?.some((part) => part.type === "text" && part.text.includes(expected)),
@@ -173,10 +194,19 @@ test(
           f.requests.find((request) => request.sessionId === sibling.receipt.sessionId),
         ).includes("PROJECT_SKILL_BODY"),
       );
+      assert.doesNotMatch(JSON.stringify(f.requests), /UNSELECTED_RESOURCE/);
+      assert.doesNotMatch(
+        JSON.stringify(
+          f.requests.find((request) => request.sessionId === sibling.receipt.sessionId),
+        ),
+        /SYNTHETIC_REFERENCE_BODY/,
+      );
       await f.ctx.sessionPersistence.flush();
       const reader = await f.ctx.sessionPersistence.open(selected.receipt.sessionId, "read");
       try {
-        assert.ok(JSON.stringify((await reader.read()).events).includes("PROJECT_SKILL_BODY"));
+        const journal = JSON.stringify((await reader.read()).events);
+        assert.ok(journal.includes("PROJECT_SKILL_BODY"));
+        assert.ok(journal.includes("SYNTHETIC_REFERENCE_BODY"));
       } finally {
         await reader.close();
       }

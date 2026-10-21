@@ -535,3 +535,29 @@ test("leaving while capability revalidation is pending never creates a plan", as
   assert.equal(ui.calls.length, 2);
   assert.equal(ui.errors.length, 0);
 });
+
+test("explicit project resource paths pass through the task form and invalid resource types do not submit", async () => {
+  const ui = await setup();
+  const selected = {
+    ...task,
+    skills: [{ origin: "project", id: "evidence-review", resources: ["references/count.md"] }],
+  };
+  ui.host.node("json").value = JSON.stringify([selected]);
+  await ui.emit("create-form", "submit");
+  assert.deepEqual(ui.calls.find((call) => call.action === "workflow.plan.create").payload.tasks, [
+    selected,
+  ]);
+  assert.match(ui.view.html, /resources:/);
+  for (const ref of [
+    { origin: "host", id: "example", resources: ["a.md"] },
+    { origin: "project", id: "example", resources: "a.md" },
+  ]) {
+    const invalid = await setup();
+    invalid.host.node("json").value = JSON.stringify([{ ...task, skills: [ref] }]);
+    await invalid.emit("create-form", "submit");
+    assert.equal(
+      invalid.calls.some((call) => call.action === "workflow.plan.create"),
+      false,
+    );
+  }
+});

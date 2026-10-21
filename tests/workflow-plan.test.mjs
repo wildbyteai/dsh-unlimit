@@ -268,6 +268,14 @@ test("invalid model proposals retain raw output and cannot be treated as executa
     ["cycle", [task("a", { dependsOn: ["b"] }), task("b", { dependsOn: ["a"] })]],
     ["unknown role", [task("a", { role: "invented" })]],
     ["preset injection", [task("a", { usePreset: true })]],
+    [
+      "unobserved resource",
+      [
+        task("a", {
+          skills: [{ origin: "project", id: "local-skill", resources: ["references/guessed.md"] }],
+        }),
+      ],
+    ],
     ["invented skill", [task("a", { skills: [{ origin: "project", id: "missing" }] })]],
     [
       "skill dependency override",
@@ -1162,4 +1170,34 @@ test("oversized upstream evidence explicitly blocks the dependent task without t
     "Readback must still retain the complete upstream result",
   );
   assert.equal(f.flow.status(f.workspace.id).active.length, 0);
+});
+
+test("explicit resource errors and combined context limit prevent executor startup", async (t) => {
+  for (const [path, value, code] of [
+    ["missing.md", null, "DEPENDENCIES_UNAVAILABLE"],
+    ["large.txt", "x".repeat(32 * 1024), "DEPENDENCY_CONTEXT_LIMIT"],
+  ])
+    await t.test(path, async (t) => {
+      const f = skillFixture(t);
+      const content =
+        "---\nname: same-name\ndescription: Synthetic resource skill\ndsh-unlimit-requirements: []\n---\nUse selected reference.";
+      f.library.dispatch("skills.import", {
+        id: f.ref.id,
+        files: [
+          { path: "SKILL.md", contentBase64: Buffer.from(content).toString("base64") },
+          ...(value === null
+            ? []
+            : [{ path, contentBase64: Buffer.from(value).toString("base64") }]),
+        ],
+      });
+      const { item } = await f.create([
+        task("selected", { skills: [{ ...f.ref, resources: [path] }] }),
+      ]);
+      const done = await until(async () => {
+        const result = await f.status(item.id);
+        return result.state === "finished-with-errors" && result;
+      });
+      assert.equal(done.tasks[0].error.code, code);
+      assert.equal(f.starts.length, 0);
+    });
 });

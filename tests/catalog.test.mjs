@@ -600,3 +600,92 @@ test("normalized environmental declarations reject guessed options and unavailab
   assert.equal(result.status, "unknown");
   assert.equal(result.checks[0].state, "unknown");
 });
+
+test("explicit project resources use the same skill snapshot and expose only selected text", async (t) => {
+  const f = fixture(t);
+  const content =
+    "---\nname: same-name\ndescription: Synthetic resource skill\ndsh-unlimit-requirements: []\n---\nRead references/check.md";
+  const reference = "\uFEFFSYNTHETIC_REFERENCE\r\nRetain exact whitespace.  \n";
+  const install = (value) =>
+    f.library.dispatch("skills.import", {
+      id: "local-one",
+      files: [
+        { path: "SKILL.md", contentBase64: Buffer.from(content).toString("base64") },
+        { path: "references/check.md", contentBase64: Buffer.from(value).toString("base64") },
+        {
+          path: "scripts/example.js",
+          contentBase64: Buffer.from("UNSELECTED_SCRIPT").toString("base64"),
+        },
+      ],
+    });
+  install(reference);
+  const ref = { origin: "project", id: "local-one", resources: ["references/check.md"] };
+  const listing = await f.catalog.read({ origin: ref.origin, id: ref.id });
+  assert.deepEqual(listing.item.resources.map(({ path }) => path).sort(), [
+    "references/check.md",
+    "scripts/example.js",
+  ]);
+  assert.doesNotMatch(JSON.stringify(listing), /SYNTHETIC_REFERENCE|UNSELECTED_SCRIPT/);
+  const metadata = await f.catalog.preflight({ skills: [ref] });
+  assert.equal(metadata.status, "ready");
+  assert.doesNotMatch(JSON.stringify(metadata), /SYNTHETIC_REFERENCE|UNSELECTED_SCRIPT/);
+  const load = f.catalog.load.bind(f.catalog);
+  f.catalog.load = async (...args) => {
+    const snapshot = await load(...args);
+    install("NEW_RESOURCE");
+    return snapshot;
+  };
+  const prepared = await f.catalog.preflight({ skills: [ref] }, { includeContent: true });
+  assert.equal(prepared.status, "ready");
+  assert.equal(prepared.skillBodies[0].resources[0].content, reference);
+  assert.equal(prepared.skillBodies[0].resources[0].bytes, Buffer.byteLength(reference));
+  assert.match(prepared.skillBodies[0].resources[0].sha256, /^[a-f0-9]{64}$/);
+  assert.equal(prepared.skillBodies[0].resources.length, 1);
+  assert.doesNotMatch(JSON.stringify(prepared), /UNSELECTED_SCRIPT|NEW_RESOURCE/);
+});
+
+test("missing, binary and oversized resources block preparation without truncating or silently dropping files", async (t) => {
+  const f = fixture(t);
+  const content =
+    "---\nname: same-name\ndescription: Synthetic resource skill\ndsh-unlimit-requirements: []\n---\nSynthetic";
+  f.library.dispatch("skills.import", {
+    id: "local-one",
+    files: [
+      { path: "SKILL.md", contentBase64: Buffer.from(content).toString("base64") },
+      { path: "invalid.txt", contentBase64: Buffer.from([0xff, 0xfe]).toString("base64") },
+      { path: "binary.txt", contentBase64: Buffer.from([65, 0, 66]).toString("base64") },
+      { path: "large.txt", contentBase64: Buffer.alloc(32 * 1024 + 1, 65).toString("base64") },
+    ],
+  });
+  for (const [path, code] of [
+    ["missing.md", "SKILL_RESOURCE_MISSING"],
+    ["invalid.txt", "SKILL_RESOURCE_BINARY"],
+    ["binary.txt", "SKILL_RESOURCE_BINARY"],
+    ["large.txt", "SKILL_RESOURCE_LIMIT"],
+  ]) {
+    const result = await f.catalog.preflight(
+      { skills: [{ origin: "project", id: "local-one", resources: [path] }] },
+      { includeContent: true },
+    );
+    assert.equal(result.status, "blocked");
+    assert.ok(result.checks.some((check) => check.code === code));
+  }
+  for (const paths of [
+    ["../escape"],
+    ["/absolute"],
+    ["C:/absolute"],
+    ["ref\\file"],
+    ["https://example.invalid/a"],
+    ["SKILL.md"],
+    ["a", "a"],
+    Array(17).fill("a"),
+  ])
+    await assert.rejects(
+      f.catalog.preflight({ skills: [{ origin: "project", id: "local-one", resources: paths }] }),
+      { code: "INVALID_INPUT" },
+    );
+  await assert.rejects(
+    f.catalog.preflight({ skills: [{ origin: "host", id: "same-name", resources: ["ref.md"] }] }),
+    { code: "INVALID_INPUT" },
+  );
+});

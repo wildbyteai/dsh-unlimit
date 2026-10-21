@@ -81,9 +81,15 @@ export function draftResult(result, candidates, validate) {
           "UNKNOWN_CAPABILITY",
           `Planner selected a capability absent from its catalog: ${requirement.kind}/${requirement.name ?? requirement.path}`,
         );
-    for (const ref of task.skills ?? [])
+    for (const ref of task.skills ?? []) {
+      if (ref.resources !== undefined)
+        fail(
+          "INVALID_PROPOSAL",
+          "Planner has no resource inventory; resource paths require explicit task selection",
+        );
       if (!knownSkills.has(JSON.stringify([ref.origin, ref.id])))
         fail("UNKNOWN_CAPABILITY", `Planner selected an unobserved skill: ${ref.origin}/${ref.id}`);
+    }
   }
   return validated.map(({ state, ...task }) => task);
 }

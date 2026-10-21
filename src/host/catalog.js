@@ -2,6 +2,7 @@ import { statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { fail, object, string } from "../core/validation.js";
 import { normalizeServers } from "../core/servers.js";
+import { normalizeSkillResources, selectedSkillResources } from "../core/skill-resources.js";
 
 const ORIGINS = ["host", "project"];
 const ENVIRONMENT_KINDS = ["environment-variable", "environment-host", "environment-key"];
@@ -13,10 +14,11 @@ function fields(value, allowed) {
     fail("INVALID_INPUT", "Unsupported catalog option");
 }
 function reference(value) {
-  fields(value, ["origin", "id", "requirements"]);
+  fields(value, ["origin", "id", "requirements", "resources"]);
   if (!ORIGINS.includes(value.origin)) fail("INVALID_INPUT", "origin must be host or project");
   string(value.id, "id");
-  return { origin: value.origin, id: value.id };
+  const resources = normalizeSkillResources(value.origin, value.resources);
+  return { origin: value.origin, id: value.id, ...(resources === undefined ? {} : { resources }) };
 }
 export function normalizeRequirements(value) {
   if (!Array.isArray(value)) fail("INVALID_INPUT", "requirements must be an array");
@@ -264,6 +266,13 @@ export class HostCatalog {
       item: {
         ...summary(item, ref.origin, ref.id),
         content: item.content,
+        ...(ref.origin === "project"
+          ? {
+              resources: item.files
+                .filter((file) => file.path !== "SKILL.md")
+                .map(({ path, bytes }) => ({ path, bytes })),
+            }
+          : {}),
         readStatus: "readable",
         dependency: declaration(item),
         dependencyStatus: "unknown",
@@ -514,8 +523,28 @@ export class HostCatalog {
           state: "invalid",
           detail: "This skill disables model invocation; workflow delivery is unavailable",
         });
+      let resources;
+      if (ref.resources !== undefined) {
+        try {
+          resources = selectedSkillResources(item, ref.resources);
+          result.resources = resources.map(({ content, ...metadata }) => metadata);
+        } catch (error) {
+          ownChecks.push({
+            kind: "skill-resource",
+            state: "invalid",
+            code: error.code,
+            detail: error.message,
+          });
+        }
+      }
       if (includeContent && result.readStatus === "readable")
-        skillBodies.push({ ...ref, name: item.name, content: item.content });
+        skillBodies.push({
+          origin: ref.origin,
+          id: ref.id,
+          name: item.name,
+          content: item.content,
+          ...(resources === undefined ? {} : { resources }),
+        });
       result.dependencyStatus = combined(ownChecks);
       skills.push(result);
       checks.push(...ownChecks.map((check) => ({ ...check, skill: ref })));
