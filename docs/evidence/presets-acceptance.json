@@ -1,0 +1,2875 @@
+{
+  "schemaVersion": 1,
+  "behaviorId": "CORE-MODES",
+  "generatedAt": "2026-10-21T05:11:30.126Z",
+  "node": "v24.21.0",
+  "platform": {
+    "os": "darwin",
+    "arch": "arm64"
+  },
+  "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
+  "patch": {
+    "path": "node_modules/@deepseek-ai/dsh-web-app/presets/standard.patch.yml",
+    "sha256": "0d398d2a6872a73a106cb3bd19303ecccf1637e1fcad4d0bf9d8a72d2c2c68f5"
+  },
+  "composition": {
+    "id": "standard",
+    "isDefault": true,
+    "rows": [
+      {
+        "entryId": "persona",
+        "moduleName": "@deepseek-ai/dsh-persona",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "agent-instructions",
+        "moduleName": "@deepseek-ai/dsh-agent-instructions",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "time-context",
+        "moduleName": "@deepseek-ai/dsh-time-context",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-bash",
+        "moduleName": "@deepseek-ai/dsh-tool-bash",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-pwsh",
+        "moduleName": "@deepseek-ai/dsh-tool-pwsh",
+        "enabled": false
+      },
+      {
+        "entryId": "tool-fs",
+        "moduleName": "@deepseek-ai/dsh-tool-fs",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-fs-search",
+        "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-jobs",
+        "moduleName": "@deepseek-ai/dsh-tool-jobs",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-schedule",
+        "moduleName": "@deepseek-ai/dsh-tool-schedule",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "skill-filesystem",
+        "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-skill",
+        "moduleName": "@deepseek-ai/dsh-tool-skill",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "command-goal",
+        "moduleName": "@deepseek-ai/dsh-command-goal",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-goal",
+        "moduleName": "@deepseek-ai/dsh-tool-goal",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-ask-user",
+        "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-todo",
+        "moduleName": "@deepseek-ai/dsh-tool-todo",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-web",
+        "moduleName": "@deepseek-ai/dsh-tool-web",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "present",
+        "moduleName": "@deepseek-ai/dsh-tool-present",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-plugin-manager",
+        "moduleName": "@deepseek-ai/dsh-plugin-manager/tools",
+        "enabled": false
+      },
+      {
+        "entryId": "tool-plugin-market",
+        "moduleName": "@deepseek-ai/dsh-plugin-market/tools",
+        "enabled": false
+      },
+      {
+        "entryId": "plan-mode",
+        "moduleName": "@deepseek-ai/dsh-plan-mode",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "compaction-basic",
+        "moduleName": "@deepseek-ai/dsh-compaction-basic",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "command-compact",
+        "moduleName": "@deepseek-ai/dsh-command-compact",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-result-pruner",
+        "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-subagent-control",
+        "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-subagent-list-agents",
+        "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-subagent",
+        "moduleName": "@deepseek-ai/dsh-tool-subagent",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-subagent-fork",
+        "moduleName": "@deepseek-ai/dsh-tool-subagent",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "workflow-ptc",
+        "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+        "enabled": true,
+        "fiberState": 2
+      },
+      {
+        "entryId": "tool-workflow",
+        "moduleName": "@deepseek-ai/dsh-tool-workflow",
+        "enabled": true,
+        "fiberState": 2
+      }
+    ]
+  },
+  "revisionBindings": [
+    {
+      "sessionId": "synthetic-standard-native",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    },
+    {
+      "sessionId": "synthetic-standard-plan",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    },
+    {
+      "sessionId": "synthetic-standard-restored",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    }
+  ],
+  "officialFiles": [
+    {
+      "path": "node_modules/@deepseek-ai/cordis/lib/index.js",
+      "sha256": "6a9394c0877ff45218818c6e815edd038f8057e1a1deb390a8d43ec81c57691e"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/cosmokit/lib/index.js",
+      "sha256": "ba44c0871656e4c7cac2c3c8a2ff644e0d2eb9d6bda7f6355866d686d513268e"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js",
+      "sha256": "638b9ad360e01236120772323f80a65570c4f3f42f4cfc6243330241025b6d72"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/cordis-plugin-include/lib/index.js",
+      "sha256": "ad5eaf3b80a8fd9945466486493a0d1a8e9590895bcde01e5673f3d07b4fd306"
+    },
+    {
+      "path": "node_modules/js-yaml/dist/js-yaml.mjs",
+      "sha256": "cea276c7e15f409a1adbe5d177aba7824398a474f7cf702bd57962c7d570636f"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-scope/lib/index.js",
+      "sha256": "2829df71d76e08941457d4dd173eac60783e55354921137c8b75e8b5c0d2ecca"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-system-prompt/lib/index.js",
+      "sha256": "7be9f7aafbf345d01ddcc12fd297b16e9a1d41283a6a04073b867becca0bf020"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/schemastery/lib/index.mjs",
+      "sha256": "cfcbe46c7416bdb35ce891c252152bbf519e08199bede5930dd7cb880c65f1ef"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-projection/lib/index.js",
+      "sha256": "7dc2b212819baf4fc292751054d30b97afcbdee0a4733230abf92c6722e6550c"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session/lib/index.js",
+      "sha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-brand/lib/index.js",
+      "sha256": "14feb59256b891982b2017d73ed03ee65e2a7365f48e4902a856acb0e52d5eb0"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-util-values/lib/index.js",
+      "sha256": "4322a2aacdfe38476d2bbc62338120beea1e1660346d7db5b6c1e1f927a26b7c"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-llm/lib/index.js",
+      "sha256": "d18d8ae4c8d961e628708c1e4698e09716a0ebb80e55a672e0bde1029bec1155"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-typert-protocol/lib/index.js",
+      "sha256": "8d48ddbb4bbc62585ce5a4d3a7f53b39f55581b5320c1cae681766edd15ff8af"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-util-crypto/lib/index.js",
+      "sha256": "640b26c8e5a1156c6c8e8749a22f805c9c0e34444778eb4ee9529be3e88ec862"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-timeout/lib/index.js",
+      "sha256": "f9a79fd5194bb4d6321e6d2d5b5eb72f99c683452e1defbb75fad52f76aed667"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-llm/package.json",
+      "sha256": "409d065250b680487ed411f9e8bb91d621b0850d6db7b743fc549a096c4569aa"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent/lib/index.js",
+      "sha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tools/lib/index.js",
+      "sha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-sandbox/lib/index.js",
+      "sha256": "b56373befbfcfe281c17c8892e9a4b2cdcb96851290b3ed0ff56b08915e2f743"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js",
+      "sha256": "cf57e3ecd487ac5c2553455aaa5cef2c6fb41e6bd61be5aa455675d1d7193033"
+    },
+    {
+      "path": "node_modules/zod/index.js",
+      "sha256": "c733a1897d6b4b30dad6998597f6896b265b094a65534359ada34b08ecf8932c"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/external.js",
+      "sha256": "179a03ace3d1d77895cc5b3c54a3fcbf2b7f8bad44d6f030092491c10e5d9097"
+    },
+    {
+      "path": "node_modules/zod/v4/core/index.js",
+      "sha256": "f9698820ee8371215e8d015cfa060230c62e65428397dce83f78e6538976301c"
+    },
+    {
+      "path": "node_modules/zod/v4/core/core.js",
+      "sha256": "a5e713beaac4647151e03716a83f51ab714e5337cf66850f3b28eaf072a0bbfe"
+    },
+    {
+      "path": "node_modules/zod/v4/core/parse.js",
+      "sha256": "2578b8d1341c3882a6c089f9ec57ce1c1a16b8b2b477721d4d89ba3d3ee50c9c"
+    },
+    {
+      "path": "node_modules/zod/v4/core/errors.js",
+      "sha256": "bdd0ed8fd4a6e9d04fe6423b0f9df3a0b403939bc7dcedd8930a4b8df1fb118c"
+    },
+    {
+      "path": "node_modules/zod/v4/core/util.js",
+      "sha256": "968e3433e810cf7ba5efb609a1cb6d9a6cfb51215fd1f699938228f7ac25deb3"
+    },
+    {
+      "path": "node_modules/zod/v4/core/schemas.js",
+      "sha256": "09da9b0cb9b9d2d795c349bc47c7521d5aaffe241885f0c9728f2aa7de3834c9"
+    },
+    {
+      "path": "node_modules/zod/v4/core/checks.js",
+      "sha256": "5a33a20dcad372b4d18ead8d1e58b1950454f136a2216e62f247e0e5601ac838"
+    },
+    {
+      "path": "node_modules/zod/v4/core/regexes.js",
+      "sha256": "3cb122080c1154321331322ebc0cbe04878fe104c8c7b335891d9f85fc4b3f63"
+    },
+    {
+      "path": "node_modules/zod/v4/core/doc.js",
+      "sha256": "e084bbcc536746a8942fd33b08afe4db345554b3a0383114f1dca95261c958d9"
+    },
+    {
+      "path": "node_modules/zod/v4/core/versions.js",
+      "sha256": "bf082fde98fa7725412d713c7f56da3a5603bdef199d68d5769263f30ce9c756"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/index.js",
+      "sha256": "d73f41a76614855d43eea493030a1aa05dca30c9a17015a0da5b8b70da61b6b1"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ar.js",
+      "sha256": "220ca3ca8cf67e4ccc05d789eeed2692d970269fe0cd82f05db8fd899b661b9e"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/az.js",
+      "sha256": "4725ffef0b2f2df947194f9698c792b69f52a8c3a5a1e1bdfabbf62259a1dd46"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/be.js",
+      "sha256": "da4bda7fbc940dd9f50efdd914caa9397243be779a505b82bd4be5395d3b795e"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/bg.js",
+      "sha256": "48511ad2f86043f0eea6e7673d5e2b848a3295a26c9c4650e96b3884d640196d"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ca.js",
+      "sha256": "796f9ba7dcd53648171aa0132c50271ef358936765cec0a44a642c41d05b3e8c"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/cs.js",
+      "sha256": "670a75fe1db1104db090c95aabb01e4eb6decd451fe77fd830c2e4dafc79b49a"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/da.js",
+      "sha256": "cdaad7a1fa370abda1943fe9c2caba961e7896b9808d51275daf33f964af49cc"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/de.js",
+      "sha256": "521a4ed29fcaf3f781163875dc282cfb5262047773aa2b70a852996b1d8a51b9"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/el.js",
+      "sha256": "9857a9e4909282b2efd86317fc3e67ed86e24287f32329cfa5ab833c05fc0d81"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/en.js",
+      "sha256": "232a0828d64df8e410b23ac9825a667bd9d485fd70acdc4b4d0870539faef0a4"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/eo.js",
+      "sha256": "ebe08048aa3ee9871ce9fe1271e254cb672b1968ec40ac253066d08d176e8a65"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/es.js",
+      "sha256": "4edd9302e9724c408b024220e99092fbd2f90100ac3c6407a94543b79843610c"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/fa.js",
+      "sha256": "2dc1bee1e984e8a15191fb3c69aaecaa26c922e12a0d4486ac005a0372b78565"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/fi.js",
+      "sha256": "3911184979f01d2ae580ce611710ee40597eff97a410d0fa823ab6ea27cee88c"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/fr.js",
+      "sha256": "3ea466ca5737984bb5acc9008822060272f596317004618cfe1e05109f707577"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/fr-CA.js",
+      "sha256": "f8716c2baaccdfd1d958743bbc5250c9bdef5152d0801470e9b9a380d618f4ab"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/he.js",
+      "sha256": "290512e43d2907700211da09dc3959fd98d120bfb89f8836e6e3f83a472e26fe"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/hr.js",
+      "sha256": "1ea65433c32b89bead43113ac69b3acc520bb73ae231dd2e05fedf8e8c5656d6"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/hu.js",
+      "sha256": "913ee94a253db79b31463ae23a337060b6fe28be73dfc7657d8a83a4942bd8a8"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/hy.js",
+      "sha256": "0d3bbb96c0f8bc74468a2dfc7d066e838bb56fab64fd5ec03ce9c4d89eccbe99"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/id.js",
+      "sha256": "cd2c19b5c30dade3ed91ffcff3deb0b068713be24f02248e7e46b87b2b9553ee"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/is.js",
+      "sha256": "ead5b14eac892229f915fe38ec94ab3b1e676f8aa2df2a8450848ba9ca9a1612"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/it.js",
+      "sha256": "439969d199427d77ebf1e477bf2295b226712804b25437d442f9dfc78aca95e0"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ja.js",
+      "sha256": "43ee10378cac22b0b8aee912a66c3f36a834d5b4c76e9748f88a784044f248fd"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ka.js",
+      "sha256": "0ab5322368f9ac6e6b58f93dac484a4f4f06cdf4c0677f4df88164e9d8b4bf81"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/kh.js",
+      "sha256": "78c3d1991041bb8c8fc0f7c5d745aae422d4c2e4e8f30bae44f3fef4765900a8"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/km.js",
+      "sha256": "dbdabda94dd93d4a1827e6c809505c79fa6aa7abefec91dc50fa0871382c99cc"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ko.js",
+      "sha256": "d2efe22ac069d9b32b0109fa07713ac0695ac1c1357afc4e4277056466f2e196"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/lt.js",
+      "sha256": "dad886e52c56a1329d22e072f8b08dc8730f69c3dc5e5acf8267cac18df1ab28"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/mk.js",
+      "sha256": "9eb4af0392fc5b9c438cdc6ceea446acc541b59e221dba918f7b80800d9da3d1"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ms.js",
+      "sha256": "c550a9185d997e8fcd17311951aa1e29793a50b8e825e18310efd5a46c641795"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/nl.js",
+      "sha256": "acba414579c5bbd7f83dc6661fa1a12d65f1822f9b0f5035549ac60f46d93763"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/no.js",
+      "sha256": "1854483c7cf158b8f97f0faf6fd799eb1f762009018b5fde893ca33f2fb0b313"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ota.js",
+      "sha256": "34ae496104bc17fea7d30c3d45c94cfe3d1d569b5d39a6ca51de6c177690c556"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ps.js",
+      "sha256": "f977b5141fa8fb6a8459372e0b2895d74b381c9f2ff4899141f7ee3e639a4513"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/pl.js",
+      "sha256": "18eab58f395e30b906e8e3fddc5f212eb19f2c4362410889a5c5e0141ebe2144"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/pt.js",
+      "sha256": "df172afc585544dee7c063c484f5a07b5ed103e2c1072a782c763ad8ceb08e17"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ro.js",
+      "sha256": "ecae409f4299ab91e2aff1095db14e23f3cf2c05b3654e242047655352c7f46b"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ru.js",
+      "sha256": "c397a473e94d7d189a9c09c7890fe379c4f6f46d9556d52a040a90ffa56f7b93"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/sl.js",
+      "sha256": "ee2ff3a19b62cd2f89b54b165088773b937de15df7253df220bef07d9adf2d80"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/sv.js",
+      "sha256": "97d6718fb643e05d6fe30fa4f9f09b8d9a3eda4a3a350b57dfb2944943d19502"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ta.js",
+      "sha256": "04bbde9766251f9047e786fdd77632f2ecd53aec2eb060eb2fc85bf576ad729d"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/th.js",
+      "sha256": "aea70c9ac2b399fe4749e19ba3aa99c3efb4dfb50eadfb62b0b2a6e005748f3d"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/tr.js",
+      "sha256": "4449f41d22c6f15ede5066f79d840a52ec45a6b694c859e16f9121062b6fad2f"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ua.js",
+      "sha256": "9391169ffbc72f777a83230b6ffcc3f4cf46ab5945ec540de9ef4609dca1f4cc"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/uk.js",
+      "sha256": "77136a2a60eef62f7cc803a0f9971aebbc641403af77c1b41fd5ce59abfa5de3"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/ur.js",
+      "sha256": "858f4f38d651073e7a3fbec7ed356692578b3ad1fae1b453cb3d85312a4f39d2"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/uz.js",
+      "sha256": "d540bed482d15c47cb45439cff34e053379c53019c7c7c5fbe43f222d0c81f04"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/vi.js",
+      "sha256": "2c61bd3f4a733f3cbb1ad85e75a053cb15a8ebeb83ab56dc21f2948b1138e12f"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/zh-CN.js",
+      "sha256": "99a4b16af598834a0b11607fcdebd1c6de026386ff1d6a5a306b364c154c5899"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/zh-TW.js",
+      "sha256": "37dcae620e1553e9174a4b9434bbcc4e465150a627e80c9c17fd01de8baaf59a"
+    },
+    {
+      "path": "node_modules/zod/v4/locales/yo.js",
+      "sha256": "98b9cbf31bf00c8b2c00de62725a9dd7cb718ac72d6e8fd4e0a1a7c49723e0f4"
+    },
+    {
+      "path": "node_modules/zod/v4/core/registries.js",
+      "sha256": "620ea1a715ccc4e6e605a271343bf47942dccae90885dc71f137b1f08a972e50"
+    },
+    {
+      "path": "node_modules/zod/v4/core/api.js",
+      "sha256": "00cb5edcfde8098e5a169e66c1dce50c101484d21436e3d78e137e1fa87c4836"
+    },
+    {
+      "path": "node_modules/zod/v4/core/to-json-schema.js",
+      "sha256": "fb3c9ab59947582f7671a53c8e20a3ced5eaa92d1c220ce8b27717a59033ad0d"
+    },
+    {
+      "path": "node_modules/zod/v4/core/json-schema-processors.js",
+      "sha256": "ff15f567c9401dd7d3151ce11736283ff747c9a9e205cc08ee96f90eadc1c0c6"
+    },
+    {
+      "path": "node_modules/zod/v4/core/json-schema-generator.js",
+      "sha256": "9cc884cdb535a9c87b85b66e61a593ff6b686222f038834f81c5e92552cd6e23"
+    },
+    {
+      "path": "node_modules/zod/v4/core/json-schema.js",
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/schemas.js",
+      "sha256": "eb4af7946a092aff8678b9251728ea58dab40154920cd65ec4a2ca1d4df68393"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/checks.js",
+      "sha256": "78a162d29e06001b4d919e1ed08f6e7d0d665bba0ef983201373745410d7b354"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/iso.js",
+      "sha256": "3cc5e6b4da086b8ffc7ee3188c69e4d3c945b368092e78d2299b5321182752c5"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/parse.js",
+      "sha256": "14cbcc416ab9169abc2cde97af77da54ca769684eac1e03a3753c16ea4a7cd95"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/errors.js",
+      "sha256": "b155316267f79068ddc2dddc7046e13785804b768ca36e6deff1691d154f7c20"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/compat.js",
+      "sha256": "0e948b101771cc0e7b753e54b3f5b486929d3db9bd4c09d98fe4ce86271bcf7b"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/from-json-schema.js",
+      "sha256": "d8866bf5232e55d12cda032bde6a56a05a0a8b276945c2e4eed66432ef5cc9b2"
+    },
+    {
+      "path": "node_modules/zod/v4/classic/coerce.js",
+      "sha256": "fb2efe3b6eacc475c77cbb571b5fb8650d92a10f316dc869e49b722973d83c3c"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-persistence/lib/index.js",
+      "sha256": "cc0b6d3a224133af611b428d5a49020e300f86c3b4ba28037aeb219029bde3eb"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-typert-registry/lib/index.js",
+      "sha256": "ea5e3beb6ddd09a7b77e6fc79933f71ba93382d0ec1caa70bd1f92c904caccdd"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-sandbox-policy/lib/index.js",
+      "sha256": "772ca58f0f786d6cb4d839deb621634c31097c13228d81b14e3f3153d0524924"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-user-approval/lib/index.js",
+      "sha256": "6a5ad1ba3c3dc3abbbae52e6c8c4463970ee0c1c8988cebb0d5cf2acd17ee90b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-fs-sandbox/lib/index.js",
+      "sha256": "cac65e21a0f0895b073cb9a447196ac265f2a171cc7f67c7434a6b3b7782caf5"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-fs-local/lib/index.js",
+      "sha256": "63fbb41d2c33e07111884b798be507e68c2752acab8249c821c20ade436e894f"
+    },
+    {
+      "path": "node_modules/chokidar/index.js",
+      "sha256": "4d1669ff207e874eb6185b8a4f04c1e694120b9eaf6723ddea1be7ce5583b164"
+    },
+    {
+      "path": "node_modules/readdirp/index.js",
+      "sha256": "a42d9f1a7de9f9db1f2e3d7afe6ca82d337a7e65a49edbbce1f62de6b1ea18f1"
+    },
+    {
+      "path": "node_modules/chokidar/handler.js",
+      "sha256": "dbc95cbb1f149acf9155fc605a5a6aeeecf354aeff7606192378d71778126450"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-fs/lib/index.js",
+      "sha256": "b165659f1eff0607222a7fe761bc56bae03fec8337c2e25affd064a3047dacb9"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-fs-observation-policy/lib/index.js",
+      "sha256": "e36b54cdb5c6fa01ccfa29f0433753e810ec1ac29a6a22be349d66b77eb64b03"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/lib/index.js",
+      "sha256": "af5bb7f33c52efe018da19c39c54e07b5a3ac804fff83f8a68e341f411ecf703"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/index.js",
+      "sha256": "32e7efd49a94a765f6d10a1a0a3c02c50c246def17c80c6f0225f85525d98505"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/external.js",
+      "sha256": "c6b584ae70ba4e7132b2cd78c23ea4ecedc9828abf999edee312372e1fb453d6"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/index.js",
+      "sha256": "2a0e452323aa5b75b7d7de4879289e2579b9dd2d6af291c0416ba6806ca2199d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/core.js",
+      "sha256": "c7ce485c97263e42568d16b11bb4a90133221c7e807498a9273d70f41ba16ef6"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/util.js",
+      "sha256": "bb08133b11b478c8e715038fff26ebea204d7fd5443fba31fe138b142d202efb"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/parse.js",
+      "sha256": "fb05b91ec260f3f484f7c00a177b6126ceb8fd1b09dc90b1200afdffd4d98efd"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/errors.js",
+      "sha256": "a0c95ef2f7085b5bc2931f7b566f524b26a0360c8df741e3f87f923745cf9792"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/schemas.js",
+      "sha256": "0ee56e8afbae28eeb1060a162ad7e56f0675ee6fb83f0ae56bea2e088f6cdbc0"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/checks.js",
+      "sha256": "bc42543274218aa7ef72192b3218d2a4a399e53df8de240a04d9ff275096f563"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/regexes.js",
+      "sha256": "24fc98f6fc9175e50ff29d28b040e3b4ac5650de19914d45ee27b853d367ecc6"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/doc.js",
+      "sha256": "be4c1b1a1ad247cc70f360a572060edd7e0cea24252c3a319f33d247899c5643"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/versions.js",
+      "sha256": "28439030e50c35b90e1f88726297a346f5285e32e24da7ea4ce15618661d9ac1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/memoizer.js",
+      "sha256": "18a3188c51229d9189a5408b0b7fbc3e121b55c2b4c3c406d79cb9b77e7ad964"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/index.js",
+      "sha256": "7ea85250d1e7bd9459cda61f38c78757a410d561a5421bb3f08019bba79c9849"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ar.js",
+      "sha256": "eec4016c2b3063ae929617d90ec609e4c425e60c97a954d3a24de0f457b6ec97"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/az.js",
+      "sha256": "5bd03646b9d18b73e71356cd28937e4e6413b806bb23e14689cc88f6f65ff3a6"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/be.js",
+      "sha256": "f969afea5d9800a71958a621658943b85a2576a2bfefdd5dea70afc4924d4af4"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/bg.js",
+      "sha256": "96741333a790320e05aef7286b5b709a4a7c48cfffc50fc5e6acff5b505275e9"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/bn.js",
+      "sha256": "6d8227b52a6864465b7c52a9ef7e09d261d904ec8a619932e15dd9f9f826e8dd"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ca.js",
+      "sha256": "67f6f38b59a6e3ee81cc5155480465331dd9a142b2471a495503a81dafba0684"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ckb.js",
+      "sha256": "bdb9ef0cfda4009f8892585a1780fff863cd409931d6f89394c271042c131137"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/cs.js",
+      "sha256": "4ffa0e484ad1842a2c0e5c7f2dfe9160155ff5be4b95ab6e524d3a30a2210488"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/da.js",
+      "sha256": "29addcd60e88422bed9ed78c6c864220a15c06b31fdb4ab7ad4f87be4098e6ae"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/de.js",
+      "sha256": "f344eb96ba18d9db907f3f9c95897ce2590ab0cde1553c023daffbb1cb5ef6f4"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/el.js",
+      "sha256": "fdea833aa0a8c381d26216db1521dd7fbc4dccb6d3aa50f9a585ffb975df91eb"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/en.js",
+      "sha256": "d5930e10d137b048b37823e168e4177947e1f696ada8419c71bb0d32da4333c0"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/eo.js",
+      "sha256": "97797bd22319ecc3f2044da6c305f1114b851803697029ffce2b66644757da3a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/es.js",
+      "sha256": "12e762b921b1e3fdb8e265d2b554de81ce9706ceb23a81527f48ae2dddf355db"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/fa.js",
+      "sha256": "60e7eeff4c000c85f8420168374344305d3c2110a5f91a2fb672b2a2381eeddf"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/fi.js",
+      "sha256": "1e72af4193e564cd37dce4a850dc18bc1bcd6ca280f29e9f5f8c6bbab6a2cad9"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/fr.js",
+      "sha256": "477345d6401d0e4f07794b1a2cff8b78953723f1fc8cfaeb6b660c19be47125a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/fr-CA.js",
+      "sha256": "a2ca0451ff943766bb6a88b392b25447462a1d3ed75c1adda5ddb0bc474bcd42"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/gu.js",
+      "sha256": "b1921ac6b4158e6360a8da6099df8bbf2d7bce7c1cf381d5a5e47aa0c74874d2"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/he.js",
+      "sha256": "1cfff31fac19616d900d1f3febd9690ea87711e13b5be299326ebfd3f33aad4d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/hi.js",
+      "sha256": "c31e466c2a31dc10ba6a288e1aebf429a6e9566a26918d0240aae058693f6329"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/hr.js",
+      "sha256": "ff2bebef0761f2d6095103d58484e3b95551bc51d56770db8f161b8e0e0ec941"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/hu.js",
+      "sha256": "9816c21ee0b3be9d973f9e033e9587a608f2d35dd1b984d415b88e03242b0189"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/hy.js",
+      "sha256": "daf6d0c590d9b061759598ba9f7f97041e2874c7a58da2c64b86f152840d68fa"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/id.js",
+      "sha256": "e5c23bb0b6f696fa936bafd7969e64738504cf7a5be3ec04b24ae899d4912b58"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/is.js",
+      "sha256": "1cce1285bbf55c8a76303fea0be0fb6d39fbd0ece833137ea23a22f406ac1ae1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/it.js",
+      "sha256": "096b497df6c5fe7de4422482b7733e764e4b344e8d7f768a7289556687acdb82"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ja.js",
+      "sha256": "2a6bbbd6dbd573687b22f35873a13cdf730c07423b4ab114e5a8b12d8777146d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ka.js",
+      "sha256": "baf3204123cf4246df654fd1948b6c8da6917e7a06e470aeeaf7c1eaa7003628"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/kh.js",
+      "sha256": "78c3d1991041bb8c8fc0f7c5d745aae422d4c2e4e8f30bae44f3fef4765900a8"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/km.js",
+      "sha256": "e61079f14070dfa9c7b2047eb79f5bea6d4e845f192756d103c121bbd63ee18a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/kn.js",
+      "sha256": "884b1b68a1ca02fe9a774b8de9cbfa3486892eea36192699120f57b31f0a1f42"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ko.js",
+      "sha256": "11fcef61a2f23e010bf0f569d71be0d49524afc97f3072cc03fdc6fe3ea2f14d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/lt.js",
+      "sha256": "d2e67a35a3c6e7241a9eb9c5851e4b5b651ac8b23278854862e6055829946c48"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/mk.js",
+      "sha256": "64ddd914c432ba5690d0686bff6603651ce886a891f84823d7dc766c9c980cd1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ms.js",
+      "sha256": "94faf0d306ffa2a4f95e57f3e53060d27220a639b9cb529f00d1d01b6270f045"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ne.js",
+      "sha256": "6da69989b702ae15baa27b799b6b2b32fd011ba3980a190dd0eccfc9233083d6"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/nl.js",
+      "sha256": "296ced8be508c5f9e82b562049d2974882029bcd5b2ab4ade14401b33ec99909"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/nn.js",
+      "sha256": "bae9756817629db30841eb54a27ed9b3c71c2a4208314d8d070be624bd2e9359"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/no.js",
+      "sha256": "f358e5586940350ee25a05db184565d23eb1c66903e182ebec812172f31cb55a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ota.js",
+      "sha256": "66ed8c3ce00b2e9971ed5a17f002937405d8cdfeb399ebe012db9d2317f42146"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ps.js",
+      "sha256": "1c15b81fcce0cdc59dbcca18df5c4ecf4e176fc3fb7668207b9ba54df43cce46"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/pl.js",
+      "sha256": "b7f82cf9f747785beeec05cd31d3d7493c52bd3647598924141568f148c07222"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/pt.js",
+      "sha256": "93a820f60d571607bf34b69198f5b24617475584c0b22c0f8d160fcdef096a46"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/pt-BR.js",
+      "sha256": "abc52db767b9dd938954776728ea7480cdcab569a5a17664f60e5a2c1d63e60b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ro.js",
+      "sha256": "54751d2866171c9c7ce1a72868dec09efa54d1b2b67401767594c5b360aca38a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ru.js",
+      "sha256": "40a019b53bd1684fd4b750db87021520dd5d710f714010c0a594e5bcf5787478"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/sk.js",
+      "sha256": "ae7c49242e70149434c9051dd00209afbd517d98ba54c13692371a5340b616da"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/sl.js",
+      "sha256": "490ca48f8aae3aed660758b32856d49a9fc5c7e255dad220e75abaef8c35140b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/sv.js",
+      "sha256": "448f36996bb0d159489b34ad7d86df03e520a13e43b1c98ea2fb18d7ed4a3c95"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ta.js",
+      "sha256": "8b6e1bc033fdaefb1acfc7edf88c9f53c3a50cc892066effdab306103e994d42"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/tg.js",
+      "sha256": "9a5c9a3b18b8ccded28d66033575b22d823df17a7afa8bb9a733f31fe071462f"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/th.js",
+      "sha256": "913cc4962ddf5cb54ed694d04b7008493ef401d3333b26426b32f4890712574e"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/tk.js",
+      "sha256": "445abfed18c5a9d79143b02c9cf9c171b41fb5dff8ffc2cb59b7aef7203e5a7f"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/tr.js",
+      "sha256": "bca07607a27f518f19877dd9c2235fada9c73eb56896f0f6e274781fab71d64e"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ua.js",
+      "sha256": "9391169ffbc72f777a83230b6ffcc3f4cf46ab5945ec540de9ef4609dca1f4cc"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/uk.js",
+      "sha256": "1e59ba41296aeb5b6142a6e5ed84712931e33e54ab0b9ae5d83faf436fc3d968"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/ur.js",
+      "sha256": "d37ed2c93408e0a6b6e1cd290117a6f0e9d7b2c83509cd34b502e1dd94899c87"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/uz.js",
+      "sha256": "2cbe07635b03064ffad0bfcc98d2d570f3264b9cd3e22bbd5c160cd0343f7872"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/vi.js",
+      "sha256": "15939adaf263e0869c602d4b34c206178a235b8bec11c8207ccd3fa50de3a141"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/zh-CN.js",
+      "sha256": "8fc02f2bd4d92f46b24b8d82da0ee95c962fc80c14dd7dd469500e14de08d320"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/zh-TW.js",
+      "sha256": "01d9b119e318d8b9f1a8fa720d06424457429425a61d0730984b750e6a5edf7d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/locales/yo.js",
+      "sha256": "88b33f6527c1a2faaf159568330cf727c448dc468eac72142a6fb24f8714ac1e"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/registries.js",
+      "sha256": "f04d4b2c0bc5b4ac2d6610ea34edf2e5260eade18f20976b79916dcdbeb9fa4d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/compile.js",
+      "sha256": "53fcf24821f50ecf42492ab7101abe8a50ead8286a53567d71648fe5ca346b99"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/api.js",
+      "sha256": "03ae6016abc9585e3f3481d6b8d775a95ae4ee65badbde73ca1ed953ff14c0e7"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/to-json-schema.js",
+      "sha256": "85b883eb8f05e9f060c71a39fce7df9345b566af29d5bc9c8fa477fe616a051d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/json-schema-processors.js",
+      "sha256": "b6d2aee72212c076b9cde38da6333591c76a24eb049a4ee4e7bd2b7825d8b817"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/json-schema-generator.js",
+      "sha256": "beaeab6faa654e99e443b8a9f5d8a4adc08cd8226f92a0cd32477a58ecfa1807"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/json-schema.js",
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/schemas.js",
+      "sha256": "2bf4a631a18f734a9a7ab7fc11bcf919214774d2235a312dcec0dd53d0324c32"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/checks.js",
+      "sha256": "7543391a9ad5e7df287bbfecaa79844d46af44c75c1de0d43a411d65795d9dd1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/parse.js",
+      "sha256": "11941573401bbef138842c7a523dff554873343fccbf0e8b0a144259d2d703f1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/errors.js",
+      "sha256": "d32f7c1ef8e2c70072f6f0ec8ba7081bbc331353cc3a7cb4429e5ece91409543"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/compat.js",
+      "sha256": "0e948b101771cc0e7b753e54b3f5b486929d3db9bd4c09d98fe4ce86271bcf7b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/from-json-schema.js",
+      "sha256": "31dc999a26cb6928f5e99ea564d648567e85cf9aa47565198fb6186dbd6c070e"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/iso.js",
+      "sha256": "deaa026b7c5302e59719f401248e7866691d8d8a892884dd2b6868b1cb7252d8"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/deep-partial.js",
+      "sha256": "0abffcc9838e04dc6f091229c1d522fbfd43aab9563316b52d3eb8ff2bacf26d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/core/visit.js",
+      "sha256": "a804062900869e09ea0b975cfa569fd3c70dc33bad7fc30b63872d451cae29f7"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/in-out.js",
+      "sha256": "34370913842ff02d14a9796b11c5ec2af160bdb35a7148edc286e9a9c6fb5c17"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-working-directory/node_modules/zod/v4/classic/coerce.js",
+      "sha256": "fb2efe3b6eacc475c77cbb571b5fb8650d92a10f316dc869e49b722973d83c3c"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-persistence-jsonl/lib/index.js",
+      "sha256": "973dd78679b2661d6f492343bc22b124ae958aa597d3b36c698a2c650f909984"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-catalog/lib/index.js",
+      "sha256": "836bbb772ab505c299f1a4a246164c50c7c08b67ab0d17f1251d7ea2cd8c1818"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format/lib/index.js",
+      "sha256": "6c7417ec2cd555e2781197d91c4566c88ffcf2728f362d7a2937859be57226ec"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-compaction-image-offload/lib/types/projection.js",
+      "sha256": "205b873f17bd73e96f474e9f2bae3dd92375b6e29d706f34bee24e869507e113"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-compaction-image-offload/lib/types/project-message.js",
+      "sha256": "8f8341afd28e967df5aa57f5f4d3d7c9a386fee39c91f4899f779c470ae3198b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v0-to-v1/lib/index.js",
+      "sha256": "1b3bff6aaf28ca62a864cf97b9aa9aa45ab76de5e459f7881ba4bc8de73490b1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v1-to-v2/lib/index.js",
+      "sha256": "b2b401d880bb000017ba8663c4448b501427b23a1cd2f9fdb04cb7ec9d763eff"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v2-to-v3/lib/index.js",
+      "sha256": "0dc56fb447e9046fc25995bcd08dbac26e832eba6e9eb583ef49d26467c27cd7"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v3-to-v4/lib/index.js",
+      "sha256": "a6b974d110572bd0b16aa7ab09a30d9061944e8dc9f811e8c4a35e4891f83f12"
+    },
+    {
+      "path": "node_modules/p-limit/index.js",
+      "sha256": "edde12a4a4dbdbe8d27161cdd0853db0bab435d5dc6c15f9f4dedc27ee9bca60"
+    },
+    {
+      "path": "node_modules/yocto-queue/index.js",
+      "sha256": "2eabf3096793c43934ef127fb50238dcba93074fb54f943fc62aeab616769dfc"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/node-addon-system/lib/flock.js",
+      "sha256": "e42af00c298d56322c073bf7cc66485096028318ab645a2e69dc2aa7481ba646"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-catalog/lib/types/message-projections.js",
+      "sha256": "c63245bf0c22fbb6bca4de7029437611bac766ca2527e89012f9a6a42c4f907d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-storage/lib/index.js",
+      "sha256": "1289574c24ecfa5b134e2750d578c00ae59654de7d00133e117c4cc34095f3a3"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-storage-json/lib/index.js",
+      "sha256": "0a6b75d5569db3379edd93e863570170e1f4121b6c9fabd856f5b476cffe8df4"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-storage-domain/lib/index.js",
+      "sha256": "a54f7664d2f64fe04a08c7058ca5bff4fc69ed6a0d30c2bc11561b620698ef16"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-commands/lib/index.js",
+      "sha256": "88909a0915e4e3b2148c72a912987c3e29ba025b5dea589a0f4543040dc34750"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-attachment/lib/index.js",
+      "sha256": "9cd6c01a6cca9431f789be334afdfe4f5cf647224bb394cc0215056796520f58"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-goal/lib/index.js",
+      "sha256": "8ec52107ead3d31f4d8ca95894c851046a2cbbd1b2033a0ea22fedf17c043ae4"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-skill/lib/index.js",
+      "sha256": "4b88621be4e7ff09b05c175fc6dcb67e77a22e5c5570e3aa603338b2937ea791"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-jobs-local/lib/index.js",
+      "sha256": "cecdc8a766f62b28999ffff574008d34a39e276d91c4cc648f10ccb18afbed34"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-jobs/lib/index.js",
+      "sha256": "7a7531c2fb1897603fdf0ec78ae9cef63f6a32688b1023168fbe9d8f782e2887"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-token-meter/lib/index.js",
+      "sha256": "b76a27f84d1f733c4a760e36fcc0491f807b32d51055703feb0fed1643cc2e05"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subagent/lib/index.js",
+      "sha256": "9a9572e70fffdb100deb63326167f32bbf63016ce49c0017495dabcb95b44168"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-util-time/lib/index.js",
+      "sha256": "9730c7bc2fe11c1f8a5b1a558e3872039fe6f5ab4fbb279c63de70a8d476b18a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-chunked-list/lib/index.js",
+      "sha256": "30285ec550e8fd1d7507913333ef9f2138b0ca8f2fd033a73dace80cf95b1957"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subagent-spawn-in-process/lib/index.js",
+      "sha256": "249df2c7bdc046c1dd7149acbb40e604eabcba28a7e07ffa4226c2a03f0a3aaa"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subagent-fork-in-process/lib/index.js",
+      "sha256": "2ce7fff41b6e0f634087ccd1a11a9e1538e7619b1fb936cb990ea3a11564cb99"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-ptc-runtime-node/lib/index.js",
+      "sha256": "e2d31fe1292e11f79080f65f69af24d7d288dfe8fb11948a5194051189c29d8d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-ptc-runtime/lib/index.js",
+      "sha256": "a09ee10c5cbd1f30662324aa5929b23f54cbd955098701fcf90d6252e06987a8"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subprocess-local/lib/index.js",
+      "sha256": "2964d94d6aa735f79e5cd5f54035a9d73b371e8060dda7e3bf666593428c04f4"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subprocess-local/lib/runner-launch-B2zsQ1Dz.js",
+      "sha256": "6df08adc4a27f278878a5f4cde8b551b51e647b922ac7d6591fd62d272ced153"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subprocess-local/lib/output.js",
+      "sha256": "4f77ef6da608d36df168c99177e9b527e7145df1418845eba567635e64a4c2a3"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-lazy-require/lib/index.js",
+      "sha256": "eab2f914e4b5f54b2a1af5998eecd52f1b737146db44881ef51fb5e501e1faeb"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subprocess/lib/index.js",
+      "sha256": "0ea9e95a73639f9e69b48aa48f373f34881adffa2ee2ac2acd4702728da9592b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-http-proxy/lib/index.js",
+      "sha256": "5310861bc89788ea24be82a3b323e34cbd42b9e6214e2a179b2e6f92a8758cd5"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subprocess/lib/control.js",
+      "sha256": "4afd0f7d7a7054b6fc8d727ea3f76731a78c9a972ddb6d5d2eef81cac4ffee3a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-win32-process/lib/index.js",
+      "sha256": "622bc3a9e97c46e784fe41c9a0a8535da2808019e4ac3f66d17cdad70c9ac0c9"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-sandbox-local/lib/index.js",
+      "sha256": "be6e1107871cf8d94c040090b13c405bc833822e2f51ed5280e93eececf762be"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/node-addon-system/lib/index.js",
+      "sha256": "a0f04e2990b6fff091d6776c41e56dac8c630a37b944632e743fa8f2ee9c4813"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-sandbox-windows-acl/lib/index.js",
+      "sha256": "83379e9c6e8bb725d0ed48ad086fc666bfe151c8c1a345e29e3da5b998aa4fd8"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-sandbox-windows-acl/lib/types-Cl_DXjhk.js",
+      "sha256": "0bb3a34508785bdc34626542f9358d398fd9f60fdaf4b48201dfdff2122f25fc"
+    },
+    {
+      "path": "node_modules/yaml/dist/index.js",
+      "sha256": "2d58984e0ae80de4acbd8f009fab332f5ce77d9e1a5f138a3058a0ada6567fb9"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/composer.js",
+      "sha256": "509c0bdb4cef641cc784c130b6cc2b350752f6841798daa1a13cbcaf4fc74c46"
+    },
+    {
+      "path": "node_modules/yaml/dist/doc/directives.js",
+      "sha256": "8f02c3c03571e377e33680b68027d4336234d7a6da3d8c6a8b7f1183c1c428ff"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/identity.js",
+      "sha256": "1a7cb042ae725ff68d05dc503efbbecbe65281f18b23dfc23f12d1749a440cfe"
+    },
+    {
+      "path": "node_modules/yaml/dist/visit.js",
+      "sha256": "a757e3b924af184b25e2386d1678b1fe341805a516ebf9bccee219b47aebd5e7"
+    },
+    {
+      "path": "node_modules/yaml/dist/doc/Document.js",
+      "sha256": "9bc1c9a56de3902d554e77193125b6aadcfaec743073b3417b22c95a8f7d7923"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/Alias.js",
+      "sha256": "139f5fbb3e7727a9cea89e16b2518f9ffe2e3a37cfb46717e60d23da7d6e739e"
+    },
+    {
+      "path": "node_modules/yaml/dist/doc/anchors.js",
+      "sha256": "ea9a479b1e98d88235ffa6736d0405e2119e9dde7b5249b72185488ab2527261"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/Node.js",
+      "sha256": "b57b42071f7ebab633626858656ec5187617f2290c272e87edc57467ef591215"
+    },
+    {
+      "path": "node_modules/yaml/dist/doc/applyReviver.js",
+      "sha256": "7271668f41f264e4b9aeb184629cfd11c510b401c5a797fa7194d17a9652976e"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/toJS.js",
+      "sha256": "34de93bb4e16abbf317210a7bd1b062ed20acb028cd8395b69b591f433e277b6"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/Collection.js",
+      "sha256": "e2d3ffdc9a997774602e72b296fba641558bc7355c9f12a3ee0502fb1e541306"
+    },
+    {
+      "path": "node_modules/yaml/dist/doc/createNode.js",
+      "sha256": "a39d14026d4cc6ff8d76d90db30c41facc26a146ebed30783bcf28e40b5caa65"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/Scalar.js",
+      "sha256": "616ac0f6a0a5a6565307a4bb4443691b0dd019c03d6bb8777353750bd3459487"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/Pair.js",
+      "sha256": "d5dad67916ba0e864a892da63265a062c45c15a191349ef50a540f2ddbae93e5"
+    },
+    {
+      "path": "node_modules/yaml/dist/stringify/stringifyPair.js",
+      "sha256": "bc03ae533d85bf9122e87c0a256c841ae7fbf063499bc3034d49fd9f7b200659"
+    },
+    {
+      "path": "node_modules/yaml/dist/stringify/stringify.js",
+      "sha256": "38efb5bc5553e98fee58c825a88131c59184368d8689e3e6f43c652a06e9c167"
+    },
+    {
+      "path": "node_modules/yaml/dist/stringify/stringifyComment.js",
+      "sha256": "490bff57104b7cfdb1893f14528610bb4d0a63c29b314e122233cf308cf96662"
+    },
+    {
+      "path": "node_modules/yaml/dist/stringify/stringifyString.js",
+      "sha256": "4113b71a9c4c087a197f71452794a6acb9929111f569c973ff4efe7caee8f777"
+    },
+    {
+      "path": "node_modules/yaml/dist/stringify/foldFlowLines.js",
+      "sha256": "7819679e80222b80c564ea4a9cf3145fa4d5e28a6cfbac248283ac55b0249761"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/addPairToJSMap.js",
+      "sha256": "e4977864d75c1fdbf7fc78c9f4329406e153deccfff090fd812dae2b27e6c2c2"
+    },
+    {
+      "path": "node_modules/yaml/dist/log.js",
+      "sha256": "f6ccc3593357801851aa1023b202f842733043ac3b25773048d836f89de8108d"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/merge.js",
+      "sha256": "9c85b5e026e4369a96f3f7b5bc6c05da102dfa2968950b17986201cfe0be542c"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/Schema.js",
+      "sha256": "d3b1bc956a766e2489c36114366f3b3f89762a257ae05ff6271ee3fc8c2a9bf5"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/common/map.js",
+      "sha256": "769207eaa56e34c113da10cdc22da845f92b4080ff2b921a72847a38d3ac03d8"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/YAMLMap.js",
+      "sha256": "d140cfc5aa8d28737bd3c993d977d5a10ab81efe221e36708ac45b3cf18f5dce"
+    },
+    {
+      "path": "node_modules/yaml/dist/stringify/stringifyCollection.js",
+      "sha256": "b55fd3b6e3f1346bbcd1fcdc48a59c089b7a4b0e6fac2b46846f7828f9488600"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/common/seq.js",
+      "sha256": "51fc0e8bfc63d1d9c7c66b0370a069bb33e0dad865080ff76802803597b9909a"
+    },
+    {
+      "path": "node_modules/yaml/dist/nodes/YAMLSeq.js",
+      "sha256": "9f89417f3cba5f22a4436f67a9ff9dce627344b5874d2ed7957ff9acffb030e4"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/common/string.js",
+      "sha256": "51d0b3aafab2ffa4ad9d86656a3b92c4b4824d0a8806423882ea5f92a1bf8d11"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/tags.js",
+      "sha256": "dba2f42d4dbe8cc8b13f662fd97d253da2da5567e71c47115305efede5a888f2"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/common/null.js",
+      "sha256": "f5d5f694ea3a42ef136e0fbcc674dfd7aa0a3da2b8d62183fb750166a12e52bb"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/core/bool.js",
+      "sha256": "9fa696b1efc38cf8c73a398f30d9f9841658aa5afd0b7a6b0822947c3991ba7a"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/core/float.js",
+      "sha256": "139e3964f0e626ad3741500faf51d855ff98eafa2d9e7523cac06260e4515382"
+    },
+    {
+      "path": "node_modules/yaml/dist/stringify/stringifyNumber.js",
+      "sha256": "26a1980d34a21a80704d356d475a0187a24ebcbeb37a2e3b149d4d791bb65598"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/core/int.js",
+      "sha256": "f0e474254f6877d5dd23bb57017980931ab333a7eaa3d33872247a80d11f754d"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/core/schema.js",
+      "sha256": "481d7c64817b40090d519fb65bd83730dadd4c6baec1440b9bf85d29e52c046e"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/json/schema.js",
+      "sha256": "9efdd848455f6e0621feb13f3eb762453cb02b09d5e04b6501163cfb26af27ed"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/binary.js",
+      "sha256": "15d7b0b8516c8190b191ec9a0adaab16808d09751ef534d7829512944072011f"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/omap.js",
+      "sha256": "3174270cd59c0f0e3ffd73b3b44c4de679efd5c681325b7aac8e0935d547bee8"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/pairs.js",
+      "sha256": "46ba76da72ad65a6202358c486c6a3084ab7c48a8eb5be60d241d9e198c5a9b5"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/schema.js",
+      "sha256": "a7320808484dc6d04817b33b2d09b65ead7ffc1c672ab54e068a80972b17702e"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/bool.js",
+      "sha256": "80a0046224dac3437f22e3b27b0180e1aad82277ab2fee4769094c6d12d67b6f"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/float.js",
+      "sha256": "a90c44db83152e4d902d46f667737dac90aa86b401abdefe89371ac3bd03abfe"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/int.js",
+      "sha256": "5ff72b08fecc3a924d4a76658a304859db5edb4fadf8893ee837aa06bba60a52"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/set.js",
+      "sha256": "e4553b0cbde79090884908f44bb3b4afd04935fc23656a1b87ec1af87f24427a"
+    },
+    {
+      "path": "node_modules/yaml/dist/schema/yaml-1.1/timestamp.js",
+      "sha256": "b157c946dc1b8854aadc4e7994b268ec8afe6d916721cb3580e0752c7d15a5f7"
+    },
+    {
+      "path": "node_modules/yaml/dist/stringify/stringifyDocument.js",
+      "sha256": "dd5ba1813a16b62955c466bce8d1c16254e90b36d688f863c508dc8fe38f2afe"
+    },
+    {
+      "path": "node_modules/yaml/dist/errors.js",
+      "sha256": "c389d9c448193ce1bcb9641f5eda62cbe56467b2104357d2fc8dd86df88cb07b"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/compose-doc.js",
+      "sha256": "0f388537747b5c1a241639413f17fc2b5f831451b5017d6902e46db6842a5fe4"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/compose-node.js",
+      "sha256": "86562c85e4e5737d28b24aae2030b97bc9b672e1f2de5da9e4d25c4571e4345c"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/compose-collection.js",
+      "sha256": "a7db11a1a7987d6412df8adbbb85ccd4370171f82265703b2b6af2d13c45d646"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/resolve-block-map.js",
+      "sha256": "dcfada448c8fc532ebba96d6788a4b41bb015fc5e697a9544ff429b9c4e4c70a"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/resolve-props.js",
+      "sha256": "0b49c6af0145c309883dbf24d1a00260c0c090412be10aaa301de126dad15983"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/util-contains-newline.js",
+      "sha256": "60182618fc9fa669e74ab74f4231c15b5d24bc52ab0a419684bb827a00d69be6"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/util-flow-indent-check.js",
+      "sha256": "c7c0c9837a1f828de19eb3ee0947dff39c4f69222c762aed9fa2fe14fc46ee3e"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/util-map-includes.js",
+      "sha256": "0330dc34072cb499493176b293228631ca8ebaaaddcdc0e63b02bf24f6a25c2d"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/resolve-block-seq.js",
+      "sha256": "18f54a39d73b600ebbd74a343e6671d0d08423f125bd86963b72dc24d6261911"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/resolve-flow-collection.js",
+      "sha256": "242470b54c0deba1507babba2e879f3005ed2ee3bd53a36affb6ecf82fddd375"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/resolve-end.js",
+      "sha256": "532bf56299183e75bb7c20db75321367c28393b66ecb8ffd540faedd9817f116"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/compose-scalar.js",
+      "sha256": "37920472755bdaa76399b6d33872f0015ae1fd9ba7faa031c03d501aa8c3e903"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/resolve-block-scalar.js",
+      "sha256": "af562e2e3cd7ee7b3cb9342984177f6b5c77de73121e87695db3ff635e12d152"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/resolve-flow-scalar.js",
+      "sha256": "13bcd9d37afd4ffec4b1b3bc9ae1ecc2cff97e7f7c91b5f58b71c99ddd526b05"
+    },
+    {
+      "path": "node_modules/yaml/dist/compose/util-empty-scalar-position.js",
+      "sha256": "460516395ef7e961d5248e047ee6d52084f279b76e8af9f3c2bac92da1c7d656"
+    },
+    {
+      "path": "node_modules/yaml/dist/parse/cst.js",
+      "sha256": "acc25760d010068844f36f4aefc7fe6f5f6048fd7f8fcc29d4290e154819d1a4"
+    },
+    {
+      "path": "node_modules/yaml/dist/parse/cst-scalar.js",
+      "sha256": "2f72b634348b04b395408ac427fb4f8ee67432244c327561d4b755a28a783b34"
+    },
+    {
+      "path": "node_modules/yaml/dist/parse/cst-stringify.js",
+      "sha256": "4d14a7a286cff9c1a578ab15839388ea76f77ae79293db25b235394bcc377b51"
+    },
+    {
+      "path": "node_modules/yaml/dist/parse/cst-visit.js",
+      "sha256": "525535fc05841407420be6505804c74d873eb3aaa9319679896f7a24a474ca01"
+    },
+    {
+      "path": "node_modules/yaml/dist/parse/lexer.js",
+      "sha256": "cb30a2c4628e270ee810530217f3f7bb0f2730ab89f8fbaf1f8a73ccd1883cf5"
+    },
+    {
+      "path": "node_modules/yaml/dist/parse/line-counter.js",
+      "sha256": "ddfd11ca2cdd42d36bc6c3090a31c21e6bbcc90bf3498bf6aacfbb30c5d79436"
+    },
+    {
+      "path": "node_modules/yaml/dist/parse/parser.js",
+      "sha256": "0adc5ffa51ffa4c0ceed1f80efa8b188d10f58c7b9389a6d46bc861e6bff34e1"
+    },
+    {
+      "path": "node_modules/yaml/dist/public-api.js",
+      "sha256": "9b318ac7b3a3751127c74f59dd1dd209230a70ca116000348b82faae189f72f0"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-bash-sandbox/lib/index.js",
+      "sha256": "0f788f99113ba7411eb33af71cdafabd07b73cf012c1715c819e03f3f77f342d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-bash-local/lib/index.js",
+      "sha256": "6d9b4426b8455198b79de398f57c0f5693e7292411059b66d5ac5eba608b59cb"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-shell/lib/index.js",
+      "sha256": "6c5aa32fda2d92ef827d949480fd32cb4867f811ce06e875e70c59ab2c9261b1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-shell-env/lib/index.js",
+      "sha256": "82b1e6663968307a387fd7f300ff9db5e3c1ff707b32953da82c3dfa12024364"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-home-paths/lib/index.js",
+      "sha256": "9877a6117c5def69b61fae12f70a7a7400894a9dc4a9f7069ce4cc58aeb66e9d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web/lib/index.js",
+      "sha256": "994d4809416c9efbd5890ab81e41cf2e10427395cab3d42139d80881909f4e2a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-user-questions/lib/index.js",
+      "sha256": "e1c51afac2e31be8593c6426976e5f31dbe2a709b85ae1ea43ed406146f54265"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-subagent/lib/model-selection-settings.js",
+      "sha256": "c0fcbd2ff5efa182802c892209460b271489e3b363c6afd1b62321507657d2d8"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-preset-registry/lib/index.js",
+      "sha256": "95edcc66175a87091ba90fe0809246821df470bf960e1cfd725b5ca6baaf4f07"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-app-boot/lib/index.js",
+      "sha256": "5135179ac810e4f626f32ec3bdc3293dc7d2028e8aa92e5e0c006f1a33b78e76"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/cordis-plugin-group/lib/index.js",
+      "sha256": "68f178f2836fafb52b3959aa71ae90aecd321c3f9a189d9f686233fcb000e419"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-launch-environment/lib/index.js",
+      "sha256": "6aab33b43d6caa4ee483f7d796a17afb400fca02b7a259fb55d486626e6bb7f0"
+    },
+    {
+      "path": "node_modules/semver/index.js",
+      "sha256": "4b3e57d3d40e29e0706002eba113d09f35aea593578376bbeec83b777b9912ab"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-atomic-write/lib/index.js",
+      "sha256": "872d7c1e6e9b267775199bdd3632870f82780d0a5ba047febc93fde94fde53f7"
+    },
+    {
+      "path": "node_modules/resolve.exports/dist/index.mjs",
+      "sha256": "f1148b3213175419722964e7deb0f38fc9f0564dd9280b87545ce68ebd1203b1"
+    },
+    {
+      "path": "node_modules/semver/internal/re.js",
+      "sha256": "5833262888e2b5d843a69193f83c05e374818dbe55379b497819b5bf58e48cd8"
+    },
+    {
+      "path": "node_modules/semver/internal/constants.js",
+      "sha256": "38a112baf27ceca0260082ff26ac2fd7a9861cab1af12dd65e720277f68e6ce9"
+    },
+    {
+      "path": "node_modules/semver/internal/debug.js",
+      "sha256": "8a9f420572260f3cf944463b5090d62a60f0730589dc23a7ec4ca25e2ee41bb3"
+    },
+    {
+      "path": "node_modules/semver/classes/semver.js",
+      "sha256": "813b2c185512d30c9b931c2fed8140889d9d7490ceeeedc370da30337dc8ca57"
+    },
+    {
+      "path": "node_modules/semver/internal/parse-options.js",
+      "sha256": "fdf51d0de8d5442c35a997ef58cd530d239ce206f961d14c5121354451b01d01"
+    },
+    {
+      "path": "node_modules/semver/internal/identifiers.js",
+      "sha256": "b4916b09dc7869ae0eb05e71c855c942a3a7365f7e6e89185d59a9e45a2451d7"
+    },
+    {
+      "path": "node_modules/semver/functions/parse.js",
+      "sha256": "29a69e15b6d02fe381d573f861881a89590e9d0f0f0ca740c5f85eaf0234c4ad"
+    },
+    {
+      "path": "node_modules/semver/functions/valid.js",
+      "sha256": "0de7ea736cb7807179d46dfac09c830a9338e02b6a07db12d7040cde2def6025"
+    },
+    {
+      "path": "node_modules/semver/functions/clean.js",
+      "sha256": "4eadb0892844cf3ae295121a86163a66c73f89acd1b7f0b114ec115b4539512f"
+    },
+    {
+      "path": "node_modules/semver/functions/inc.js",
+      "sha256": "952069fc8690b7d3af0fe9d55f7c54fe2ac067b48c5e74f6a54f9ce19a334493"
+    },
+    {
+      "path": "node_modules/semver/functions/diff.js",
+      "sha256": "7a11fd39b987cdf06c65e928cb1aca49bec583feb86fb5c8fe47a6fd61d7de31"
+    },
+    {
+      "path": "node_modules/semver/functions/major.js",
+      "sha256": "5c678480d882f511200fed2c16ec3847dfedb08a1d70328dc2f031d35d825276"
+    },
+    {
+      "path": "node_modules/semver/functions/minor.js",
+      "sha256": "1b051794f1713adec2a236517196691687c35f82e0b596ff3316a78b3cc10ae6"
+    },
+    {
+      "path": "node_modules/semver/functions/patch.js",
+      "sha256": "f02d3c1b059fe3d96ce124886f7eef321d381a95638fd3c4a8d5ccd8e76ffadd"
+    },
+    {
+      "path": "node_modules/semver/functions/prerelease.js",
+      "sha256": "baedbf503d5610ad041bfb56071efa48feb331ca278295c399537d35d3ffb593"
+    },
+    {
+      "path": "node_modules/semver/functions/compare.js",
+      "sha256": "d404b5aa48aaddc8a654c5da8fb7d4443404b7948589b21ac4b045d1cee4e34c"
+    },
+    {
+      "path": "node_modules/semver/functions/rcompare.js",
+      "sha256": "84fa5e88adf08d15c993cac8cdec6d1a65045b7e95a9c55184230a7f807f4dc0"
+    },
+    {
+      "path": "node_modules/semver/functions/compare-loose.js",
+      "sha256": "07b6a3a1db0a5210ceb784c1708bd4679f3a94fc73a9c9eb349349e7070a6f78"
+    },
+    {
+      "path": "node_modules/semver/functions/compare-build.js",
+      "sha256": "5ab651d5b40af289bd85c645a92b6d8cfe1a986dc413c797cfcc8d623d7c844c"
+    },
+    {
+      "path": "node_modules/semver/functions/sort.js",
+      "sha256": "c2fe2d3ed0be8a4e9de8f02abdfd5d9c0d3bcc510d88e87af84185592882c4b8"
+    },
+    {
+      "path": "node_modules/semver/functions/rsort.js",
+      "sha256": "6ec659ce3b6c2b173c719286caab04409adba046c0917874ec3b5e36ddfbc7e3"
+    },
+    {
+      "path": "node_modules/semver/functions/gt.js",
+      "sha256": "135523704aa48cd98834dd170ee9f74f0e68043b379f32d021db11e6304c5c93"
+    },
+    {
+      "path": "node_modules/semver/functions/lt.js",
+      "sha256": "1c897a9bc849320e2e9dc0f6c09555c01ee3ddf30734515d717b88ad7740ea25"
+    },
+    {
+      "path": "node_modules/semver/functions/eq.js",
+      "sha256": "b6e30a7168e52723216fc163d300e2bbabf92ec0251f9ac5438bb6ccf57c8936"
+    },
+    {
+      "path": "node_modules/semver/functions/neq.js",
+      "sha256": "a662883751918822c162183b46b9e20d09489132f82686c92ab78bee67f3a127"
+    },
+    {
+      "path": "node_modules/semver/functions/gte.js",
+      "sha256": "991c5bbe48ecb210a562646872f05862ad9fc0d42186d85aa60bdc6fa323eb9d"
+    },
+    {
+      "path": "node_modules/semver/functions/lte.js",
+      "sha256": "3a8d0b1d00423f60cc7cb810b36ab77b61330831ad237dbe73eb5cecfa412800"
+    },
+    {
+      "path": "node_modules/semver/functions/cmp.js",
+      "sha256": "a63d74e87b73788e78e9ce0a4892b5333d6b809c0de88b31e4ed76cbf17f94b3"
+    },
+    {
+      "path": "node_modules/semver/functions/coerce.js",
+      "sha256": "28a251c5ab210ddf9e97551b9f37a53329fcce91f0c3943dcbc02de1a1de915a"
+    },
+    {
+      "path": "node_modules/semver/functions/truncate.js",
+      "sha256": "e145833a250311927c92f424f56498c52f1b7bb1271ce6afbf006db87773ff43"
+    },
+    {
+      "path": "node_modules/semver/classes/comparator.js",
+      "sha256": "054202956430d63d5ff4599fae09760ce465b489e4f0b5ef5ce7cc7ac21157ac"
+    },
+    {
+      "path": "node_modules/semver/classes/range.js",
+      "sha256": "a6544485aa8575aa9854c67e2caa67726815de18a482d0ceb8a1003244de3bc1"
+    },
+    {
+      "path": "node_modules/semver/internal/lrucache.js",
+      "sha256": "14d087c87da87b6f5c36fc4cdd7d2d14077874b14a68e20fce5b6138fa2ca34f"
+    },
+    {
+      "path": "node_modules/semver/functions/satisfies.js",
+      "sha256": "8cf5e122b757251671ed6c9d9680904b71cd375845853f05312e608cf2cc2946"
+    },
+    {
+      "path": "node_modules/semver/ranges/to-comparators.js",
+      "sha256": "6c5e966210cff270fa2850668aaf8460fac7759f8d99f282521ef7a78f4564e9"
+    },
+    {
+      "path": "node_modules/semver/ranges/max-satisfying.js",
+      "sha256": "e1a2c0d6144cc772cd20bbc8ecb9e8a3a4074e9172a3d8e794838b591cdeb416"
+    },
+    {
+      "path": "node_modules/semver/ranges/min-satisfying.js",
+      "sha256": "2681abf54098aa670f12826b76a6ec77a2441186ae4243afde3be8ae4908f7ca"
+    },
+    {
+      "path": "node_modules/semver/ranges/min-version.js",
+      "sha256": "fefba0a88c2bf74d5cede504b5ae50a8dc3edfd69cf0174a491e2cf3e442614b"
+    },
+    {
+      "path": "node_modules/semver/ranges/valid.js",
+      "sha256": "5ef6f995af801868925940cf8df5735d565ebabb090b068695cae65218bcd3ac"
+    },
+    {
+      "path": "node_modules/semver/ranges/outside.js",
+      "sha256": "3a2b0b23593d2f49419c06af2af75450cab103b0c25d665d48fe5bca495a21ca"
+    },
+    {
+      "path": "node_modules/semver/ranges/gtr.js",
+      "sha256": "8fadad28e36d28e93d498ac7ac20badba2a407312845eabc18e82e90a0732b19"
+    },
+    {
+      "path": "node_modules/semver/ranges/ltr.js",
+      "sha256": "e5186fcc03018acf9be6d968755d4c49727aeb0d981d179eb568ae5fbe983038"
+    },
+    {
+      "path": "node_modules/semver/ranges/intersects.js",
+      "sha256": "fe87ac5d3020010ad3ec00636dadbf0c669ff07d0f57e0a8165a8264f79a676f"
+    },
+    {
+      "path": "node_modules/semver/ranges/simplify.js",
+      "sha256": "7b78581c13322bc68ece2088685386b2a9b51c15b94d0a2063bdf2546bd41934"
+    },
+    {
+      "path": "node_modules/semver/ranges/subset.js",
+      "sha256": "ceb9eb6ed5bfc6c7ac7af7f47e5c3535444a4e66a0e2b58cdad4bd02a35d454d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-schedule/lib/index.js",
+      "sha256": "022b9f191b6ca0f4b0f26625afc49f375933068a42712c0a75e94e439d7e6d0e"
+    },
+    {
+      "path": "node_modules/@js-temporal/polyfill/dist/index.esm.js",
+      "sha256": "21f067c54fa5f532f20a8e85e3d2401a3ae1cf60d85fafea6502f621dc93b167"
+    },
+    {
+      "path": "node_modules/jsbi/dist/jsbi-cjs.js",
+      "sha256": "b952fc88337eae5d90b397da4251e207d816056ea4c574df576f17e68626dd94"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-llm/lib/types/brand.js",
+      "sha256": "6b70219e0478d3307d865309523e7e7be3f169b06c04f4eef0d49b54aaef72a2"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-api-session-controller/lib/index.js",
+      "sha256": "a9801acb577b03053c5d5a3191ff555c5f1d791d0acddec113bea4511e33b386"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-native-command/lib/index.js",
+      "sha256": "609b10dcba6fa782d5d1f9819c1afb11bfcb6ae6b23bdc28be4f87699503aba6"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-query/lib/index.js",
+      "sha256": "76ce2944e561c12f48b5e240d68cafe54ce6d667b1d20722e6939ed834489939"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-title/lib/index.js",
+      "sha256": "eb814490ca3d0aaabf8f6ddc705a031f99a98709c484c1502c5f28f101cf0eeb"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-credentials/lib/index.js",
+      "sha256": "1b6afdb04e966285e0732eb766eb0a12f3f9c0821c8caacfd192ce1ac88bee7a"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session/lib/types/fork.js",
+      "sha256": "72ca7ae2cce506eb607e565f2e6b15fc6e3c2663de8403f79e37fc3a469e34cf"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session/lib/types/repair.js",
+      "sha256": "ee2e02d4e924bf01af621c38c27e030b89eaa8e0abfdf801a6220eca95aa2038"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session/lib/types/types.js",
+      "sha256": "91723a2522999e2c8b6c455796ad699794a6f0abfcb44d9cb883edb13142ff9b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-deque/lib/index.js",
+      "sha256": "2408939cfecf325c42b1f03fef1f2ab8b964feff8418fb49a28c6f25b4a5f765"
+    },
+    {
+      "path": "node_modules/mime-types/index.js",
+      "sha256": "7de0cc894fd1d45cc9e4d0b5ad76d00aca6cb04966bed947bdfbf7d710c61c06"
+    },
+    {
+      "path": "node_modules/mime-db/index.js",
+      "sha256": "2ccebf3d525708c915c6a86ffbb68e5023d34c9bc30b6b4021db9ebbc6ca9ecc"
+    },
+    {
+      "path": "node_modules/mime-db/db.json",
+      "sha256": "96b8a5746867c832ab56743c05e46e73c9facb04879677df0b356f20496cb6cd"
+    },
+    {
+      "path": "node_modules/mime-types/mimeScore.js",
+      "sha256": "4f5d57657dc1180bd282485edf8bc95ebaecd405bdb405f4c279ab8d51374e43"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-workspace/lib/index.js",
+      "sha256": "931ca0cb10c5102066c7723690a887f0e6e8e7ab0ffdee1a782686745b0b934f"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-attachment-local/lib/index.js",
+      "sha256": "cd39685581b4573a453c6126f8ce73da0bf1257c378827ebb431d6d4064f7662"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-default-model/lib/index.js",
+      "sha256": "3685a0d4665007cfd377f6555a2a0eeea061cd9e7eb87102430771858ac0bbcb"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-api-remote-access/lib/index.js",
+      "sha256": "a912d21fcf1be495c36f797b9d37cc5671a6c3e9b1da9b0d07217db2330d4b00"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-client-file-upload/lib/index.js",
+      "sha256": "5dd5bd2d20656a1edeb1366e6b878afb04db519d2ba400135cb020ef037912fb"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-client-connection/lib/index.js",
+      "sha256": "0ebcca7583e082716f79b0b55bc1749d48269cc8db2989b043b321b57abd3684"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-credentials-local/lib/index.js",
+      "sha256": "6b4926ef62bfeb95bc3d7687b85303d739a41e813fe05ac06de50111361da069"
+    },
+    {
+      "path": "node_modules/js-yaml/index.js",
+      "sha256": "e85d524fcd45466669dfc37618284e0c53ccaaf3f4bef1e23cd25ec6c43120bc"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/loader.js",
+      "sha256": "88a97ccd655f8eb9d81af9b51ab9ddafbab9dc545337e772ba922ab062f8b72d"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/common.js",
+      "sha256": "72216ccee36a52ece3f21f2d58a679c14c1483201ef6cbbfc4a1aa9cb6d34c9c"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/exception.js",
+      "sha256": "9ef16628112beacc7497c3f3d0ab001c66c2db501f9e21fad4c30e7cd21d1d10"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/snippet.js",
+      "sha256": "c9180c66091356e16a750c07cbc21ee477d6d07e7c39b6a8622e5882cf85326d"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/schema/default.js",
+      "sha256": "1c4c9573b4c05ce47391c6bcba10401385d8d6a4d596c1c0fd1d6ea664f97ea2"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/schema/core.js",
+      "sha256": "201ffb119aad04c9397df088452e00910becab9a43a3b3a392370878646c06ad"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/schema/json.js",
+      "sha256": "b08f46efd2c45c46c6d3eaf9b05489356d80391c5f7d5094fb8ec7713e796281"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/schema/failsafe.js",
+      "sha256": "8e109fccabab5c066b66113f5d68bb74372f48bf589de39e44ed26432a98a27a"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/schema.js",
+      "sha256": "dd26a9e56d934099eb53e04f242ed1962660e4e64697c300ff5c4bc1a83165da"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type.js",
+      "sha256": "a595092ee9fb6901769201ff7e5a485ee5f501bd1519d209af93b37dd2314a32"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/str.js",
+      "sha256": "1f8725eac2dc7bed4b91610f21796ed3c057cee44b81a1ae8cc9beb9cd6c63ff"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/seq.js",
+      "sha256": "3a38b7f3242737c2e21462c42a8da1682325686cb2b30dc3630e515cf9c45522"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/map.js",
+      "sha256": "6dd30a02cabaccf71c230464537bda5785093da80cd3319ed3a6481206e2ec7d"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/null.js",
+      "sha256": "5eea804da258ba10fa736199ed0cef9d89dbb01eac1c1bd3609a79a132d1885e"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/bool.js",
+      "sha256": "cc0d255ac6c55064421c19bbea312dcb9e22aee49fa9f8461723d9fbf7a0f8b3"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/int.js",
+      "sha256": "9d428a6e6de891a52b2b5ebd2bf09f9d1f9506514aaf35c6428f0111ecf86fdb"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/float.js",
+      "sha256": "42b4d238e5d00267fe126996b912f34506d273c39725524d662626bb9e2d4e7e"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/timestamp.js",
+      "sha256": "54e2070e0319d7fa3becd426dd5bfdb822b9602bd4a3c366976cbaa2278bdb5c"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/merge.js",
+      "sha256": "4cd0343e63f3c3d7cea620cf122e3dd8f8d1c4c4105d384e8d82d35ae154d1e2"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/binary.js",
+      "sha256": "9dd6a70eb318a123fdc11a36d613419d79535b6ecf105bd865de3a5cbbb60e7c"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/omap.js",
+      "sha256": "8a865841abeb5f12a30f39f095967b6ac05ef6240e78872573fb23e8c9b5c47f"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/pairs.js",
+      "sha256": "f9eb5d2dc3cdbf7dd802e0a62b5aa2d09eedeb0509b71a247ebdad223315d6a5"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/type/set.js",
+      "sha256": "fa5b815c6334def52dae5b58193d3798f8e53558f6c7f48a643898e996333dd7"
+    },
+    {
+      "path": "node_modules/js-yaml/lib/dumper.js",
+      "sha256": "695c80b3c310ef3f6fbd232bbcd3f82464917a008c24f1e05b560f35c20116a0"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-preset/lib/index.js",
+      "sha256": "23cd2dd62ac3b27522a2d377e14b5a93f80c2189e733937dcdd02b73a6d3d1da"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-persona/lib/index.js",
+      "sha256": "1e9dd7f0dfd87cbff6486b7ca043d2e1b863a2a56b99106a4bf74831591266d5"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-instructions/lib/index.js",
+      "sha256": "4011f6e4c08228601bd4348ac78e322913142264f6e491ffdf9dcfda97393988"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-time-context/lib/index.js",
+      "sha256": "b1fe32437d4a62c35292783d652b60b5a167568cc1a3d6b67cb3712f29f9e3b3"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js",
+      "sha256": "a1215d7bcaf82c0755be48321ef6bb45075f1cb33296d6263009e9d10fd596f6"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-fs/lib/index.js",
+      "sha256": "b11d3fa50b9042019a91cc38a6abe35d74ed651374278f95e60b42734e079df1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-util-code-language/lib/index.js",
+      "sha256": "d49730fccc6eec570498d919230556a744e22d48d87182f43c2aa121ea6eb60c"
+    },
+    {
+      "path": "node_modules/diff/libesm/index.js",
+      "sha256": "b1f400fd24da44377867ede7ab847a34940423f8bbf3fc5475d8c7647759a2aa"
+    },
+    {
+      "path": "node_modules/diff/libesm/diff/base.js",
+      "sha256": "faa81734df6ea7f8034efc5572ad1bbf19c50b300fdd183baf0d7813c5eec3b2"
+    },
+    {
+      "path": "node_modules/diff/libesm/diff/character.js",
+      "sha256": "75677c2b3c5990099675493b415ce59f92f5de4709de59fa481b9fb563168deb"
+    },
+    {
+      "path": "node_modules/diff/libesm/diff/word.js",
+      "sha256": "c1d6a6c52ef517e4ea9df6d71465fa520ce677d1b4e127425e3c2d8cf14f7a22"
+    },
+    {
+      "path": "node_modules/diff/libesm/util/string.js",
+      "sha256": "0836eacdebdb30c8aba0e898f9c7a45e236d036848ccfb058f56745f5ff020d3"
+    },
+    {
+      "path": "node_modules/diff/libesm/diff/line.js",
+      "sha256": "e3ef2d8c8c3a56f6b9fb04609f545b2aae2f84a02c31c5de3201aef1b0545f90"
+    },
+    {
+      "path": "node_modules/diff/libesm/util/params.js",
+      "sha256": "bb76a1c299071b6f8314bb7195ad701af06f092c629aed8b4fef4a7474ab3759"
+    },
+    {
+      "path": "node_modules/diff/libesm/diff/sentence.js",
+      "sha256": "dad3b5952b2d8f29d8a01618580661c1757ed0bcce5e2af969b17eff613ca93b"
+    },
+    {
+      "path": "node_modules/diff/libesm/diff/css.js",
+      "sha256": "db85fa43d4e4d4bbe3707d9e575de338589deb9a4cc8243c7f15fa5e2c87724d"
+    },
+    {
+      "path": "node_modules/diff/libesm/diff/json.js",
+      "sha256": "c97ec8c04a7c4fc37a605d5863018ead1cac1c19128a7333bcb19d33fa6771b7"
+    },
+    {
+      "path": "node_modules/diff/libesm/diff/array.js",
+      "sha256": "5bcc1320c7ee74e565421a556d81ed3fdd82ff2f366e6151beebac6b425f528f"
+    },
+    {
+      "path": "node_modules/diff/libesm/patch/apply.js",
+      "sha256": "f8096efdfda914e9b85a8cb270dfb1a57f0d483656368327c89b80098955589e"
+    },
+    {
+      "path": "node_modules/diff/libesm/patch/line-endings.js",
+      "sha256": "65af590b9426800782d692a7b1923ad1d6d6bbc1c74e9863053c6cfe1d97f3f4"
+    },
+    {
+      "path": "node_modules/diff/libesm/patch/parse.js",
+      "sha256": "0d8c9a406b8ee41be2e1e6d32f7ccece5c04f6995e6f1f71d4bf4485a5c1bce9"
+    },
+    {
+      "path": "node_modules/diff/libesm/util/distance-iterator.js",
+      "sha256": "41e12ebbedb76278e3bd37ede510e009a5952897a3e748e9673b4e5c8ae660e5"
+    },
+    {
+      "path": "node_modules/diff/libesm/patch/reverse.js",
+      "sha256": "8d4e2d14cff3632a9c9a6d42d52aca16593d97812efe8c185e39094ceb7badf2"
+    },
+    {
+      "path": "node_modules/diff/libesm/patch/create.js",
+      "sha256": "f29a276d2b036858b2f6a509b1e6e147efa572d4820317ee7285d6fe4f2888de"
+    },
+    {
+      "path": "node_modules/diff/libesm/convert/dmp.js",
+      "sha256": "05bad2211249703a43f2d4250fb0e0831511a32aed763cd21890c1b5ee7032c4"
+    },
+    {
+      "path": "node_modules/diff/libesm/convert/xml.js",
+      "sha256": "c9dfceeb2ab8248f6dee37f0ce253317939fe1302ffb4483ccf777400a3ac552"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-fs-search/lib/index.js",
+      "sha256": "8d64d2e8a5310b442ae66bc0daf7d6957ec095dbe43cabd9eb208f7370e381ed"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-output-retention/lib/index.js",
+      "sha256": "de82f0000afe5b8cc846aa489ecebb589ed2fa7a1557290284bc8deae8ba9b27"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-jobs/lib/index.js",
+      "sha256": "de5707b43480ba37c8e141e6f67674978f3a46d87d58390c18eb1659bb17ec2f"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-schedule/lib/index.js",
+      "sha256": "172100bf8a53e45ce3cb8fb476bf8bdd51c208e28135ceca59897fab4edc7929"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-skill-filesystem/lib/index.js",
+      "sha256": "783214a95cc531c82567925ed0afabfdee5c091a56c4b1c1e1bce523b948ee02"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-skill/lib/index.js",
+      "sha256": "3d0aecda4e4b10ffc0404f0e1b99e31d0271018031f553c2d600e4c8e9db0ba2"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-command-goal/lib/index.js",
+      "sha256": "ba117f69b62db6ae1d8e546515f1f3309ed4a5ce246223e70315475396f9e5c1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-commands/lib/types/brand.js",
+      "sha256": "50808fed83c5cfe09b80df4165108abba0188645b9b9d39d0426b293e8f188dd"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-goal/lib/index.js",
+      "sha256": "7220fa7b5b7c95c94377ac32c6b01ecac5b4853d9dec3a48ab17d371cda63e6c"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-ask-user/lib/index.js",
+      "sha256": "1db15abff879ad09bfc64c0edaa764f5dc773d43c09fb05dea4eb44a1e274268"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-todo/lib/index.js",
+      "sha256": "6baad8bf8e53647319b408cbab0c8c13c0693f65d20b779484c4436f47a6a11b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-web/lib/index.js",
+      "sha256": "a8313d4e02c751f79d0f91dceb8dfcaa29e7c7a0299ab0d7f8db65471217b0c8"
+    },
+    {
+      "path": "node_modules/turndown/lib/turndown.cjs.js",
+      "sha256": "6c6cd6f7c7093a80c016429f3b5635bec677aba687e09e817ec387ec4cf888ee"
+    },
+    {
+      "path": "node_modules/@joplin/turndown-plugin-gfm/lib/turndown-plugin-gfm.cjs.js",
+      "sha256": "6406c82dff8fb44042be5032f2a8ead9a7d6d63a1f4482a9e7e6bd24e5fefff8"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-present/lib/index.js",
+      "sha256": "b4944a5a114ebf528542775f222125afa331c47e061b481adfcacd7e06bfb5ce"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-plan-mode/lib/index.js",
+      "sha256": "39a825b066aefe948c3bd6bdb69f229d68436c8561a7058df2184abd6c5fd552"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-compaction-basic/lib/index.js",
+      "sha256": "b7ac52f20a36430cf01a66b3a36f23a48ffdb22708d714dbe1fff541b5df4ec5"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-compaction/lib/index.js",
+      "sha256": "9db5200bd40b7d046e52308c7cbf209fd95946b22c0a7d10b0a082a992b04533"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-command-compact/lib/index.js",
+      "sha256": "ee8b2519449ad549db3c2d81d652b2b0827492b3ae1d809e8c01df3f79b6ad94"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-compaction-tool-result-pruner/lib/index.js",
+      "sha256": "e86442e9a2403c392482b9035916e5610c251d62f3581892866404d69c064254"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-subagent-control/lib/index.js",
+      "sha256": "3f64ef2df3bfc7d7f5e31607949246dc64c32bf4179b74188bc4b764e081af38"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subagent/lib/types/internal.js",
+      "sha256": "e08b14221f417b73024e62e0466ec745ab9b45ecbcdca0c302ccc800ddadca6d"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-subagent-control/lib/types/list-agents.js",
+      "sha256": "0cfb5e0e36fdd48d8fbe9f720d15760eb025d42c6e538b07808a13e7e655677f"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-subagent/lib/index.js",
+      "sha256": "de7b10aaf52b1b1616d13a831a9ece1f820b8a6302fe94667f31b6d641b2f46e"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js",
+      "sha256": "c7718bc30bcdfb33de38e2011096f2edddccba536b8891c4e6ea456a41fbf19c"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-workflow/lib/index.js",
+      "sha256": "1e46dc295ebe1b02d8aafdacd6b9f34ff2d674e3ab3c535e4429a48070249560"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-workflow/lib/index.js",
+      "sha256": "9d7ccb5238318aae82cbf6ae497f00c2b45e4afa29ed430c7b5c7e7e2cd409e4"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/index.js",
+      "sha256": "ff8b944c17ca699c7672f7f0548b29db0078aff0db9fdde6fec148d5704807bf"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/DOMImplementation.js",
+      "sha256": "5765edef2ece2b9c738dd4e10f86a06161bcaeec108260b70cc82218483aa685"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Document.js",
+      "sha256": "b1427939ffcfd70d47dbdc30cc66c5906e4a28125015815dca7e2524d1ed4ed7"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Node.js",
+      "sha256": "a6643c9c37f10ef24f2b0f405b83a0a03ecc5e9ae8482116ab601e2f607227ca"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/EventTarget.js",
+      "sha256": "551ae7cb1a4278123b9e54eb8f9f06d92756cbdc0faba5da3ab8dc14ae339ddc"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Event.js",
+      "sha256": "ba0a5cf2ab8df8b014f8229039c1afa7bc351fe727bf22a3dc755b067d362dcd"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/MouseEvent.js",
+      "sha256": "0f54a616bb41d6eb1b6e661ce12a15bc8f1a2272d9c2643b44fd2f3b34d76870"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/UIEvent.js",
+      "sha256": "48e5c4cd622ab908bcf7c3cdcb80077a6688e579ca3c0f44d55f4ae6f3958a83"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/utils.js",
+      "sha256": "2f8bb2bfe98ed6c17d7f65238cf036b3287974cd3c6374d8953855a7e94b5f5d"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/DOMException.js",
+      "sha256": "c2cfc15ca2a737f481bc69c76660db41c7d44fb93dd6c0e78972405105dac543"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/config.js",
+      "sha256": "bea733120a6cefb8900082f5c89d5b6a0319808ff699c91565c4949953994d03"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/LinkedList.js",
+      "sha256": "6742cd28eb5bd2b18494f28e1f4ed8498f273fae8005ee8c01e1f3cc9a17ec79"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NodeUtils.js",
+      "sha256": "4f1f7cacff07f5b3b3df84ac7444d92d11a219428b53a9d3e5430555f66e77fa"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NodeList.js",
+      "sha256": "71f878bb624602aa71c7ba35d2e63b376f620abdb63bfc937945830a4d541dcc"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NodeList.es6.js",
+      "sha256": "0effe3314b06eeb0f803d02ac9d65a80fd88a4a0ceb5dc339b52c3f7db740c47"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/ContainerNode.js",
+      "sha256": "c54a3996d9840859025ec53c539f15885061e15f2471cc00c1d34a1eded015e7"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Element.js",
+      "sha256": "85f33881b00c9e25dceb7b4672a300278ac070c50700cd25d564ce439764a0f5"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/xmlnames.js",
+      "sha256": "e116767010530147915957c0c5dba2a468b0c7123e6db538ccdeb4e0ab1445f8"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/attributes.js",
+      "sha256": "7f5e32a115681db37cca6f63d8d1d6c159a7414d2cccca97f360f160899e84a8"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/FilteredElementList.js",
+      "sha256": "8f54edf15d78e9d53b4334899b590fa43214dd4edc4d5342e6e4dee6b4355f9f"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/DOMTokenList.js",
+      "sha256": "d0454d191c3bd2e23fda13b0bde13cbbeb47e2fc26fa10e6b7403684b4adc59a"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/select.js",
+      "sha256": "db2616cf91a8e84a9d64415451bd9b0b9e2262d3a6e27c1aa5907b3910011178"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/ChildNode.js",
+      "sha256": "92ae1d936bbd2ca92f13445a755d63ceba56107380929dfd1e908d0ffcdd016b"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NonDocumentTypeChildNode.js",
+      "sha256": "e27ef924e8c81bd3d46c44fe8ffbb0884a40c7671c6fb2e3e768fcc642843a5f"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NamedNodeMap.js",
+      "sha256": "e31a86b5a6ae165f510a2283a392978d73584253016218cc9a48b742e45d11f0"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Text.js",
+      "sha256": "aa8d2b0ebb9e778e4b63131e5ef9b8ade4dce9678318b7b42017f0b0cd279d78"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/CharacterData.js",
+      "sha256": "4fc7f0067f4039c8eb42d4fd6a50e9e496ca32ac62ba204778ad98a71b29ae9d"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Leaf.js",
+      "sha256": "e435b102ea3ec1edf595e909050f8fc0a8bc0d60ba640d7fe0a85a0923c0a0b7"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Comment.js",
+      "sha256": "1a385f44bcca62b81f6bb316cc6eaa06d179c46be0a9e5b98bacfa94f2b2c4df"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/DocumentFragment.js",
+      "sha256": "0957b429da199b6b2133ad04186a40307bd28d2ba24b1984aca8eab75d6191ff"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/ProcessingInstruction.js",
+      "sha256": "06530301e3c3517f6c121a35ff427654e708c3e55661c3eacb44bfc20de19742"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/TreeWalker.js",
+      "sha256": "f6a7901ab4144d7df1b610230a29e1f8cc28099a2c730577bc470f77e667392c"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NodeFilter.js",
+      "sha256": "d42154c9c52579615813df149610300a5a3f278ae105cd7cd8fba38710e46272"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NodeTraversal.js",
+      "sha256": "70483ab4680b10a6476b68994599629c894050a1b6ef382e28d2294e52500e96"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NodeIterator.js",
+      "sha256": "8d9117d48dbc21de4b40d4589a1316e45b081ac08d20797cbc82b4e082306e76"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/URL.js",
+      "sha256": "b5816b7750e49eabff88e9f349c4d9306705f25db1606081176f436834a0657b"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/events.js",
+      "sha256": "19a05f2d93086ea06d306f1e91659545029f3b8a11fbcbd259f9ed36bfb847c8"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/CustomEvent.js",
+      "sha256": "247676415af6dc1a04b88cf61c718ed4239cb34caebd28400482e8f2a4105906"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/htmlelts.js",
+      "sha256": "14bcca75a3d51b8266e8f66441ecd4491b56e77fc05d8063df4f27660e24a2ff"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/CSSStyleDeclaration.js",
+      "sha256": "ec591428586976611ee2e9002d8bd879ef80a14e8f2328e6bd64bf826ab007a6"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/style_parser.js",
+      "sha256": "b41b215a146a119303d052223216207ca4cbc48a14b122eda966094a56610f10"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/URLUtils.js",
+      "sha256": "e77540e2d22b8c7ccdf4bfdb8bb7caa282b33f40985a64992734772c49460a3f"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/defineElement.js",
+      "sha256": "83eee2912d633b376692259374eac97a4449e5743126e7c4e4812ae8c2eff347"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/svg.js",
+      "sha256": "91e4de91f1adff7399733cf42f93f19518b97f56985d91cbb39f00f43e56f97d"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/MutationConstants.js",
+      "sha256": "eb1d17660729e19c81eeff9e48ada9ab369bb16a1b4306937b593685abbdb052"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/DocumentType.js",
+      "sha256": "8fa356bcde03eb1bb6bfa27f34c478c528ad1e06c509902655120f97896efdfb"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/HTMLParser.js",
+      "sha256": "8d5a4561cd1ebbcf79c4583e42e0d2e3ca1986f0387e5ee71979949c1df309b9"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Window.js",
+      "sha256": "f6c7d70978071a8cd4ba2fb19bd7e174b3815748a65128ac5d6f1a8d74fd66d2"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/Location.js",
+      "sha256": "8cc203e54c301cad5a71cf2909f3e7958b8881e88c6aa3eee5654a124f0884da"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/NavigatorID.js",
+      "sha256": "a92e43b543ab4f8434a0e62eb5b67a93b8a3ab2e0b700e5e00b99e18d0890a8f"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/WindowTimers.js",
+      "sha256": "c7887ee5685c309acf5100a6f1a0c42a01c1a2857d03cd7037537f5b360199c0"
+    },
+    {
+      "path": "node_modules/@mixmark-io/domino/lib/impl.js",
+      "sha256": "876ba022c315c97f41670b76e4c38e430f8a356ae2cb218298bd6f0df30092f9"
+    }
+  ],
+  "installedEntries": [
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js",
+      "sha256": "e64e11d4c542c8d85e70c2a810205d22ef20e8252d49fd6ea102108282178434",
+      "inventorySha256": "a1215d7bcaf82c0755be48321ef6bb45075f1cb33296d6263009e9d10fd596f6",
+      "executed": false,
+      "unchanged": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-pwsh/lib/index.js",
+      "sha256": "f74bef5d2c65b7d7ad5979be9c8d6a7505be372ac08707eb13b466e5209905bb",
+      "inventorySha256": "94c7f68c425e62c8006907b3f4fea771935321581fd2327b7ee1f0ba8d15eec1",
+      "executed": false,
+      "unchanged": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-fs/lib/index.js",
+      "sha256": "a8866836428f7af011482dfe769b9eba15073759abad69b30bc4e74e7abdaf54",
+      "inventorySha256": "b11d3fa50b9042019a91cc38a6abe35d74ed651374278f95e60b42734e079df1",
+      "executed": false,
+      "unchanged": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-instructions/lib/index.js",
+      "sha256": "3ac195f57618c21d94e461a69778aabc7c19f40502a57ed225749a4cd6e51a2d",
+      "inventorySha256": "4011f6e4c08228601bd4348ac78e322913142264f6e491ffdf9dcfda97393988",
+      "executed": false,
+      "unchanged": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web-app/cordis.patch.yml",
+      "sha256": "b184edc231c1ce61ce03b70462060ae6cc957921c7438756c8bffb8dd2c7b097",
+      "inventorySha256": "3e1f923309612ed8551141127409d662e78758e2d0d125218a3f70514417e472",
+      "executed": false,
+      "unchanged": true
+    }
+  ],
+  "isolation": {
+    "realProfileLoaded": false,
+    "realCredentialsRead": false,
+    "networkAttempts": [],
+    "filesystemAttempts": [],
+    "subprocessAttempts": [],
+    "rootsRemoved": true,
+    "filesystemReadsReal": true,
+    "filesystemBoundaryGuards": true,
+    "syntheticModelAdapter": true
+  },
+  "scenarios": [
+    {
+      "id": "STANDARD-NATIVE-READ-AND-ACTIVE-COMPOSITION",
+      "result": "passed"
+    },
+    {
+      "id": "STANDARD-ISOLATED-PLAN-REVIEW",
+      "result": "passed"
+    },
+    {
+      "id": "STANDARD-REVERT-RETAINS-PRESET",
+      "result": "passed"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "synthetic-standard-native",
+      "requests": 2,
+      "toolCalls": ["read"],
+      "persistedEvents": 19,
+      "preset": "standard"
+    },
+    {
+      "id": "synthetic-standard-plan",
+      "requests": 4,
+      "toolCalls": ["read", "exit_plan_mode", "read", "read"],
+      "persistedEvents": 35,
+      "preset": "standard"
+    },
+    {
+      "id": "synthetic-standard-restored",
+      "requests": 2,
+      "toolCalls": ["read"],
+      "persistedEvents": 19,
+      "preset": "standard"
+    }
+  ],
+  "schemas": {
+    "sha256": "1614a0b643e90e394adac31efdbcee072760dfea80719b60e5c3303731d7f744",
+    "names": [
+      "ask_user_question",
+      "bash",
+      "create_goal",
+      "edit",
+      "exit_plan_mode",
+      "get_goal",
+      "glob",
+      "grep",
+      "interrupt_agent",
+      "job_kill",
+      "job_list",
+      "job_output",
+      "list_agents",
+      "present",
+      "read",
+      "read_image",
+      "schedule_create",
+      "schedule_delete",
+      "schedule_list",
+      "schedule_update",
+      "send_message",
+      "skill",
+      "subagent",
+      "subagent_fork",
+      "todo_write",
+      "update_goal",
+      "web_fetch",
+      "web_search",
+      "workflow",
+      "write"
+    ],
+    "count": 30,
+    "allRequestsIdentical": true
+  },
+  "promptVerification": [
+    {
+      "id": "STANDARD-PERSONA-REPLACED",
+      "section": "deployment:persona-prefix",
+      "officialRenderedSha256": "f712821254922b0628c5d97576a76ab7b43f9937c2598a73d3e444c460815611",
+      "result": "passed"
+    },
+    {
+      "id": "STANDARD-PLAN-SECTION-PRESERVED",
+      "section": "plan:policy",
+      "officialRenderedSha256": "eab4c75ea563561b1b70dec5ec228564281b979f3b610ec0adacadb435c08951",
+      "result": "passed"
+    },
+    {
+      "id": "STANDARD-PERSONA-RESTORED",
+      "section": "deployment:persona-prefix",
+      "officialRenderedSha256": "f712821254922b0628c5d97576a76ab7b43f9937c2598a73d3e444c460815611",
+      "result": "passed"
+    }
+  ],
+  "testResult": {
+    "tests": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+  },
+  "calls": {
+    "syntheticModelRequests": 8,
+    "agentLoopToolCalls": 6,
+    "directToolRuntimeCalls": 0,
+    "byTool": {
+      "read": 5,
+      "exit_plan_mode": 1
+    }
+  },
+  "sourceDigests": [
+    {
+      "path": "tests/presets-host.test.mjs",
+      "sha256": "ed0af28e6f0e493e79dcf388f4bc9b2551ed0e7396ecfeb70349b1779ef60ce7"
+    },
+    {
+      "path": "tests/helpers/preset-fixture.mjs",
+      "sha256": "15c76461f481956a3b3c152def2733c6222f9d8f405c1bcb294709e16b8562fd"
+    },
+    {
+      "path": "tests/helpers/official-packages.mjs",
+      "sha256": "50ae2fb6580a69e817f3d10adff7ea86a90f46b1cbdea72b797bcfe07230033a"
+    },
+    {
+      "path": "tests/fixtures/official-preset-packages.json",
+      "sha256": "cd43b3ec481366df267c399920c9ff8162bdab566fc8237d1b6f82c720a5aa91"
+    },
+    {
+      "path": "src/host/runtime.js",
+      "sha256": "05b834cca346499ee7f8297d8d7e14ac3a42a8f11eba4f8f73a2f161aabb19bd"
+    },
+    {
+      "path": "src/host/native-instructions.js",
+      "sha256": "fc1d199b57675fdc034470a6329a4628321fd7b43667e2ca466fd5ff9c4f02b2"
+    },
+    {
+      "path": "src/host/permission-defaults.js",
+      "sha256": "22fab542099c6c7d4a7bf8bf35f6052d2ba36bd9892a8beb9f5c40b98540fc45"
+    },
+    {
+      "path": "src/host/prompt-refresh.js",
+      "sha256": "acede7bce069a7fad9a0a27877effdfedacd02e13ac41b1d58f9cd82b26182cd"
+    }
+  ],
+  "boundaries": {
+    "completeStandardPresetMounted": true,
+    "actualOfficialLoader": true,
+    "actualOfficialRegistry": true,
+    "actualAgentLoop": true,
+    "actualOfficialFilesystemRead": true,
+    "actualJsonlReadback": true,
+    "syntheticReviewAnswerer": true,
+    "minimalOrPtcExecuted": false,
+    "realDesktopExecuted": false,
+    "otherDeclaredToolsExecuted": false
+  }
+}

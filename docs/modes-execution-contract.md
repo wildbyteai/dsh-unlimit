@@ -1,6 +1,6 @@
 # 原生工具执行与计划切换合同
 
-对应 `CORE-MODES`，目标为 DSH desktop `0.2.1-rc.2`、macOS arm64。组件级回归通过 **8 项（1 个父测试、7 个场景）**；后续新增官方 AgentLoop 驱动回归通过 **7 项（1 个父测试、6 个场景）**，覆盖原生读文件、计划审阅、同批工具与下一步切换、取消及 JSONL 读回。两层证据分别保存，没有完成标准、极简、PTC、计划四模式的整体验收。
+对应 `CORE-MODES`，目标为 DSH desktop `0.2.1-rc.2`、macOS arm64。组件级回归通过 **8 项（1 个父测试、7 个场景）**；后续新增官方 AgentLoop 驱动回归通过 **7 项（1 个父测试、6 个场景）**，覆盖原生读文件、计划审阅、同批工具与下一步切换、取消及 JSONL 读回。再新增完整 standard 预设回归 **4 项（1 个父测试、3 个场景）**，经真实 Loader/Registry 绑定预设并执行读取和计划审阅。三层证据分别保存，没有完成标准、极简、PTC、计划四模式的整体验收。
 
 ## 官方接口与实际边界
 
@@ -68,11 +68,27 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 
 证据保存在 [modes-loop-acceptance.json](evidence/modes-loop-acceptance.json)，只有 `DSH_UNLIMIT_MODES_LOOP_EVIDENCE=1` 才更新。复验使用上面的两个运行环境变量，将测试路径换为 `tests/modes-loop-host.test.mjs`。执行后撤销插件适配、释放官方服务、清理临时工作区与运行时；已安装的修改入口只做摘要读回，未执行或恢复。
 
+## 完整 standard 预设隔离执行（2026-10-21）
+
+[presets-host.test.mjs](../tests/presets-host.test.mjs) 通过 [preset-fixture.mjs](../tests/helpers/preset-fixture.mjs)，以官方 YAML schema 和 patch 应用器解析未经删减的 `standard.patch.yml`，再交给真实 Loader 与 AgentPresetRegistry。没有将逐项工具挂载改称完整预设：实际保留的 revision 包含原声明的 **29 个条目**，**26 个启用条目全部 active**；macOS 的 pwsh 及两个管理工具按官方声明禁用。每个 Agent 的上级 scope 与 Registry 提供的当前 revision lease key 按对象身份比较，已绑定模块与启用条目逐项对应，无泄漏服务。
+
+Host 依赖也使用官方服务，包括调度、存储、会话控制器、子代理、技能、连接与本地凭据提供方；只把模型响应及计划人答作为明确的合成边界。连接服务不监听网络，凭据文件新建于临时根，shell、PTC 和子进程服务仅加载，未执行后端。测试以临时 `DSH_HOME`、`DSH_AGENTS_HOME`、`DSH_BUNDLED_SKILL_DIR` 和受限文件访问隔离真实资料，不改 `HOME` 或应用配置。
+
+| 场景           | 实际结果                                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 完整预设读取   | 真实 AgentLoop 调用官方 read，读取合成文件并结束；自定义正文替换官方 persona，原始 30 种工具 schema 保留。       |
+| 预设内计划审批 | 计划服务留在预设的隔离 scope；replace 前后完整官方计划段相同，明确合成人答批准后下一步退出，后续请求移除计划段。 |
+| 撤销适配       | 新会话读文件成功，自定义标记消失，官方 persona 恢复，工具 schema 与启用替换时逐项相同。                          |
+
+三个会话共 **8 次合成模型请求、6 次循环调度工具调用（read 5 次、exit_plan_mode 1 次）**；30 种 schema 在全部请求中一致。每个会话从官方 JSONL reader 重读，与内存事件逐项一致。公开证据只记录官方正文的摘要、条目和模块元数据，不附正文、凭据或临时路径。
+
+执行证据见 [presets-acceptance.json](evidence/presets-acceptance.json)，记录 535 个实际加载文件的发行摘要、原始预设摘要、源码摘要、三类越界尝试为空及临时根清理结果。复验沿用上面的两个环境变量，测试路径换为 `tests/presets-host.test.mjs`；增加 `DSH_UNLIMIT_PRESETS_EVIDENCE=1` 才生成证据。所需五个固定公开归档及校验边界见[维护流程](maintenance.md)。
+
 ## 保留差距
 
-- 本次逐项组合服务，未激活完整 standard/minimal/PTC 预设，也未读取真实用户的默认预设选择；不能把 native 工具执行等同于完整标准预设验收。
+- 完整 standard 声明、读取与计划切换已有隔离证据；其余已注册工具没有在本回归执行。minimal/PTC 完整预设和真实用户默认预设选择仍未验，不能把工具注册视为工具执行验收。
 - ToolRuntime 的呈现值是 native/ptc；极简是另一份工具组合，其原生配置关闭文本 `read`，依赖持久 shell 读取文本。本次没有启动 shell 或 PTY。
 - PTC 需要实际后端。此前隔离探针被平台 `sandbox-unavailable` 阻断；本回归未重试 PTC、未运行子进程，也未用描述性 runtime 或宿主 eval 代替执行。
-- 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复、完整预设及桌面计划 UI 仍未验证。
+- 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复、极简/PTC 完整预设及桌面计划 UI 仍未验证。
 - 合成人答没有执行真实 UI/Gateway 路由或 UI 所拥有的提问审计事件；本证据只声称已读回的 `plan/mode` Session 事件。
 - 本回归没有增加网页抓取或浏览器路径覆盖；`CORE-WEBTOOLS` 的本地页面检索和完整四模式工具能力仍需独立验收。

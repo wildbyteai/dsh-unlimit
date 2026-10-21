@@ -18,10 +18,10 @@ const within = (root, path) => {
   return p === "" || (!p.startsWith(".." + sep) && p !== ".." && !p.startsWith(sep));
 };
 
-function unpack(bytes) {
+function unpack(bytes, release = { name: TOOL_FS, integrity: SRI, entrySha256: ENTRY }) {
   assert.equal(
     "sha512-" + createHash("sha512").update(bytes).digest("base64"),
-    SRI,
+    release.integrity,
     "pinned npm SRI",
   );
   const tar = gunzipSync(bytes, { maxOutputLength: 4 * 1024 * 1024 });
@@ -48,23 +48,44 @@ function unpack(bytes) {
     files.set(name, Buffer.from(tar.subarray(offset + 512, offset + 512 + size)));
     offset += 512 + Math.ceil(size / 512) * 512;
   }
-  assert.equal(sha(files.get("package/lib/index.js")), ENTRY);
+  assert.equal(sha(files.get("package/lib/index.js")), release.entrySha256);
   const pkg = JSON.parse(files.get("package/package.json"));
-  assert.equal(pkg.name, TOOL_FS);
+  assert.equal(pkg.name, release.name);
   assert.equal(pkg.version, "0.2.1-rc.2");
   return files;
 }
 
 /** One isolated runtime per test process; no download, profile, or installed-entry execution. */
-export function officialReadRuntime(runtimeRoot, cache) {
+export function officialReadRuntime(runtimeRoot, cache, { presets = false } = {}) {
   const manifest = JSON.parse(readFileSync(join(runtimeRoot, "desktop-runtime.json"), "utf8"));
   assert.equal(manifest.release.version, "0.2.1-rc.2");
   const rows = new Map(manifest.files.map((row) => [row.path, row]));
+  const verifiedFiles = new Map();
   assert.equal(rows.get(`node_modules/${TOOL_FS}/lib/index.js`)?.sha256, ENTRY);
   const files = unpack(readFileSync(join(cache, "dsh-tool-fs-0.2.1-rc.2.tgz")));
+  const packages = new Map([[TOOL_FS, files]]);
+  if (presets) {
+    const releases = JSON.parse(
+      readFileSync(new URL("../fixtures/official-preset-packages.json", import.meta.url), "utf8"),
+    );
+    for (const release of releases) {
+      assert.equal(release.version, "0.2.1-rc.2");
+      assert.equal(
+        rows.get(`node_modules/${release.name}/lib/index.js`)?.sha256,
+        release.entrySha256,
+      );
+      const filename = `${release.name.split("/")[1]}-${release.version}.tgz`;
+      const members = unpack(readFileSync(join(cache, filename)), release);
+      for (const [path, bytes] of members) {
+        const installed = rows.get(`node_modules/${release.name}/${path.slice(8)}`);
+        if (installed) assert.equal(sha(bytes), installed.sha256, `${release.name}/${path}`);
+      }
+      packages.set(release.name, members);
+    }
+  }
   const root = realpathSync(mkdtempSync(join(tmpdir(), "dsh-unlimit-clean-runtime-")));
   const copied = [
-    TOOL_FS,
+    ...packages.keys(),
     "@deepseek-ai/cordis",
     "@deepseek-ai/cordis-plugin-loader",
     "@deepseek-ai/dsh-hmr",
@@ -79,9 +100,10 @@ export function officialReadRuntime(runtimeRoot, cache) {
     rmSync(root, { recursive: true, force: true });
   };
   try {
-    for (const [path, bytes] of files)
-      put(join(root, "node_modules", TOOL_FS, path.slice(8)), bytes);
-    for (const pkg of copied.slice(1)) {
+    for (const [name, members] of packages)
+      for (const [path, bytes] of members)
+        put(join(root, "node_modules", name, path.slice(8)), bytes);
+    for (const pkg of copied.filter((name) => !packages.has(name))) {
       const prefix = `node_modules/${pkg}/`;
       const members = manifest.files.filter((row) => row.path.startsWith(prefix));
       assert.ok(members.length > 0);
@@ -122,16 +144,21 @@ export function officialReadRuntime(runtimeRoot, cache) {
           const path = fileURLToPath(url);
           if (within(root, path)) {
             const rel = relative(root, path);
-            if (rel.startsWith(`node_modules/${TOOL_FS}/`)) {
-              const member = "package/" + relative(join(root, "node_modules", TOOL_FS), path);
-              assert.equal(sha(readFileSync(path)), sha(files.get(member)), member);
+            const archive = [...packages.keys()].find((name) =>
+              rel.startsWith(`node_modules/${name}/`),
+            );
+            if (archive) {
+              const member = "package/" + relative(join(root, "node_modules", archive), path);
+              assert.equal(sha(readFileSync(path)), sha(packages.get(archive).get(member)), member);
             } else assert.equal(sha(readFileSync(path)), rows.get(rel)?.sha256, rel);
+            verifiedFiles.set(rel, sha(readFileSync(path)));
           } else if (within(runtimeRoot, path)) {
             assert.equal(
               sha(readFileSync(path)),
               rows.get(relative(runtimeRoot, path))?.sha256,
               `official dependency: ${relative(runtimeRoot, path)}`,
             );
+            verifiedFiles.set(relative(runtimeRoot, path), sha(readFileSync(path)));
           } else throw new Error("Official fixture tried to load outside its approved runtime");
         }
         return next(url, context);
@@ -140,6 +167,7 @@ export function officialReadRuntime(runtimeRoot, cache) {
     const require = createRequire(join(runtimeRoot, "package.json"));
     return {
       root,
+      verifiedFiles,
       dispose,
       load: async (name) => import(pathToFileURL(require.resolve(name)).href),
       host: { kind: "desktop", version: "0.2.1-rc.2", supported: true, runtimeRoot: root },

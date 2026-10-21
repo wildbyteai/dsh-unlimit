@@ -34,6 +34,10 @@
 
 原生规则适配还依赖精确的事件来源和步骤时点。内存 Session 接纳成功不代表物理 JSONL 合法；升级必须运行 `native-instructions-host.test.mjs`，从落盘日志重建每次完整请求，并检验恢复、分支与取消。文件权限验收运行 `file-permissions-host.test.mjs`，不能以默认配置读回替代工具实际写入/拒绝。两项均需要显式官方运行时与可信公开归档目录；不执行摘要已变化的安装入口。
 
+完整预设升级检查使用 `presets-host.test.mjs`，从经校验的官方 YAML 经真实 Loader/AgentPresetRegistry 建立 revision。等待加载完成后，检查每个启用条目的状态、实际工具 schema 及 Agent 绑定的确切 revision；注册方法返回不代表依赖已满足。再以合成模型流驱动真实 AgentLoop 和文件读取，核对计划审阅、提示词替换/恢复与持久日志。没有执行的极简终端、PTC 后端和其他工具仍须另验。
+
+该测试需同时设置 `DSH_UNLIMIT_RUNTIME` 和 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，后者包含版本固定为 `0.2.1-rc.2` 的 `dsh-tool-fs`、`dsh-tool-bash`、`dsh-tool-pwsh`、`dsh-web-app`、`dsh-agent-instructions` 原始 npm `.tgz`，文件名为 `<包短名>-0.2.1-rc.2.tgz`。归档仅保存在忽略目录，不提交或随包分发；测试不联网获取缺失文件。换版本时应重新核实公开来源、SRI、发行库存和接口，不能只更新测试摘要使修改过的安装文件通过。
+
 ## 做最小可复验的改动
 
 先在临时目录中运行失败场景，再修对应适配器。保持原生消息来源、工具说明、模型协议和用户明确权限选择；不能用“接口存在”代替实际请求验证。确认哪些旧补丁已经由新版原生行为满足，避免重新引入历史问题。

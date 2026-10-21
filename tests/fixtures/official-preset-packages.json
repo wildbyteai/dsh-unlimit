@@ -1,0 +1,26 @@
+[
+  {
+    "name": "@deepseek-ai/dsh-tool-bash",
+    "version": "0.2.1-rc.2",
+    "integrity": "sha512-TwHTe7WTbvkcH9d5mTW8X7FviWEVbDCjfbi6bvsleFSsvPJoWCHdn14XXYlc0hOCpfVWoTxaW2bhryykh/W7+g==",
+    "entrySha256": "a1215d7bcaf82c0755be48321ef6bb45075f1cb33296d6263009e9d10fd596f6"
+  },
+  {
+    "name": "@deepseek-ai/dsh-tool-pwsh",
+    "version": "0.2.1-rc.2",
+    "integrity": "sha512-WAId/fyd7A6i78LWPy+zWTB15r9qCBdJmlOi+uzn9ZyMNG/n9QrdT6PPdcXeDU1FYgCJFJyeFnwekBSJfBDbcg==",
+    "entrySha256": "94c7f68c425e62c8006907b3f4fea771935321581fd2327b7ee1f0ba8d15eec1"
+  },
+  {
+    "name": "@deepseek-ai/dsh-web-app",
+    "version": "0.2.1-rc.2",
+    "integrity": "sha512-PCWhkSc/WJsGDnMwO1XHI1izzjyAR1nChnixQE9cmsllBwXcgauaD5NxBW5pNe8gqTn/aXZUXDm+Rng6WgXJ4Q==",
+    "entrySha256": "6662ca712368c56fb8818efa53039ef92ce215a328a76b9cdd5e1bed624a0e84"
+  },
+  {
+    "name": "@deepseek-ai/dsh-agent-instructions",
+    "version": "0.2.1-rc.2",
+    "integrity": "sha512-a1VQsocz34VvkwYMNc/zolMXrLXWIClhZ62kb3pi8hYd/8MSgjuE09YcoqX6ZmU8i4tmaroC9W1PdUEIksSgiQ==",
+    "entrySha256": "4011f6e4c08228601bd4348ac78e322913142264f6e491ffdf9dcfda97393988"
+  }
+]
