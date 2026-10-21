@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "behaviorId": "CORE-REWIND-PTC-TODOS",
-  "generatedAt": "2026-10-21T11:56:11.055Z",
+  "generatedAt": "2026-10-21T15:31:54.600Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2436,6 +2436,18 @@
     {
       "path": "node_modules/@mixmark-io/domino/lib/impl.js",
       "sha256": "876ba022c315c97f41670b76e4c38e430f8a356ae2cb218298bd6f0df30092f9"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-terminal/lib/index.js",
+      "sha256": "d89bd6e304d0904dc3cd6c9fd50085be2e5eeaf8f1444f18a4c669b6e764ecb4"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-terminal-bash/lib/index.js",
+      "sha256": "388ce251b94a919edcfb9c13f6ffc49bcd1f4caf9ee493c65b46b454786c8c8b"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-pwsh-local/lib/index.js",
+      "sha256": "8b7b57eb7f6c597caa5ee72e4dfd88cec7b5ac51e450ed3521b6b6b29306b88e"
     }
   ],
   "installedEntries": [
@@ -2550,6 +2562,7 @@
         "actualLoads": 1,
         "verifiedBeforeLoadAndAfterDispose": true
       },
+      "availableWebProgramSha256": "846a48b633f12578d20c43ba50c3d7e076044655d456b64b009597c59d9f60ba",
       "originalReadOnlySeatbeltSha256": "bd20ec0dde1b8a9e662c792110ee4134b0fc4c6e4c257e1fc35caf7c1f3c7e9c",
       "cleanup": {
         "verified": true,
@@ -2577,7 +2590,7 @@
     "physicalJsonlBytesUnchanged": true,
     "actualOfficialReaderBeforeAndAfter": true,
     "persistedEvents": 9,
-    "jsonlSha256": "59203534fe1540b1e69e3bff5ab6683cd94a8ba9381adc1b15ad830b0be8dcd8"
+    "jsonlSha256": "4e3054354bb37c5d8bcde1e91b490a29e97f40e3c65fb1dec3510a67981c8593"
   },
   "schemaNames": ["run_code"],
   "calls": {
@@ -2608,15 +2621,15 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "f019dcf29c1be847ab69d92535a1610aed23a094624082a8e6e19fb9209f22db"
+      "sha256": "ccf6d0a0b8ca7296e7395470b69865da89db22b5848a4a02ae677840e999485a"
     },
     {
       "path": "tests/helpers/ptc-process-guard.mjs",
-      "sha256": "5ca2ab682d1e1d1695fad4d2c9972e768f048f16be6bd8d9740df2f2b8c3a6a4"
+      "sha256": "42690fc6fde01990a7759c1f95bd450203198157efd392462888fd4a8a00c277"
     },
     {
       "path": "tests/helpers/official-packages.mjs",
-      "sha256": "caa96664aaaf1660054ea26b64ca647f7ec93f81ef4dce530e71d82806ec08fc"
+      "sha256": "988c36669293299dc984c7e1c56184312008631dbca0e4fc048463389946e4c8"
     },
     {
       "path": "tests/fixtures/official-preset-packages.json",

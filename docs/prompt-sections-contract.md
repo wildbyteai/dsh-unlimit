@@ -30,6 +30,14 @@
 
 另由 [plugin.test.mjs](../tests/plugin.test.mjs) 通过实际 mount 与官方事件链验证默认关闭、无标记同文、拒绝、零数据库读取、零日志写入及卸载中等待回调失效；它使用合成 Session，不替代上面的磁盘冷恢复测试。[prompt-refresh.test.mjs](../tests/prompt-refresh.test.mjs) 验证冻结对象、空节点和未知标记边界。所有记录和传输为原创合成数据，没有安装、真实配置读写或模型联网。
 
+## 完全卸载恢复的入口复核（2026-10-21）
+
+当前仍未实现完全卸载后的旧会话恢复。此次核验 0.2.1-rc.2 的 `dsh-agent-loop`、`dsh-session`、`dsh-session-persistence`、`dsh-session-persistence-jsonl` 和 `dsh-api-session-controller` 发行入口：持久存储约定为追加、不重写既有事件；`runMaintenance()` 只切换 Agent 运行阶段，不开放 turn/step；控制器没有独立的离线系统提示修复操作。没有修改已关闭日志或制造人类输入来适应这些约束。
+
+新增 `prompt-recovery-host.test.mjs` 的隔离反例：先完成一个真实官方 AgentLoop 步骤并卸载插件 scope，再在官方 `runMaintenance()` 中使用原生 `systemPrompt.project()` 产生替换、提交到一次性合成日志。内存追加可以成功，但物理 JSONL 读回的原因链明确报 `system/message does not match an open turn and step`。这个尝试只存在于测试中，损坏的合成日志随临时目录清理，产品没有引入该写法。原日志前缀不变，没有新 turn/step/人类消息或清理用模型请求。
+
+既有完全卸载反例及四协议冷恢复场景同时保持：插件仍加载时可以在下一真实步骤恢复；完全卸载后 DeepSeek 旧正文仍可能进入下一请求，新会话没有该残留。要补齐，需要经验证的宿主历史维护入口，或另一条能在合法生命周期中完成并持久验证的恢复路径；当前不能把“方法返回”或“内存正文已变”记成完成。此结论限定当前版本和已核验接口，不断言其他方案永远不可实现。
+
 ## 工具步骤与重试的协议回归
 
 [prompt-steps-host.test.mjs](../tests/prompt-steps-host.test.mjs) 通过真实 AgentLoop、ToolRuntime、官方重试执行器、四种官方协议适配器及 JSONL 读回验证。HTTP/SSE 回复、凭据、工具及全部会话均为合成数据；没有真实网络、模型、用户 profile 或安装操作。

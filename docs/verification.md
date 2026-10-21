@@ -843,3 +843,13 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 - 定向日志 `artifacts/hooks-memory-targeted.log` 为 44 通过、1 项因未设官方运行时门而明确跳过；随后带官方双环境门执行完整回归 `artifacts/hooks-memory-full.log`，1116 通过、0 失败、0 跳过。语法/来源/分层/格式、构建与离线包检查通过；原 117 项验收前五列未变。离线包 78 文件，SHA-256 `bf67b61a641a4d60a9ce3705403395d6f0c70d896a81b6de5365801b85f10637`。
 
 本批完成的是接口核查与无效配置行为修正，不把它记成 Hook/第三方记忆能力已实现。其余已实现破甲路径保持，完全卸载后提示词恢复、PTC 待办恢复等原缺口继续保留。未安装、重载、读写真实 DSH 配置或真实会话，也未改变来源、许可或第三方归属声明。
+
+## 完全卸载提示词与 PTC 待办恢复边界复验（2026-10-21）
+
+基于 `fda11e4` 工作树，用户将 Hook/第三方记忆暂缓，优先补齐这两条恢复路径。本轮没有新增产品实现，两个缺口均保留：当前核验接口未提供所需的合法维护写入路径，不能把绕过原工具边界或伪造宿主步骤当作恢复。
+
+- 提示词新增官方隔离反例：真实步骤完成、插件 scope 卸载后，`runMaintenance()` 内执行原生 `systemPrompt.project()` 替换，内存可以追加，物理 JSONL reader 却以 `system/message does not match an open turn and step` 拒绝。没有制造 turn/step/人类消息、没有清理模型请求，损坏的日志仅在一次性测试目录中存在并被清理。初次断言预期错误文字不准确，随后改为核对实际原因链；产品与原验收标准未变。原卸载残留反例及四协议驻留/冷恢复仍通过，见[合同](prompt-sections-contract.md#完全卸载恢复的入口复核2026-10-21)。
+- PTC 完整预设探针按 `env -i PATH=/usr/bin:/bin DSH_UNLIMIT_RUNTIME=<官方运行时> <bundled-node> --expose-internals scripts/probe-ptc-rewind.mjs` 复跑，仍为预期不支持。原会话/待办/JSONL 不变，无创建/归档/工具执行/模型请求/后端进程；更新[证据](evidence/ptc-rewind-acceptance.json)中的时间、当前 fixture 摘要和清理记录。SDK 的 nested 调用参数不作为维护权限，详见[合同](session-attachments-contract.md#原生-todo-语义)。
+- 使用 bundled Node v24.21.0、显式 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES` 执行 `node --expose-internals --test tests/*.test.mjs`，1117 通过、0 失败、0 跳过；日志 `artifacts/recovery-gaps-full.log`。定向日志 `artifacts/recovery-boundaries.log`。语法、来源、分层检查通过；客户端构建和离线打包通过，78 文件，SHA-256 `bf67b61a641a4d60a9ce3705403395d6f0c70d896a81b6de5365801b85f10637`，与上批相同，因为交付产品文件未改。
+
+117 项原验收前五列保持。此次只修改隔离测试、合成证据和功能清单/合同，没有 UI 变更或新增桌面验收声明；未安装、重载、请求真实模型或改动真实 DSH 配置、profile、会话。

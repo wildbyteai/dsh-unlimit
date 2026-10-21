@@ -19,6 +19,60 @@ const systemWire = (body) =>
 const owner = { version: 1, owner: "managed-prompt" };
 
 test(
+  "official maintenance cannot durably restore an idle system prompt without a real step",
+  options,
+  async (t) => {
+    const target = targets[0];
+    const f = await rewindProtocolFixture(t, runtimeRoot, target, { unloadableRuntime: true });
+    f.settings.prompt = "SYNTHETIC_IDLE_MANAGED_PROMPT";
+    const handle = await f.ctx.agents.create({
+      sessionId: "synthetic-idle-prompt-maintenance",
+      meta: { cwd: join(f.directory, "project") },
+      agentOptions: { provider: target.id, model: target.model },
+    });
+    try {
+      assert.equal((await f.follow(handle.agent, "SYNTHETIC_INPUT")).kind, "completed");
+      const before = await f.durable(handle.agent);
+      const position = before.events.findLast((event) => event.type === "step/end").data;
+      await f.unloadRuntime();
+      // Deliberately exercise a rejected candidate only in this disposable log.
+      // A successful in-memory append is not proof of a valid durable repair.
+      await assert.rejects(
+        handle.agent.runMaintenance(async () => {
+          const commits = handle.agent.systemPrompt.project("SYNTHETIC_HOST_RESTORED", {
+            inHistory: false,
+            startsSeries: true,
+          });
+          assert.ok(commits.length > 0);
+          for (const { message, intent } of commits)
+            handle.agent.session.append("system/message", { ...position, message }, intent);
+          await f.durable(handle.agent);
+        }),
+        (error) => {
+          assert.equal(error.cause?.message, "system/message does not match an open turn and step");
+          return true;
+        },
+      );
+      assert.deepEqual(
+        handle.agent.session.snapshotEvents().slice(0, before.events.length),
+        before.events,
+      );
+      assert.equal(f.captures.length, 1, "Maintenance must not issue a cleanup model request");
+      assert.equal(
+        handle.agent.session
+          .snapshotEvents()
+          .slice(before.events.length)
+          .some((event) => ["turn/start", "step/start", "user/message"].includes(event.type)),
+        false,
+        "Do not invent a native turn, step or human input to make restoration legal",
+      );
+    } finally {
+      await handle.dispose();
+    }
+  },
+);
+
+test(
   "official DeepSeek cold history can retain a managed prompt after plugin scope disposal",
   options,
   async (t) => {

@@ -73,6 +73,8 @@ bridge 仅接受精确 `event.origin === location.origin`、`event.source === �
 
 PTC 不能以空闲分支中的 `run_code` 替代上述调用：实际隔离探针虽然写入成功，但官方 reader 报 `tool/ptc-dispatch-start is outside an open turn`。0.2.1-rc.2 的公开 `tools.execute` 不创建 turn，`runMaintenance` 仅切换阶段，官方 fork 已闭合回合；当前未找到可用的独立工具回合入口。本实现没有保留该尝试，没有伪造用户输入或日志，也没有将恢复延期到下一次用户发送并声称立即完成。完整 PTC 预设的提前拒绝证据见 [ptc-rewind-acceptance.json](evidence/ptc-rewind-acceptance.json)。
 
+2026-10-21 再次核验官方工具和控制器接口：`todo_write` 只有工具注册和投影，没有独立维护写入服务。`resolveExecution(name, agent, true)` 的第三参数表示真实 PTC 子调用，不能把它当作空闲维护授权；伪造 parent 或临时把工具改呈现为 native 都会改变现有执行边界，未采用。`SessionController` 的 create/fork/prompt/cancel/queue 接口没有独立工具回合。完整 PTC 探针复跑仍为提前拒绝，原待办、事件及物理 JSONL 不变，没有创建或归档会话、工具执行、模型请求和后端进程。本项继续列缺口；继续实现需要合法维护写入/工具回合入口，不需要安装到用户正在使用的 profile 来重复确认。
+
 下一轮仍由原生 `turn/start` 清空 todo 投影，不注册重应用机制。以上是当前限定的会话任务恢复能力，不代表完整 SESSION-VIEW、真实桌面切换或任意外部任务系统已经验收。新增合成场景见 `tests/rewind-todos.test.mjs`；官方隔离场景见 `tests/sessions-host.test.mjs` 的限定恢复、持久读回、前后策略拒绝、PTC 限制、新输入及关闭取消场景；界面回执见 `tests/rewind-todo-ui.test.mjs`。具体执行结果以对应修订的验证记录为准。
 
 ## 可复验测试与边界
