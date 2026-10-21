@@ -4,7 +4,7 @@
 
 ## 发现与解码
 
-独立实现依据 [RFC 6052 §2.2–2.3](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2) 的六种布局（/32、/40、/48、/56、/64、/96）及 [RFC 7050 §3](https://www.rfc-editor.org/rfc/rfc7050.html#section-3) 的 `ipv4only.arpa` 发现规则；该域名的特殊用途见 [RFC 8880](https://datatracker.ietf.org/doc/html/rfc8880)。`src/core/nat64.js` 只解释调用者提供的 DNS 快照，没有网络、缓存或外部依赖。
+独立实现依据 [RFC 6052 §2.2–2.3](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2) 的六种布局（/32、/40、/48、/56、/64、/96）及 [RFC 7050 §3](https://www.rfc-editor.org/rfc/rfc7050.html#section-3) 的 `ipv4only.arpa` 发现规则；该域名的特殊用途见 [RFC 8880](https://datatracker.ietf.org/doc/html/rfc8880)。`src/core/nat64.js` 只解释调用者提供的 DNS 快照，没有网络、缓存或外部依赖。 地址字节转换共用本项目的 `src/core/ip-bytes.js`；规范依据、限定输入的编写过程和字节验收见 [IP 解析设计](ip-bytes-design.md)。显示地址仍由 WHATWG URL 规范化，译址布局与地区策略保持原约定。
 
 - 有效 A 答案仅含 `192.0.0.170 / 192.0.0.171` 且没有 AAAA，视为此次未发现 DNS64 前缀。
 - AAAA 必须能按标准布局解释为上述发现地址。地址出现位置不唯一时，用另一发现地址的无歧义证据消歧；仍不能确定、格式非法、记录超过 256 条、空答案或部分 AAAA 无法解释时，整个发现结果为未知。

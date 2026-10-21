@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-21T04:12:43.676562+00:00",
+  "sourceBaseCommit": "da7097ebb1d13e5986ea1518235eff4d05a4e7e1",
+  "status": "component-reimplemented-and-isolated-regression-passed",
+  "target": {
+    "desktop": "0.2.1-rc.2",
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v24.21.0"
+  },
+  "sourceDigests": [
+    {
+      "path": "src/core/ip-bytes.js",
+      "sha256": "e359891f5b67935cd7edd09913204371f606f570711b2b269fd00a9b7a347cdd"
+    },
+    {
+      "path": "src/core/country-database.js",
+      "sha256": "72f6aac880c62356dfeae73a631f178ec762a6580e2ef802d9fcb3e1e9d9d274"
+    },
+    {
+      "path": "src/core/nat64.js",
+      "sha256": "3356a4fc1e8364323b7864050bb0f71fdced05e73191fa7377986a874df5a57c"
+    },
+    {
+      "path": "tests/ip-bytes.test.mjs",
+      "sha256": "6c46d6251bf1ed6fd9f5af1da5f49b014dc30c95bba7cbe29d2c6847af9cbe37"
+    }
+  ],
+  "unit": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "ipv6CompressionIntervals": 36,
+    "ipv4TailCompressionIntervals": 21,
+    "ipv4Cases": 256
+  },
+  "referenceComparison": {
+    "oracle": "Python standard library ipaddress",
+    "seed": 20261021,
+    "comparisons": 3165,
+    "passed": 3165,
+    "failed": 0,
+    "vectorSha256": "355eed8bbe501759b0946d05ac2ca2097b1b40396a518176ae97d170f7685620",
+    "node": "v24.21.0",
+    "io": "local files only; no DNS/network"
+  },
+  "targeted": {
+    "files": [
+      "tests/ip-bytes.test.mjs",
+      "tests/country-database.test.mjs",
+      "tests/nat64.test.mjs",
+      "tests/network-scope.test.mjs"
+    ],
+    "passed": 54,
+    "failed": 0,
+    "skipped": 0
+  },
+  "initialConsumerRun": {
+    "passed": 29,
+    "failed": 1,
+    "reason": "loopback listen EPERM under default sandbox"
+  },
+  "initialFullRun": {
+    "passed": 637,
+    "failed": 1,
+    "skipped": 0,
+    "failure": "existing toolkit pre-uninstall test did not see synthetic process ready within its unchanged startup polling bound"
+  },
+  "isolatedFailureRecheck": {
+    "passed": 1,
+    "failed": 0,
+    "unchangedTest": true
+  },
+  "fullRecheck": {
+    "passed": 638,
+    "failed": 0,
+    "skipped": 0,
+    "command": "DSH_UNLIMIT_RUNTIME=<official-runtime> DSH_UNLIMIT_OFFICIAL_PACKAGES=<verified-archives> <bundled-node> --expose-internals --test tests/*.test.mjs",
+    "concurrentBuild": false,
+    "startupTimingIssueFixed": false
+  },
+  "parityBaseline": {
+    "rows": 117,
+    "firstFiveColumnsChanged": false
+  },
+  "boundaries": {
+    "syntheticDataOnly": true,
+    "realDshProfileChanged": false,
+    "installedOrReloaded": false,
+    "realExternalTargets": false,
+    "wholeProjectCleanRoomClaim": false,
+    "rightsDetermination": false
+  }
+}

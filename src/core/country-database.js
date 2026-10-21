@@ -9,10 +9,10 @@ import {
   renameSync,
   unlinkSync,
 } from "node:fs";
-import { isIP } from "node:net";
 import { isAbsolute, join, normalize, parse, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { gunzipSync } from "node:zlib";
+import { parseIpBytes } from "./ip-bytes.js";
 import { StoreError, fail } from "./validation.js";
 
 const PLAIN_BYTES = 48 * 1024 * 1024;
@@ -155,38 +155,17 @@ function directoryStat(directory) {
 }
 const identity = (stat) => `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
 
-// net.isIP provides syntax validation. Numeric conversion is deliberately local
-// and independent of third-party IP libraries, including dotted IPv6 tails.
+// The database folds mapped IPv6 into its IPv4 index; the byte parser keeps
+// the original family so imports can still validate their declared range.
 function addressOf(address) {
-  if (typeof address !== "string" || address.length > 45 || address.includes("%")) return null;
-  const originalFamily = isIP(address);
-  if (!originalFamily) return null;
+  const parsed = parseIpBytes(address);
+  if (!parsed) return null;
+  const originalFamily = parsed.family;
   let family = originalFamily;
-  let value = 0n;
-  if (family === 4) {
-    for (const octet of address.split(".")) value = (value << 8n) | BigInt(octet);
-  } else {
-    let text = address;
-    if (text.includes(".")) {
-      const colon = text.lastIndexOf(":");
-      const octets = text
-        .slice(colon + 1)
-        .split(".")
-        .map(Number);
-      text = `${text.slice(0, colon)}:${((octets[0] << 8) | octets[1]).toString(16)}:${((octets[2] << 8) | octets[3]).toString(16)}`;
-    }
-    const halves = text.split("::");
-    const left = halves[0] ? halves[0].split(":") : [];
-    const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
-    const words =
-      halves.length === 2
-        ? [...left, ...Array(8 - left.length - right.length).fill("0"), ...right]
-        : left;
-    for (const word of words) value = (value << 16n) | BigInt(`0x${word}`);
-    if (value >> 32n === 0xffffn) {
-      family = 4;
-      value &= 0xffffffffn;
-    }
+  let value = BigInt(`0x${parsed.bytes.toString("hex")}`);
+  if (family === 6 && value >> 32n === 0xffffn) {
+    family = 4;
+    value &= 0xffffffffn;
   }
   return {
     family,

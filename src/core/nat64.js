@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { parseIpBytes } from "./ip-bytes.js";
 
 const LENGTHS = [32, 40, 48, 56, 64, 96];
 const MAX_RECORDS = 256;
@@ -19,21 +20,11 @@ const unknownDiscovery = () => ({
   reason: "nat64-discovery-unknown",
 });
 function ipv6(value) {
-  if (typeof value !== "string" || value.length > 45 || value.includes("%") || isIP(value) !== 6)
-    return null;
+  const parsed = parseIpBytes(value);
+  if (parsed?.family !== 6) return null;
   // WHATWG URL canonicalizes mixed dotted/hex forms without DNS or I/O.
   const address = new URL(`http://[${value}]/`).hostname.slice(1, -1);
-  const halves = address.split("::");
-  const left = halves[0] ? halves[0].split(":") : [];
-  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
-  const words =
-    halves.length === 2
-      ? [...left, ...Array(8 - left.length - right.length).fill("0"), ...right]
-      : left;
-  const bytes = Buffer.alloc(16);
-  for (let index = 0; index < words.length; index++)
-    bytes.writeUInt16BE(parseInt(words[index], 16), index * 2);
-  return { address, bytes };
+  return { address, bytes: parsed.bytes };
 }
 const embedded = (bytes, length) => POSITIONS.get(length).map((index) => bytes[index]);
 const sentinel = (bytes) =>
