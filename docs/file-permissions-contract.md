@@ -103,22 +103,42 @@ node --expose-internals --test tests/file-permissions-host.test.mjs
 
 ## 持久 PTY 权限切换与撤销缺陷（2026-10-21）
 
-[probe-terminal-permissions.mjs](../scripts/probe-terminal-permissions.mjs) 使用完整 minimal 预设、真实 AgentLoop、TerminalRegistry、node-pty 和 Seatbelt，仅模型输出和文件内容为合成。证据见 [terminal-permissions-acceptance.json](evidence/terminal-permissions-acceptance.json)。该证据的最终结果是 `gap-confirmed`，测试断言通过表示复现稳定，不表示撤销功能已修复。
+[probe-terminal-permissions.mjs](../scripts/probe-terminal-permissions.mjs) 使用完整 minimal 预设、真实 AgentLoop、TerminalRegistry、node-pty 和 Seatbelt，仅模型输出和文件内容为合成。证据见 [terminal-permissions-acceptance.json](evidence/terminal-permissions-acceptance.json)。该历史证据的最终结果是 `gap-confirmed`，对应修复前版本 `89651a3`；测试断言通过表示复现稳定。后续修复另存新证据，不覆盖此记录，见本节之后的“插件升权终端回收”。
 
 - **原生显式权限：**workspace-write 下持久终端实际写入工作区，外目录被拒绝。终端打开时，官方 `setSandboxMode(read-only)` 抛错，既不追加权限事件，也不改变原模式。在同一 Agent 用原生 bash 执行 `exit` 后，终端注册为空，切换成功；再次调用启动新的只读 PTY，工作区内外写入都被拒绝。这条关闭→切换→重建路径已验证，不能写成原进程原地降低权限。
 - **插件全访问默认：**没有显式权限覆盖的新 Agent 在插件 fullAccess 下启动真实全访问 PTY，外目录写入成功。撤销插件后 `sandboxPolicy.resolve()` 已返回 read-only，但原 PID 的下一次外目录写入仍成功。随后用 `exit` 关闭，在相同 Agent 再调用时新建只读 PTY，外部写入才被拒绝。当前撤销只还原后续解析器，没有终止或重新约束已经启动的终端。
 - 两个场景共 4 个真实 PTY，所有退出回调与 FD 关闭、注册清理、临时根删除均检查；官方 JSONL reader 与内存完整事件一致。已有原生终端读取与状态保持探针同时复验。禁止修改官方 profile、关闭 Seatbelt、伪造成功或使用假终端。
 
-当前产品修正了能力说明、还原确认及卸载页面/回执中的提示，明确旧终端可能保留全访问；**这只是消除错误承诺，不是权限撤销修复**。自动关闭由插件扩大权限创建的终端将丢失 shell 变量/当前目录并可能中止工作；该处理方式已向用户提出选择，尚未获答复时不引入自动终止行为。不会通过关闭所有终端代替判断所有权。
+该次仅修正能力说明、还原确认及卸载提示，尚未实现权限回收。随后用户明确选择“关闭由插件扩大权限创建的终端，再完成撤销”，授权开发此行为，仍禁止操作真实 DSH。后续实现见下节；不会通过关闭所有终端代替判断所有权。
 
-复验命令与前节一致，脚本改为 `scripts/probe-terminal-permissions.mjs`。它不安装或重载插件，不访问真实 profile。未来的撤销修复需要把缺陷断言替换为真正的权限收回断言，并保留本次历史证据。
+历史复现脚本保存在提交 `89651a3`；当前同名脚本已替换为权限回收断言，写入独立的修复证据，原缺陷证据保持。它不安装或重载插件，不访问真实 profile。
 
 ## 活动终端只读清单（2026-10-21）
 
 诊断页通过 `status.terminalPermissions` 读取当前内存 Agent 目录，再按精确 Agent 对象向其保留预设的 `terminals` 服务调用 `list(owner)`。返回所属会话 ID、终端 ID 和 running/exited 状态；相同 `pty-1` 在不同会话下分别保留。没有读取终端输出、名称、MOTD、历史日志或 profile，也不返回 PID。运行控制撤销后仍可只读检查，检查过程不启用、撤销或关闭任何终端。
 
-官方快照只有身份、类型、PID 与状态，没有启动时沙箱模式及插件升权来源；当前 `startupMode`、`elevatedByPlugin` 明确为 `unknown`。不能用当前 resolve 结果、fullAccess 开关、终端 ID 或 PID 推断历史归属，不能据清单批量关闭未知来源终端。未来回收需有创建时可追溯的权限归属证据，现存未记录终端不能倒推为插件所有。
+官方快照只有身份、类型、PID 与状态，没有启动时沙箱模式及插件升权来源；当时 `startupMode`、`elevatedByPlugin` 均为 `unknown`；本批新增创建时跟踪后，仅有明确升权证据的项返回 `danger-full-access / true`，其他仍为 `unknown`。不能用当前 resolve 结果、fullAccess 开关、终端 ID 或 PID 推断历史归属，不能据清单批量关闭未知来源终端。本批回收以创建时可追溯的权限归属证据为前提，现存未记录终端不能倒推为插件所有。
 
 `available:true` 时返回 `scannedAgents`、`terminals` 和 `pendingOwners`。后者仅标记 `list(owner)` 为空但 `hasOwnerActivity(owner)` 为真的会话，不表示全部 pending spawn 的数量；有已发布终端的会话同样不能视为已清理。没有宿主接口或检查失败返回 `available:false` 和原因，不返回伪造的空清单。“运行诊断”和全局刷新都会重新读取。
 
-真实 PTY 探针在旧全访问终端撤销后仍可写的时刻检查此清单，两个活动终端均保持真实归属与未知权限，全部 Session 事件不变；随后原有缺陷仍如实复现。API 及页面验证见 [验证记录](verification.md#终端只读清单与未知权限来源2026-10-21)。此功能不收回旧权限，不替代待确认的终端关闭方案。
+真实 PTY 探针在旧全访问终端撤销后仍可写的时刻检查此清单，两个活动终端均保持真实归属与未知权限，全部 Session 事件不变；随后原有缺陷仍如实复现。API 及页面验证见 [验证记录](verification.md#终端只读清单与未知权限来源2026-10-21)。只读清单本身不收回权限；已获用户确认的撤销关闭行为见下节。
+
+## 插件升权终端回收（2026-10-21）
+
+本批实现对应 `CORE-FILES / CORE-PERMISSION / DESK-REVERT`。用户已明确允许开发“关闭由插件扩大权限创建的终端，再完成撤销”，仍未授权安装或真实配置变更。
+
+`TerminalOwnership` 对固定发行摘要核验后的官方 registry 与 Bash 后端创建入口增加内存跟踪。使用独立异步调用域关联精确 Agent、registry 和官方返回的终端 ID，只记录本插件 `fullAccess` 解析确实将原受限模式改为全访问的创建。不是根据当前开关、PID、会话 ID 字符串或当前权限猜测归属。用户显式全访问和原生已全访问不计为插件升权；不带可跟踪 registry 创建域的官方后端调用不会获得插件默认升权。
+
+撤销立即恢复权限解析并使旧回调失效，等待已经接纳的终端创建发布，再调用官方 `kill(owner,id)` 并等待关闭。创建/关闭失败如实返回；关闭失败的记录保留以便用户重试，未发布创建的清理异常持续报告，不能当成空清单成功。接口被其他所有者替换时保留外部修改，同时仍尝试关闭已记录终端。正常退出的终端无需重复关闭。
+
+[新证据](evidence/terminal-revocation-acceptance.json) 使用完整 minimal 预设、真实 AgentLoop、官方 registry/后端、node-pty 和 Seatbelt：
+
+- 显式 workspace-write 终端仍需先关闭才能切只读，原生约束保持。
+- 插件默认升权的终端确实可写临时工作区外；撤销返回前注册已清空，未改 Session 事件。
+- 同时存在的只读终端和用户显式全访问终端保持；显式终端撤销后仍能执行其原先授权的写入。
+- 官方 Bash 首次调用已关闭终端会报告 `unknown PTY session` 并清空其缓存，该命令没有执行。下一次调用启动真实只读终端，外目录写入被内核拒绝。插件不自动重放任何用户命令。
+- 真实进程退出、FD、注册表、临时文件和宿主入口前后摘要均检查；不安装、不重载、不读写真实 profile。
+
+另有并发创建/关闭等待、交错显式授权、关闭失败与重试、外部接口冲突、旧回调及创建清理异常的隔离回归。页面以真实组件和合成记录核对“全访问/已确认·还原时关闭”及“未知/未确认”，卸载/还原文案披露变量和当前目录丢失。
+
+**仍未覆盖：**旧版未记录来源的终端自动回收、任意其他后端、脱离官方终端进程树的后台进程、Windows 和真实桌面。关闭 fullAccess 设置本身不等于执行“还原”；需明确执行还原以回收已启动终端。不能将这项修复扩写为所有 shell 后代或所有权限均已收回。

@@ -7,6 +7,7 @@ import {
 import { connectPromptRecovery, connectPromptRefresh } from "./prompt-refresh.js";
 import { PermissionDefaults } from "./permission-defaults.js";
 import { NativeInstructions } from "./native-instructions.js";
+import { TerminalOwnership } from "./terminal-ownership.js";
 
 function replace(target, key, create) {
   const descriptor = Object.getOwnPropertyDescriptor(target, key);
@@ -53,6 +54,7 @@ export class DesktopRuntime {
     this.host = host;
     this.permissionDefaults = new PermissionDefaults(ctx, store, host);
     this.nativeInstructions = new NativeInstructions(this);
+    this.terminalOwnership = new TerminalOwnership(this);
     if (
       host.supported &&
       host.runtimeRoot &&
@@ -103,8 +105,12 @@ export class DesktopRuntime {
             agentId: owner.id,
             terminalId: snapshot.sessionId,
             state: snapshot.status.kind,
-            startupMode: "unknown",
-            elevatedByPlugin: "unknown",
+            startupMode: this.terminalOwnership.owns(registry, owner, snapshot.sessionId)
+              ? "danger-full-access"
+              : "unknown",
+            elevatedByPlugin: this.terminalOwnership.owns(registry, owner, snapshot.sessionId)
+              ? true
+              : "unknown",
           });
         }
         if (snapshots.length === 0 && registry.hasOwnerActivity(owner))
@@ -116,7 +122,7 @@ export class DesktopRuntime {
         terminals,
         pendingOwners,
         detail:
-          "仅检查当前活动会话的终端注册，不读取输出或历史。宿主未记录启动权限及本插件升权来源，未知不等于已收回；本检查不会关闭终端。",
+          "仅检查当前活动会话，不读取输出或历史。仅标记本次加载后由本插件实际升权创建的终端；未记录的来源保持未知。本检查不会关闭终端。",
       };
     } catch (error) {
       return { available: false, detail: `终端检查失败：${error.message}` };
@@ -153,7 +159,7 @@ export class DesktopRuntime {
           ? "此宿主版本尚未通过适配验收"
           : present
             ? id === "sandbox"
-              ? "还原只恢复权限接口；已开启的持久终端保留启动权限，须关闭后重建才能使用恢复后的权限。"
+              ? "还原会关闭本次加载后由本插件升权创建的持久终端并等待退出；未记录来源或用户显式授权的终端不关闭。"
               : "运行时适配；还原后恢复宿主接口"
             : "当前组合未提供所需接口",
       })),
@@ -162,6 +168,7 @@ export class DesktopRuntime {
     ];
   }
   apply() {
+    if (this.terminalOwnership.closing) throw new Error("正在关闭升权终端，请等待还原完成");
     if (this.enabled) return;
     if (!this.host.supported) throw new Error("此宿主版本未通过适配检查，拒绝应用");
     const required = this.capabilities().filter(
@@ -171,9 +178,12 @@ export class DesktopRuntime {
       throw new Error(`缺少核心能力：${required.map((cap) => cap.label).join("、")}`);
     const runtime = this;
     const pending = [];
+    let terminalTrackingStarted = false;
     const activation = {};
     this.#activation = activation;
     try {
+      this.terminalOwnership.apply();
+      terminalTrackingStarted = true;
       this.permissionDefaults.apply();
       pending.push(() => this.permissionDefaults.revert());
       pending.push(
@@ -246,9 +256,17 @@ export class DesktopRuntime {
               const request = args[0] ?? {};
               const explicit =
                 request.mode ?? (request.session && this.overrideOf?.(request.session));
-              return config.enabled && config.fullAccess && explicit === undefined
-                ? { ...resolved, mode: "danger-full-access" }
-                : resolved;
+              if (
+                config.enabled &&
+                config.fullAccess &&
+                explicit === undefined &&
+                runtime.terminalOwnership.allowsElevation()
+              ) {
+                if (resolved.mode !== "danger-full-access")
+                  runtime.terminalOwnership.elevated(request.session);
+                return { ...resolved, mode: "danger-full-access" };
+              }
+              return resolved;
             },
         ),
       );
@@ -275,6 +293,13 @@ export class DesktopRuntime {
     } catch (error) {
       this.#activation = null;
       const cleanup = [];
+      if (terminalTrackingStarted) {
+        try {
+          this.terminalOwnership.revert();
+        } catch (failure) {
+          cleanup.push(failure);
+        }
+      }
       for (const undo of pending.reverse()) {
         try {
           undo();
@@ -291,8 +316,14 @@ export class DesktopRuntime {
     this.#activation = null;
     // A failed durable restoration remains retryable after other wrappers have
     // already been released by a previous revert attempt.
-    if (this.#undo.length === 0) return this.nativeInstructions.revert();
     const errors = [];
+    if (this.#undo.length === 0) {
+      try {
+        this.nativeInstructions.revert();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
     for (const undo of this.#undo.reverse()) {
       try {
         undo();
@@ -301,6 +332,22 @@ export class DesktopRuntime {
       }
     }
     this.#undo = [];
+    let closing;
+    try {
+      closing = this.terminalOwnership.revert();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (closing)
+      return closing.then(
+        () => {
+          if (errors.length)
+            throw new AggregateError(errors, "部分接口已被其他插件变更，请检查状态");
+        },
+        (error) => {
+          throw new AggregateError([...errors, error], "运行控制撤销未完成");
+        },
+      );
     if (errors.length) throw new AggregateError(errors, "部分接口已被其他插件变更，请检查状态");
   }
 }

@@ -820,3 +820,15 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 - 全量官方隔离回归 1106 通过、0 失败、0 跳过；194 项语法、55 模块分层检查通过。构建与离线包通过，77 文件，SHA-256 `fe39a98e6cfb58f5c64b7923259b7f96b2c2a2731809e8e919da4ba09b9852eb`。日志为 `artifacts/terminal-inventory-targeted.log`、`artifacts/terminal-inventory-host.log`、`artifacts/terminal-inventory-full.log`。
 
 自动关闭方案仍待用户选择，此批没有增加终止行为；现存终端的未知升权归属不能据当前状态补造。117 项原验收目标、来源与许可说明保留，未安装、重载或修改真实 DSH 配置/profile/会话。
+
+## 撤销时回收插件升权终端（2026-10-21）
+
+基于 `89651a3abae5b29a131d11715044a4a50cec4718` 的工作树，用户明确选择关闭插件升权创建的终端后再完成撤销。本批实现创建时归属记录与等待关闭，并更新原对照项 `CORE-FILES / DESK-REVERT / DESK-STATUS` 的状态，未修改原 117 项验收前五列。
+
+- 实际修复：官方终端创建调用与本插件权限解析通过异步作用域关联，只有原受限默认确实被本插件提升才记录。还原先停止后续升权，再等待创建发布和官方关闭；失败不报完成。用户显式全访问、旧终端和未知来源不误关。无需读取终端输出或改写 Session。
+- 官方 minimal/AgentLoop/PTY 验收确认：升权终端撤销前实际可写外目录，撤销后注册消失；显式全访问与无关只读终端仍在；下一新建终端被实际只读沙箱拒绝外目录写入。首次 Bash 调用旧缓存会报错并清缓存，下一次才新建；没有自动重放命令。[修复证据](evidence/terminal-revocation-acceptance.json) 绑定最终探针与产品源码摘要，修复前 [缺陷证据](evidence/terminal-permissions-acceptance.json) 保持原文件。
+- 初次执行因隔离副本缺少官方后端懒加载的 `@xterm/headless` 而失败；仅向临时干净运行时加入发行清单逐文件摘要核验的该依赖后重跑，未改宿主、未放宽网络或进程守卫。最终真实 PTY 的退出/FD/注册清理、临时根移除及禁止操作检查全部通过。探针日志 `artifacts/terminal-revocation-probe.log`。
+- 并发创建/关闭等待、交错显式权限、关闭失败重试、旧回调、外部接口冲突及未发布创建清理失败均有隔离回归。全量官方模块测试 1113 通过、0 失败、0 跳过，日志 `artifacts/terminal-revocation-full.log`。语法/来源/分层检查通过；证据 JSON 格式检查初次失败，格式化后复验。构建、离线打包和 117 项基线检查通过，包含 78 文件，SHA-256 `9160ff34b55272611a73cd8ddbbf931bcbb28f3753e6f6af7c1056fa7124cc64`。
+- 1280×720 真实组件与完整合成工作台实际渲染，分别核对已确认/未知归属和还原确认，随后取消，无 console error。截图 `artifacts/terminal-revocation-preview.png`、`artifacts/terminal-revocation-confirmation.png`。组件预览退出 0；完整 npm 预览 Ctrl+C 返回 130，随后确认两端口均关闭。页面全部关闭。
+
+此修复只计入有创建证据的官方终端撤销，不能推定任意后台后代进程、未知旧终端、Windows 或真实桌面均通过。Hook/第三方记忆、完全卸载后的旧提示词恢复、PTC 待办立即恢复等原缺口保持。真实来源、NOTICE、UNLICENSED、DB-IP 归属及原验收基线不变。本批未安装、重载、发起真实模型请求或修改真实 DSH 配置/profile/会话。

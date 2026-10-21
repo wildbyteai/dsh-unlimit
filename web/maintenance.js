@@ -8,7 +8,7 @@ const esc = (value) =>
 const promptHistoryNotice =
   "卸载不会批量恢复旧会话中的提示词。恢复依赖插件仍已加载，并在该会话下一次正常请求前执行；卸载后旧会话可能保留原正文，建议新建会话。本操作不会自动发送消息。";
 const terminalPermissionNotice =
-  "卸载前请关闭已有持久终端。还原权限接口不会收回这些终端的启动权限，它们仍可能保留全访问；在终端执行 exit 或通过宿主关闭后，新终端才使用恢复后的权限。";
+  "还原时会关闭本次加载后由插件升权创建的持久终端，丢失其中的变量与当前目录状态，并等待关闭完成。用户显式授权或来源未知的终端不会自动关闭；旧版未记录来源的全访问终端仍需手工关闭。关闭后首次 bash 调用可能报告旧终端已失效，下一次调用新建终端；不会自动重放命令。";
 
 export function terminalStatusSection(status) {
   if (status?.available !== true)
@@ -16,7 +16,7 @@ export function terminalStatusSection(status) {
   const rows = status.terminals
     .map(
       (row) =>
-        `<tr><td>${esc(row.agentId)}</td><td>${esc(row.terminalId)}</td><td>${row.state === "running" ? "运行中" : "进程已退出，注册待清理"}</td><td>未知</td><td>未确认</td></tr>`,
+        `<tr><td>${esc(row.agentId)}</td><td>${esc(row.terminalId)}</td><td>${row.state === "running" ? "运行中" : "进程已退出，注册待清理"}</td><td>${row.startupMode === "danger-full-access" ? "全访问" : "未知"}</td><td>${row.elevatedByPlugin === true ? "已确认 · 还原时关闭" : "未确认"}</td></tr>`,
     )
     .join("");
   return `<p class="info">已检查 ${esc(status.scannedAgents)} 个活动会话。${esc(status.detail)}</p>${rows ? `<div class="tablewrap"><table><thead><tr><th>所属会话</th><th>终端</th><th>运行状态</th><th>启动权限</th><th>由本插件升权</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="info">此次检查没有发现已发布的终端注册。</p>'}${status.pendingOwners.length ? `<div class="note">以下会话仍有未发布的终端活动，不能视为已清理：${status.pendingOwners.map(esc).join("、")}</div>` : ""}`;

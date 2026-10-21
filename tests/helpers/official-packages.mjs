@@ -93,6 +93,9 @@ export function officialReadRuntime(runtimeRoot, cache, { presets = false } = {}
     "@deepseek-ai/dsh-agent-loop",
     "@deepseek-ai/dsh-tool-todo",
     "@deepseek-ai/dsh-tools",
+    "@deepseek-ai/dsh-terminal",
+    "@deepseek-ai/dsh-terminal-bash",
+    "@xterm/headless",
   ];
   const put = (path, bytes) => {
     mkdirSync(dirname(path), { recursive: true });

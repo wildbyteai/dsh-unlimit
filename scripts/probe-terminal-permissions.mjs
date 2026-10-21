@@ -1,4 +1,4 @@
-// Explicit synthetic PTY permission lifecycle characterization; never loads a real profile.
+// Explicit synthetic PTY permission revocation acceptance; never loads a real profile.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -33,6 +33,7 @@ const sourceDigests = [
   "tests/helpers/official-packages.mjs",
   "tests/fixtures/official-preset-packages.json",
   "src/host/runtime.js",
+  "src/host/terminal-ownership.js",
   "src/host/native-instructions.js",
   "src/host/permission-defaults.js",
   "src/host/prompt-refresh.js",
@@ -47,7 +48,7 @@ let completedEvidence;
 process.once("exit", (code) => {
   if (code === 0 && completedEvidence !== undefined)
     writeFileSync(
-      join(presetProjectRoot, "docs/evidence/terminal-permissions-acceptance.json"),
+      join(presetProjectRoot, "docs/evidence/terminal-revocation-acceptance.json"),
       completedEvidence,
     );
 });
@@ -75,7 +76,7 @@ test(
         .map((row) => row.data.message);
     };
     const expectWrite = (result, path, allowed) => {
-      assert.equal(existsSync(path), allowed);
+      assert.equal(existsSync(path), allowed, text([result]));
       if (allowed) assert.equal(readFileSync(path, "utf8"), value);
       assert.equal(result.isError, false, "A completed command is not a failed tool invocation");
       assert.ok(
@@ -136,7 +137,7 @@ test(
         },
       );
       await t.test(
-        "plugin full-access default is retained by an already running PTY after revert",
+        "revert closes only tracked plugin-elevated PTYs and waits for registry cleanup",
         async () => {
           f.settings.fullAccess = true;
           const agent = await f.create("permission-full-default", []);
@@ -148,35 +149,68 @@ test(
             true,
           );
           const launch = f.minimalTerminal.evidence().launches.at(-1);
-          f.adapter.revert();
-          assert.equal(f.ctx.sandboxPolicy.resolve({ session: agent.session }).mode, "read-only");
-          // This reproduces a gap, not desired revocation behavior. Keep the actual
-          // disk effect visible; do not claim that restoring resolve() changes a PTY.
-          const after = join(outside, "default-after-revert.txt");
-          expectWrite((await run(agent, [bash(command(after))], []))[0], after, true);
-          assert.equal(f.minimalTerminal.evidence().launches.at(-1).pid, launch.pid);
+          const explicit = await f.create("permission-explicit-full", []);
+          f.api.sandboxPolicy.setSandboxMode(explicit.session, "danger-full-access");
+          expectWrite(
+            (
+              await run(
+                explicit,
+                [bash(command(join(outside, "explicit-before.txt")))],
+                ["danger-full-access"],
+              )
+            )[0],
+            join(outside, "explicit-before.txt"),
+            true,
+          );
           const beforeInspection = agent.session.snapshotEvents();
           const inventory = f.adapter.terminalStatus();
           assert.equal(inventory.available, true);
-          assert.equal(inventory.scannedAgents, 2);
-          assert.equal(inventory.terminals.length, 2);
-          assert.deepEqual(inventory.pendingOwners, []);
+          assert.equal(inventory.scannedAgents, 3);
+          assert.equal(inventory.terminals.length, 3);
           const observed = inventory.terminals.find((row) => row.agentId === agent.id);
           assert.equal(observed.terminalId, launch.sessionId);
-          assert.equal(observed.state, "running");
-          assert.equal(observed.startupMode, "unknown");
-          assert.equal(observed.elevatedByPlugin, "unknown");
+          assert.equal(observed.startupMode, "danger-full-access");
+          assert.equal(observed.elevatedByPlugin, true);
+          assert.equal(
+            inventory.terminals.find((row) => row.agentId === explicit.id).elevatedByPlugin,
+            "unknown",
+          );
+          await f.adapter.revert();
+          assert.equal(f.ctx.sandboxPolicy.resolve({ session: agent.session }).mode, "read-only");
+          const registry = f.ctx.agentPresets.serviceFor(agent, "terminals");
+          assert.deepEqual(registry.list(agent), []);
           assert.deepEqual(agent.session.snapshotEvents(), beforeInspection);
-          await run(agent, [bash("exit")], []);
+          const afterInventory = f.adapter.terminalStatus();
+          assert.equal(
+            afterInventory.terminals.length,
+            2,
+            "Unrelated and explicitly authorized PTYs stay open",
+          );
+          const after = join(outside, "default-after-revert.txt");
+          // Official persistent bash holds a cached id. Its next call reports the
+          // closed session and resets that cache; never replay user commands here.
+          const reset = (await run(agent, [bash(command(after))], []))[0];
+          assert.equal(reset.isError, true);
+          assert.match(text([reset]), /unknown PTY session/);
+          assert.equal(existsSync(after), false);
           const next = join(outside, "default-after-close.txt");
           expectWrite((await run(agent, [bash(command(next))], ["read-only"]))[0], next, false);
+          const explicitAfter = join(outside, "explicit-after.txt");
+          expectWrite(
+            (await run(explicit, [bash(command(explicitAfter))], []))[0],
+            explicitAfter,
+            true,
+          );
           scenarios.push({
-            id: "revert-leaves-existing-pty-permission",
-            result: "gap-confirmed",
+            id: "revert-closes-plugin-elevated-pty",
+            result: "passed",
             resolvedModeAfterRevert: "read-only",
-            actualOldPtyOutsideWrite: true,
-            samePtyRetained: true,
-            afterClosingNewPtyOutsideWrite: false,
+            pluginRegistryEmptyAfterAwaitedRevert: true,
+            explicitFullAccessPtyPreserved: true,
+            unownedReadOnlyPtyPreserved: true,
+            firstCachedCallReportsClosedWithoutExecuting: true,
+            newPtyOutsideWrite: false,
+            sessionEventsUnchangedByRevert: true,
             officialPersistenceReadbackEqual: true,
             terminalInventory: inventory,
           });
@@ -190,7 +224,7 @@ test(
     const evidence = {
       schemaVersion: 1,
       behaviorIds: ["CORE-FILES", "CORE-PERMISSION", "DESK-REVERT"],
-      developmentBasis: "d707c33ebcdb97bb181576e0255c8a2d9c702b17",
+      developmentBasis: "89651a3abae5b29a131d11715044a4a50cec4718 plus working tree",
       generatedAt: new Date().toISOString(),
       node: process.version,
       platform: { os: process.platform, arch: process.arch },
@@ -203,7 +237,7 @@ test(
         realDesktopExecuted: false,
         realProfileModified: false,
       },
-      result: "gap-confirmed",
+      result: "passed",
     };
     completedEvidence =
       JSON.stringify(evidence, null, 2)

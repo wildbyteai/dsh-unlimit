@@ -240,3 +240,27 @@ test("terminal inventory displays unknown permissions, pending activity and unav
     /此次检查没有发现已发布的终端注册/,
   );
 });
+
+test("confirmed terminal attribution and close-on-revert consequences are visible", async () => {
+  const { terminalStatusSection } = await import("../web/maintenance.js");
+  assert.match(
+    terminalStatusSection({
+      available: true,
+      scannedAgents: 1,
+      pendingOwners: [],
+      terminals: [
+        {
+          agentId: "synthetic",
+          terminalId: "pty-1",
+          state: "running",
+          startupMode: "danger-full-access",
+          elevatedByPlugin: true,
+        },
+      ],
+      detail: "Creation-time evidence",
+    }),
+    /全访问<\/td><td>已确认 · 还原时关闭/,
+  );
+  assert.match(uninstallConfirmation, /丢失其中的变量与当前目录状态/);
+  assert.match(uninstallConfirmation, /来源未知的终端不会自动关闭/);
+});

@@ -787,7 +787,7 @@ export async function presetFixture(
     ctx.systemPrompt.assemble({ agent, scope: api.scope.scopeOf(agent.ctx) });
   const unadaptedAssembly = async (agent) => {
     const enabled = adapter.enabled;
-    if (enabled) adapter.revert();
+    if (enabled) await adapter.revert();
     try {
       return await assemble(agent);
     } finally {
