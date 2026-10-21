@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "behaviorId": "CORE-MODES",
   "slice": "complete-minimal-image-path",
-  "generatedAt": "2026-10-21T07:15:11.960Z",
+  "generatedAt": "2026-10-21T07:35:43.203Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2217,7 +2217,7 @@
       "toolCalls": ["read_image"],
       "persistedEvents": 17,
       "physicalJsonlRows": 18,
-      "jsonlSha256": "4d396d2111b6816c1d56e15a50d0d89ade2ad3f77b78fdd3dbe8f31f72a5ab6e",
+      "jsonlSha256": "19bdfcd875b486771c82c7246efe11e25cdf413187b4dedbca519d3563cd335e",
       "actualJsonlToolResultsEqual": true,
       "preset": "minimal"
     },
@@ -2227,7 +2227,7 @@
       "toolCalls": ["read_image"],
       "persistedEvents": 17,
       "physicalJsonlRows": 18,
-      "jsonlSha256": "59ba15a2cafaf494857bd8ef91fe485c90cc8a63244065ec3bd2a09df4714028",
+      "jsonlSha256": "1d84c2c9a528e33ef71fb0c0a044341388ea02d978a5aaa6a625e42b714e7b1d",
       "actualJsonlToolResultsEqual": true,
       "preset": "minimal"
     },
@@ -2237,7 +2237,7 @@
       "toolCalls": ["read_image"],
       "persistedEvents": 17,
       "physicalJsonlRows": 18,
-      "jsonlSha256": "fd79836bcd78a559f1a1d1e693c5e4388ac0a8f3df8cc6bed02c3d4db9269b2c",
+      "jsonlSha256": "fb16c6d6c6d96858f78a9d8ac61d8edf12e35d5e1732261344c9f04d76770ad9",
       "actualJsonlToolResultsEqual": true,
       "preset": "minimal"
     }
@@ -2368,7 +2368,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "13a89058495dcd9936cc6fa67fa6119aa70dba7c771d571bbe894c4c71281d62"
+      "sha256": "f019dcf29c1be847ab69d92535a1610aed23a094624082a8e6e19fb9209f22db"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

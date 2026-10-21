@@ -145,13 +145,29 @@ node-pty 的 native `pty.fork` 不经过 `child_process.spawn`，验收不能只
 
 实际观察到两个 child close 和控制管道 close，官方 subprocess、controlChannels、PTC live 集合均为 0；两处临时根删除，禁止操作和清理错误均为空。共享夹具的清理改为逐项执行并汇总错误，避免一次持久化失败阻断其余服务处置；失败仍使验收失败，不能生成通过记录。
 
-执行命令与组件探针一致，将末尾脚本改为 `scripts/probe-ptc-preset.mjs`；该脚本独立于普通 `npm test`，需要明确允许实际官方子进程的执行入口。它验证真实 PTC 工具读取和适配撤销，不代表真实模型决策、桌面嵌入、所有工具执行、PTC 计划切换或默认 Host 资源配置完成验收。官方只读 Seatbelt 原样保留，也不声称它提供内核读取/网络白名单或追踪逃离进程组的后代。极简模式的持久终端文本路径仍缺。
+执行命令与组件探针一致，将末尾脚本改为 `scripts/probe-ptc-preset.mjs`；该脚本独立于普通 `npm test`，需要明确允许实际官方子进程的执行入口。它验证真实 PTC 工具读取和适配撤销，不代表真实模型决策、桌面嵌入、所有工具执行、PTC 计划切换或默认 Host 资源配置完成验收。官方只读 Seatbelt 原样保留，也不声称它提供内核读取/网络白名单或追踪逃离进程组的后代。该批次尚缺的极简持久终端文本路径，后续执行结果见下一节。
+
+## 完整 minimal 持久终端文本路径（2026-10-21）
+
+[独立探针](../scripts/probe-minimal-terminal.mjs) 在完整原始 minimal 预设下执行真实 `AgentLoop → bash → TerminalRegistry → LocalSubprocessRuntime → node-pty`。保留 9 个叶条目、7 个活动项和 `bash/read_image` 两个原生 schema；没有添加普通 `read` 或全局 terminals/planMode 服务。468 个实际导入官方文件与发行清单一致，另外分别核验并记录 `pty.node`、`spawn-helper` 与 `system.node` 的字节数和摘要。
+
+两个场景及父测试共 **3 项通过，进程 exit 0**：replace 后用 bash 内建 `read/printf` 读取原创临时文本，第二次调用读取同一 shell 变量；revert 后在另一会话重新读取，确认变量初始未设置、PID 不同。合计 **5 次合成模型请求、3 次 AgentLoop bash 调用、2 次真实 PTY 启动**，没有直接调用 ToolRuntime。实际返回包括官方退出码标记；persona 替换/恢复、schema、后续请求中的完整工具消息均逐项核对。
+
+官方 JSONL reader 的完整事件与内存一致；另从磁盘独立解析两份 JSONL，核对所有 call/result。两会话分别有 22/17 个 Session 事件，物理文件有 23/18 行（包括文件头），不把行数当作事件数。公开记录保留合成输出和文件摘要，临时 HOME、工作目录与运行时路径已替换，见 [执行证据](evidence/minimal-terminal-acceptance.json)。
+
+测试 Node 从 `env -i` 启动，仅此进程及其子进程使用临时 HOME/TMPDIR；历史文件为 `/dev/null`、容量为 0。native fork 的每个参数、完整环境、helper、cwd、PID/FD 都从真实调用核对。官方 `--noprofile --norc -i` 和只读 Seatbelt 保持原样，官方初始化仍执行 `stty -echo`。实际 `/bin/ps` 检查返回未经改写的系统元数据供官方实现使用，证据只保留本次所属树；不保存无关行或 argv。
+
+终端归属通过实际 owner 的 retained preset registry 核对，ID 按该 registry 的真实计数检查，不假设全局唯一。官方清理对本次两个 shell 先发 SIGTERM，宽限后发 SIGKILL；native onexit 均触发，FD 确认 EBADF，owner list、registry sessions、subprocess live/terminals/controlChannels 全部为 0。三份 native/helper 文件在处置后重新核验，临时根删除，禁止操作与清理错误为空。只读 Seatbelt 并非内核读取/网络白名单，测试也不声称拦截 shell 的所有子进程或跟踪逃离进程组的后代。
+
+前两次诊断均不算通过：第一次断言漏掉官方退出码标记；第二次功能断言与清理通过，但测试结束后的取消监听器访问了已释放的会话，进程 exit 1。两次临时根和终端均已清理。最终修复移除已完成会话的取消监听器，且通过记录延迟到整个测试进程 exit 0 才写入；未更改官方输出、预设或沙箱。
+
+复验使用上述白名单环境命令，将脚本替换为 `scripts/probe-minimal-terminal.mjs`，并通过正式允许实际子进程的执行入口运行。它独立于普通 `npm test`，只覆盖固定发行/macOS arm64 下的合成文本任务与适配撤销；没有执行真实模型、桌面安装、压力压缩、其他命令或写入拒绝验收。
 
 ## 保留差距
 
-- 完整 standard 的读取/计划切换、minimal 图片及完整 PTC 的 AgentLoop 读取/replace/revert 已有隔离证据。极简文本任务、真实用户默认预设选择及桌面仍未验，不能把已执行的读取扩展为全部工具能力。
-- ToolRuntime 的呈现值是 native/ptc；极简是另一份工具组合，其原生配置关闭文本 `read`，依赖持久 shell 读取文本。本次没有启动 shell 或 PTY。
+- 完整 standard 的读取/计划切换、minimal 图片/持久终端文本及完整 PTC 的 AgentLoop 读取/replace/revert 已有隔离证据。真实用户默认预设选择及桌面仍未验，不能把已执行的读取扩展为全部工具能力。
+- ToolRuntime 的呈现值是 native/ptc；极简是另一份工具组合，其原生配置关闭文本 `read`，依赖持久 shell 读取文本。已验证固定合成内建命令，不代表任意命令、写入拒绝或终端 UI 通过。
 - PTC 组件探针与完整预设读取已验证真实受限后端；PTC 内的计划切换、其他工具和桌面仍未验证，不再将旧 Node 26 的失败外推为当前环境阻碍。
-- 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复、极简文本执行及桌面计划 UI 仍未验证。
+- 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复及桌面计划 UI 仍未验证。
 - 合成人答没有执行真实 UI/Gateway 路由或 UI 所拥有的提问审计事件；本证据只声称已读回的 `plan/mode` Session 事件。
 - 本回归没有增加网页抓取或浏览器路径覆盖；`CORE-WEBTOOLS` 的本地页面检索和完整四模式工具能力仍需独立验收。

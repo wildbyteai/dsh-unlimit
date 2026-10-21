@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "behaviorId": "CORE-RESULT",
-  "generatedAt": "2026-10-21T07:15:14.310Z",
+  "generatedAt": "2026-10-21T07:35:45.546Z",
   "node": "v24.21.0",
   "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
   "patch": {
@@ -2596,7 +2596,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "13a89058495dcd9936cc6fa67fa6119aa70dba7c771d571bbe894c4c71281d62"
+      "sha256": "f019dcf29c1be847ab69d92535a1610aed23a094624082a8e6e19fb9209f22db"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

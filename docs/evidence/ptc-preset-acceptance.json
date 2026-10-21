@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "behaviorId": "CORE-MODES",
   "developmentBasis": "d455551d169c977e7cd405cea468275a91c4d6d6",
-  "generatedAt": "2026-10-21T07:13:52.697Z",
+  "generatedAt": "2026-10-21T07:35:39.745Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2787,7 +2787,7 @@
         "actualLoads": 1,
         "verifiedBeforeLoadAndAfterDispose": true
       },
-      "programSha256": "9021df89e0fbe3d63f09167e934e6821aeb3dfa27b71e327961c8b0b0390dd7f",
+      "programSha256": "69e13b54c1f094e7714b858dc7c842c4e52c9298ec69db000382166d2a67b04a",
       "originalReadOnlySeatbeltSha256": "bd20ec0dde1b8a9e662c792110ee4134b0fc4c6e4c257e1fc35caf7c1f3c7e9c",
       "cleanup": {
         "verified": true,
@@ -2872,7 +2872,7 @@
       ],
       "persistedEvents": 21,
       "physicalJsonlRows": 22,
-      "jsonlSha256": "41d625e83c13a75d1a7a47f291bc889c8e1b8d59d2b60dff19fd02a184c1c18c",
+      "jsonlSha256": "6b9255b85a83a8c3e5458d08f38b4547963a35cde348a62cd6f23c543be41986",
       "actualJsonlEventsEqual": true,
       "nextModelToolResultEqual": true
     },
@@ -2915,7 +2915,7 @@
       ],
       "persistedEvents": 21,
       "physicalJsonlRows": 22,
-      "jsonlSha256": "58528dea93ec5878f380d6e57e957309d60aef32e1a46c20830a226cca1d572d",
+      "jsonlSha256": "d249ab90be96c822740222ec9a66916e8ba89fad65bbe46e0717a80a83d88965",
       "actualJsonlEventsEqual": true,
       "nextModelToolResultEqual": true
     }
@@ -2960,7 +2960,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "13a89058495dcd9936cc6fa67fa6119aa70dba7c771d571bbe894c4c71281d62"
+      "sha256": "f019dcf29c1be847ab69d92535a1610aed23a094624082a8e6e19fb9209f22db"
     },
     {
       "path": "tests/helpers/ptc-process-guard.mjs",

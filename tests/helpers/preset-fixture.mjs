@@ -14,6 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { DesktopRuntime } from "../../src/host/runtime.js";
 import { officialReadRuntime } from "./official-packages.mjs";
 import { createPtcProcessGuard } from "./ptc-process-guard.mjs";
+import { createMinimalTerminalGuard } from "./minimal-terminal-guard.mjs";
 
 export const presetProjectRoot = fileURLToPath(new URL("../../", import.meta.url));
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -27,10 +28,17 @@ export async function presetFixture(
   t,
   selectedRoot,
   cache,
-  { permissionPresets = false, presetId = "standard", modelModalities, ptcExecution = false } = {},
+  {
+    permissionPresets = false,
+    presetId = "standard",
+    modelModalities,
+    ptcExecution = false,
+    terminalExecution = false,
+  } = {},
 ) {
   assert.ok(["standard", "minimal", "ptc"].includes(presetId));
   assert.equal(ptcExecution, presetId === "ptc", "PTC is an explicit standalone execution probe");
+  if (terminalExecution) assert.equal(presetId, "minimal");
   const marker = presetId.toUpperCase();
   const provider = `synthetic-${presetId}-offline`;
   const installedRoot = fs.realpathSync(selectedRoot);
@@ -55,6 +63,15 @@ export async function presetFixture(
     DSH_HOME: join(directory, "dsh-home"),
     DSH_AGENTS_HOME: join(directory, "agents-home"),
     DSH_BUNDLED_SKILL_DIR: join(directory, "bundled-skills"),
+    ...(terminalExecution
+      ? {
+          HOME: join(directory, "home"),
+          TMPDIR: join(directory, "tmp"),
+          HISTFILE: "/dev/null",
+          HISTSIZE: "0",
+          HISTFILESIZE: "0",
+        }
+      : {}),
   };
   const originalEnvironment = new Map(Object.keys(homes).map((key) => [key, process.env[key]]));
   const originalCwd = process.cwd();
@@ -67,6 +84,7 @@ export async function presetFixture(
     join(homes.DSH_AGENTS_HOME, "skills"),
     homes.DSH_BUNDLED_SKILL_DIR,
     join(directory, "home"),
+    ...(terminalExecution ? [join(directory, "tmp")] : []),
   ])
     fs.mkdirSync(path, { recursive: true });
   const sourceFile = join(workspace, "evidence.txt");
@@ -100,7 +118,7 @@ export async function presetFixture(
         t.mock.method(api, key, deny(`${label}.${key}`));
   syncBuiltinESMExports();
 
-  let runtime, ctx, adapter, ptc;
+  let runtime, ctx, adapter, ptc, minimalTerminal;
   const handles = [],
     fibers = [],
     errors = [],
@@ -133,6 +151,7 @@ export async function presetFixture(
         if (fiber.uid !== null) await cleanup("fiber", () => fiber.dispose());
       await cleanup("context", () => ctx?.fiber.dispose());
       await cleanup("PTC processes", () => ptc?.verifyDisposed());
+      await cleanup("minimal terminal processes", () => minimalTerminal?.verifyDisposed());
       officialLifecycleDisposed = cleanupErrors.length === 0;
       await cleanup("descriptors and installed entries", () => {
         assert.equal(directoryFsyncFds.size, 0, "All ancestor metadata handles must be closed");
@@ -169,6 +188,14 @@ export async function presetFixture(
   runtime = officialReadRuntime(installedRoot, cache, { presets: true });
   if (ptcExecution)
     ptc = createPtcProcessGuard(t, { installedRoot, runtime, workspace, forbidden });
+  if (terminalExecution)
+    minimalTerminal = createMinimalTerminalGuard(t, {
+      installedRoot,
+      runtime,
+      workspace,
+      directory,
+      forbidden,
+    });
   assert.ok(
     runtime.verifiedFiles instanceof Map,
     "Shared Loader must record every actual official import",
@@ -210,6 +237,14 @@ export async function presetFixture(
       );
     }
     const filename = resolve(path instanceof URL ? fileURLToPath(path) : String(path));
+    if (
+      !writing &&
+      minimalTerminal?.metadataPaths.includes(filename) &&
+      /^(?:stat|lstat|access|exists|realpath)(?:Sync)?(?:\.native)?$/.test(operation)
+    ) {
+      metadataReads.push({ operation, scope: "fixed-minimal-executable" });
+      return;
+    }
     if (
       !writing &&
       ptc?.metadataPaths.includes(filename) &&
@@ -550,6 +585,7 @@ export async function presetFixture(
   await mount(api.jobs);
   await mount(api.tokenMeter);
   await mount(api.subprocess);
+  minimalTerminal?.bind(ctx);
   await mount(api.sandbox);
   await mount(api.shell, { timeoutMs: 1000 });
   await mount(api.shellEnv, { dshHome: homes.DSH_HOME });
@@ -766,6 +802,7 @@ export async function presetFixture(
     unadaptedAssembly,
     dispose,
     ptc,
+    minimalTerminal,
     evidence: () => ({
       inventorySha256: digest(inventoryBytes),
       patch: { path: patchPath, sha256: digest(patchBytes) },
@@ -804,13 +841,16 @@ export async function presetFixture(
         ...(permissionPresets || presetId === "minimal"
           ? {
               metadataOnlyReads: {
-                purpose:
-                  presetId === "minimal"
+                purpose: terminalExecution
+                  ? "Official minimal PTY executable metadata and exact synthetic-root ancestor metadata"
+                  : presetId === "minimal"
                     ? "Actual attachment durability directory fsync"
                     : "Official filesystem containment identity checks and canonical temporary roots",
-                scope: permissionPresets
-                  ? "Exact synthetic-root ancestors and platform temporary-root paths only"
-                  : "Exact synthetic-root ancestors only; O_RDONLY directory handles deny content and mutation",
+                scope: terminalExecution
+                  ? "Fixed minimal executables and exact synthetic-root ancestors only; ancestor handles deny content and mutation"
+                  : permissionPresets
+                    ? "Exact synthetic-root ancestors and platform temporary-root paths only"
+                    : "Exact synthetic-root ancestors only; O_RDONLY directory handles deny content and mutation",
                 operations: metadataReads.reduce((counts, row) => {
                   const key = `${row.scope}:${row.operation}`;
                   counts[key] = (counts[key] ?? 0) + 1;
@@ -822,6 +862,14 @@ export async function presetFixture(
             }
           : {}),
         syntheticModelAdapter: true,
+        ...(minimalTerminal
+          ? {
+              minimalTerminalBackend: minimalTerminal.evidence(),
+              executableMetadataReads: structuredClone(
+                metadataReads.filter((row) => row.scope === "fixed-minimal-executable"),
+              ),
+            }
+          : {}),
         ...(ptc
           ? {
               ptcBackend: ptc.evidence(),
