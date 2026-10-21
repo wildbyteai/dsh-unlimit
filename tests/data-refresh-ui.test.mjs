@@ -148,7 +148,9 @@ function setup({ page = "reports", respond, admitted = true, bindError = false }
     progressPage() {},
     rolesPage() {},
     sessionsPage() {},
-    environmentPage() {},
+    environmentPage() {
+      return { html: `<div id="process-project">${esc(state.workspaceId)}</div>` };
+    },
     diagnosticsPage() {},
     schemas: {},
     mountedDrafts: [],
@@ -205,6 +207,23 @@ function seedUnread(ui, page = ui.state.page, workspaceId = "A") {
   ui.updates.observe(snapshot(workspaceId, 1));
   assert.equal(ui.updates.hasUnread({ workspaceId, page }), true);
 }
+
+test("environment page refreshes the active project before displaying scoped processes", async () => {
+  const ui = setup({
+    page: "environment",
+    respond(method) {
+      if (method === "workspaces.list")
+        return { activeId: "B", items: [project("A"), project("B")] };
+    },
+  });
+  await ui.render();
+  assert.equal(ui.state.workspaceId, "B");
+  assert.match(ui.node("content").innerHTML, /id="process-project">B</);
+  assert.equal(
+    ui.calls.some(({ method }) => method === "workspaces.changes"),
+    false,
+  );
+});
 
 test("late project-list response cannot replace the new project's state or read receipt", async () => {
   const pendingList = deferred();

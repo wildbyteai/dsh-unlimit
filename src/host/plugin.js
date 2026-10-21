@@ -28,6 +28,7 @@ import { ConnectionChecks } from "../core/connection-checks.js";
 import { NetworkScope } from "../core/network-scope.js";
 import { CountryDatabase } from "../core/country-database.js";
 import { WebScope } from "./web-scope.js";
+import { DesktopProcesses } from "./processes.js";
 
 export const name = "dsh-unlimit";
 export const inject = ["webServer", "connection"];
@@ -49,6 +50,7 @@ export function mount(ctx, host) {
   const repeat = new RepeatReminder(ctx, store, host);
   const readLimits = new ReadLimits(ctx, store, host);
   const admission = new DrillAdmission(store, host.dataRoot);
+  const processes = new DesktopProcesses(ctx, store, host, { toolkit, admission });
   const countryDatabase = new CountryDatabase(realpathSync(host.dataRoot));
   const networkScope = new NetworkScope(store, { database: countryDatabase, admission });
   const webScope = new WebScope(ctx, store, host, { scope: networkScope });
@@ -80,6 +82,7 @@ export function mount(ctx, host) {
     workflow,
     continuation,
     admission,
+    processes,
     connectionChecks,
     networkScope,
     webScope,
@@ -92,6 +95,7 @@ export function mount(ctx, host) {
   ctx.effect(() => async () => {
     const errors = [];
     for (const cleanup of [
+      () => processes.close(),
       () => webScope.revert(),
       () => connectionChecks.close(),
       () => networkScope.close(),

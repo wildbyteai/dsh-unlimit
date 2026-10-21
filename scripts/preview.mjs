@@ -10,6 +10,7 @@ import { Templates } from "../src/core/templates.js";
 import { Flow } from "../src/core/flow.js";
 import { WorkspaceFiles } from "../src/core/files.js";
 import { DesktopRuntime } from "../src/host/runtime.js";
+import { DesktopProcesses } from "../src/host/processes.js";
 import { RetryPolicy } from "../src/host/retry-policy.js";
 import { ReadLimits } from "../src/host/read-limits.js";
 import { HostCatalog } from "../src/host/catalog.js";
@@ -29,7 +30,15 @@ const port = Number(values.port);
 if (!Number.isInteger(port) || port < 0 || port > 65535)
   throw new Error("--port 必须是 0 到 65535 之间的整数");
 const temporary = mkdtempSync(join(tmpdir(), "dsh-unlimit-synthetic-preview-"));
-let store, toolkit, flow, server, origin, connectionChecks, countryDatabase, networkScope;
+let store,
+  toolkit,
+  flow,
+  server,
+  origin,
+  connectionChecks,
+  countryDatabase,
+  networkScope,
+  processes;
 let closing;
 async function close() {
   if (closing) return closing;
@@ -41,6 +50,7 @@ async function close() {
         })
       : Promise.resolve();
     try {
+      await processes?.close();
       await connectionChecks?.close();
       await networkScope?.close();
       countryDatabase?.close();
@@ -136,6 +146,10 @@ try {
   flow = new Flow(store);
   const skills = new SkillLibrary(join(temporary, "skills"));
   const admission = new DrillAdmission(store, temporary);
+  processes = new DesktopProcesses({ get: () => undefined }, store, hostInfo, {
+    toolkit,
+    admission,
+  });
   countryDatabase = new CountryDatabase(realpathSync(temporary));
   networkScope = new NetworkScope(store, { database: countryDatabase, admission });
   connectionChecks = new ConnectionChecks(store, { admission, scope: networkScope });
@@ -163,6 +177,7 @@ try {
     sessions: { list: () => [] },
     host: hostInfo,
     admission,
+    processes,
     connectionChecks,
     networkScope,
   });

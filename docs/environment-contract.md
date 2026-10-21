@@ -63,4 +63,25 @@
 
 已只读核对与发行库存一致的 `dsh-subprocess`、`dsh-subprocess-local`、`dsh-sandbox`、`dsh-sandbox-local`、`dsh-sandbox-policy`、`dsh-user-approval` 和 jobs 接口。官方 `sandbox.confine(argv, policy, signal)` 可配合 `subprocess.spawn` 启动精确参数进程，但 subprocess 自身不做会话权限或批准。`ApprovalService.request` 要求真实打开中的 turn；当前 Controller/UI 没有该执行上下文，不能用拼造 agent/turn 或直接 raw spawn 代替审批。安装 tool-bash 入口摘要不符，核对时使用已有固定公开归档，未执行该安装入口或读取其备份。
 
-后续适配需要在真实模型工具 `execution.agent` 中取得会话权限，走官方审批、沙箱及进程句柄；输出按 offset 读回并披露 lossy，停止只针对本插件保存的句柄并等待 done 与 waitForExit。macOS 官方进程树归属不保证收回逃离的后代。以上是接口调查，没有新增通用 start/output/stop，也没有执行命令、网络任务或真实会话。`ENV-PROCESS` 继续保留缺口。
+本次调查确认适配须在真实模型工具 `execution.agent` 中取得会话权限，走官方审批、沙箱及进程句柄；输出按 offset 读回并披露 lossy，停止只针对本插件保存的句柄并等待 done 与 waitForExit。macOS 官方进程树归属不保证收回逃离的后代。调查本身没有新增或验证通用 start/output/stop；下节记录后续实现，验证证据单独记录。
+
+## 本地工具进程接口
+
+`src/host/processes.js` 的 `DesktopProcesses` 接入官方会话策略、单次提权审批、沙箱与 subprocess。模型入口是 `unlimit_process`，action 为 `start/list/output/stop`；Controller 内部使用 `processes.*`。可信执行上下文单独传参，HTTP JSON 中的 agent、callId 或 execution 不能成为该上下文。启动必须来自宿主注册的当前 agent，已绑定项目且当前安装完成演练确认。
+
+| 操作   | 参数                                                                     | 返回                   |
+| ------ | ------------------------------------------------------------------------ | ---------------------- |
+| start  | `tool,args:string[],cwd?,timeoutMs?,sandbox_permissions?,justification?` | `{item}`               |
+| list   | UI 必填 `workspaceId`；模型取会话绑定                                    | `{items}`              |
+| output | `id,stdoutOffset?,stderrOffset?`，UI 另填 `workspaceId`                  | `{item,stdout,stderr}` |
+| stop   | `id`，UI 另填 `workspaceId`                                              | `{item,stopped}`       |
+
+`tool` 是已配置并可用的工具标识，只启动该路径和精确参数数组，不拼 shell、不搜索系统 PATH。保存路径不会启动工具；版本探测仍使用原有独立入口。参数最多 256 项、单项 32 KiB、合计 256 KiB，不接受 NUL。cwd 默认会话目录，可以指定现有绝对目录，但不会据此扩大宿主策略的写入根。审批或沙箱准备后重新核对 agent、项目绑定、路径和文件元信息，变化则拒绝启动。
+
+默认使用会话当前权限。扩大权限须成对提供 `sandbox_permissions`（`workspace-write` 或 `danger-full-access`）和非空 `justification`，调用官方审批；拒绝、取消和缺通道均不启动。受限模式必须通过官方 confine；当前会话已为 full-access 或明确获批的单次 full-access 按官方模式直接交给 subprocess。沙箱失败不自动降级。这里不另行实现网络目标过滤；通用外部工具的网络出口范围仍属于未补齐项。
+
+开始接纳后在后台运行，原工具调用结束不会自动终止；指定 `timeoutMs` 时为 50–86400000 毫秒，否则直到退出、明确停止、演练确认撤销或插件释放。未完成的审批/沙箱准备可被取消，迟到结果不会启动进程。只保存本插件创建的句柄，不接管系统进程或调用宿主全局清理。模型只能管理自己会话的记录；UI 可管理所选项目内本插件记录。记录仅保存在插件实例内存中，重载不提供历史输出恢复。
+
+每路 stdout/stderr 保留最多 64 KiB，返回 `{text,nextOffset,lossy}`；不创建输出溢出文件、不返回 PID/句柄或溢出路径。UI 手动读取保留片段并明确显示截断。元信息包含项目、会话、工具、参数、目录、模式、状态、时间与退出信息。状态包括 `preparing/running/settling/stopping`、`exited/failed/denied/stopped/timed-out`；只有命令退出和官方管理范围结束都确认后才给出终态。不能确认清理时返回 `cleanup-pending` 和错误，允许再次停止。
+
+不把 LocalEnvironment 的秘密、主机或私钥登记注入进程；使用官方 subprocess 默认环境清理。页面位于“工具与环境”，提供列表、输出、停止与手动刷新；启动仍在真实会话中完成，因为独立页面没有宿主审批轮次。缺少进程服务只禁用启动，不使其他配置页面失效。官方运行时隔离测试与实际桌面验收的区别见 [验证记录](verification.md)。

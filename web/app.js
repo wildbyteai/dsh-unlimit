@@ -4,6 +4,7 @@ import { DataUpdates } from "./data-updates.js";
 import { MemoryDrafts } from "./drafts.js";
 import { admissionPage } from "./admission.js";
 import { environmentSettings } from "./environment-settings.js";
+import { processMonitor } from "./processes.js";
 import { workflowPlans } from "./workflow-plans.js";
 import { openWorkspaceRules } from "./workspace-rules.js";
 import { openPromptPreview } from "./prompt-preview.js";
@@ -858,7 +859,7 @@ async function render() {
   let result;
   try {
     const tracked = dataPages.has(state.page);
-    if (tracked) await refreshProjects(read);
+    await refreshProjects(read);
     const context = dataContext();
     const track = tracked && state.admission?.accepted;
     const changes = async () => {
@@ -3756,9 +3757,9 @@ async function sessionsPage() {
     },
   };
 }
-async function environmentPage() {
-  await refreshStatus();
-  const localEnvironment = await environmentSettings({ api, esc, panel, toast, run });
+async function environmentPage(read = api) {
+  await refreshStatus(read);
+  const localEnvironment = await environmentSettings({ api: read, esc, panel, toast, run });
   const workspaceId = state.workspaceId;
   environmentPage.views ||= new Map();
   const view = environmentPage.views.get(workspaceId) || {
@@ -3773,7 +3774,7 @@ async function environmentPage() {
     catalogError = "";
   if (can("catalog.list")) {
     try {
-      catalog = await api("catalog.list", scopePayload);
+      catalog = await read("catalog.list", scopePayload);
     } catch (error) {
       catalogError = error.message;
     }
@@ -3893,7 +3894,8 @@ async function environmentPage() {
         : ""
     }<form id="${requirementsFormId}"><details><summary>明确声明本次所需依赖</summary><div class="fields" style="margin-top:16px"><div class="field"><label for="required-host-tools">所需宿主工具 · 每行公开名称</label><textarea id="required-host-tools" name="hostTools" rows="3" placeholder="例如已登记的工具名称"></textarea></div><div class="field"><label for="required-local-tools">所需本机工具 · 每行标识</label><textarea id="required-local-tools" name="localTools" rows="3" placeholder="例如 nmap"></textarea></div><div class="field wide"><label for="required-directories">所需本地目录 · 每行一个</label><textarea id="required-directories" name="directories" rows="3" placeholder="绝对路径，或相对于当前会话工作目录的路径"></textarea></div><div class="field"><label for="required-variables">所需环境变量 · 每行名称</label><textarea id="required-variables" name="variables" rows="3" placeholder="SYNTHETIC_TOKEN"></textarea><small>只检查已配置且非空，不返回值。</small></div><div class="field"><label for="required-hosts">所需登记主机 · 每行一个</label><textarea id="required-hosts" name="hosts" rows="3" placeholder="operator@example.invalid"></textarea><small>只核对本安装登记，不连接或授予权限。</small></div><div class="field wide"><label for="required-keys">所需私钥登记编号 · 每行一个</label><textarea id="required-keys" name="keys" rows="3" placeholder="使用上方私钥登记编号"></textarea><small>只检查登记编号与文件元信息，不读取内容或验证密钥有效性。</small></div></div></details><p class="info">留空表示本次未声明额外依赖；仍检查已配置的工具目录。未声明的技能依赖不会被猜测或自动安装。</p><button type="submit" ${can("catalog.preflight") ? "" : "disabled"}>预检明确依赖</button></form>`,
   );
-  const data = await api("toolkit.status");
+  const data = await read("toolkit.status");
+  const monitor = await processMonitor({ api: read, workspaceId, esc, panel, empty, run, toast });
   const tools = data.tools || [];
   const feedback = state.environmentFeedback;
   const identityLabel = (value) =>
@@ -3908,6 +3910,7 @@ async function environmentPage() {
   return {
     html:
       heading(capabilityButton("toolkit.adapt", "离线适配建议", 'id="adapt-tools"')) +
+      monitor.html +
       localEnvironment.html +
       (feedback
         ? `<div class="${feedback.error ? "error" : "note"}" role="status">${esc(feedback.message)}</div>`
@@ -3941,6 +3944,7 @@ async function environmentPage() {
       `<div id="environment-preflight-result">${preflightHTML(view.preflight)}</div>`,
     bind() {
       localEnvironment.bind();
+      monitor.bind($("#content"));
       const inContext = () =>
         state.page === "environment" &&
         state.workspaceId === workspaceId &&
@@ -4103,7 +4107,10 @@ async function environmentPage() {
             })),
       );
     },
-    dispose: () => localEnvironment.dispose?.(),
+    dispose() {
+      monitor.dispose();
+      localEnvironment.dispose?.();
+    },
   };
 }
 function confirmUninstall(message) {

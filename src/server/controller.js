@@ -43,6 +43,7 @@ export class Controller {
     workflow,
     continuation,
     admission,
+    processes,
     plans,
     environment,
     maintenance,
@@ -69,6 +70,7 @@ export class Controller {
       workflow,
       continuation,
       admission,
+      processes,
       plans,
       environment,
       maintenance,
@@ -118,6 +120,7 @@ export class Controller {
     };
     const runtimeCapabilities = this.runtime.capabilities();
     const workflowCapabilities = this.workflow?.capabilities() ?? {};
+    const processCapabilities = this.processes?.capabilities() ?? {};
     const maintenance = await this.maintenance?.info();
     const canApply =
       this.host.supported &&
@@ -154,6 +157,10 @@ export class Controller {
       ["workflow.plan.status", Boolean(this.plans)],
       ["workflow.plan.stop", Boolean(this.plans)],
       ["environment.status", Boolean(this.environment)],
+      ...["start", "list", "output", "stop"].map((operation) => [
+        `processes.${operation}`,
+        Boolean(processCapabilities[operation]),
+      ]),
       ["continuation.status", this.host.supported && Boolean(this.continuation)],
       ["continuation.stop", this.host.supported && Boolean(this.continuation)],
       ["maintenance.install", false],
@@ -201,10 +208,11 @@ export class Controller {
       sessions: sessionCapabilities.list ? await this.sessions.list() : [],
       sessionCapabilities,
       workflowCapabilities,
+      processCapabilities,
       updates: { mode: "offline" },
     };
   }
-  async dispatch(action, payload = {}) {
+  async dispatch(action, payload = {}, execution) {
     if (action === "maintenance.uninstall") {
       if (!this.maintenance) return unavailable("当前未提供可验证的官方卸载接口");
       return this.maintenance.uninstall(payload, () => this.prepareUninstall());
@@ -231,8 +239,8 @@ export class Controller {
         code: "MAINTENANCE_BUSY",
       });
     const pending = controlActions.has(action)
-      ? this.#sequenceControl(() => this.route(action, payload))
-      : this.route(action, payload);
+      ? this.#sequenceControl(() => this.route(action, payload, execution))
+      : this.route(action, payload, execution);
     this.#pending.add(pending);
     try {
       return await pending;
@@ -259,6 +267,11 @@ export class Controller {
     if (this.connectionChecks) await step("checks", () => this.connectionChecks.stopAll());
     if (this.networkScope) await step("scope", () => this.networkScope.stopAll());
     if (this.webScope) await step("http", () => this.webScope.stopAll());
+    if (this.processes)
+      await step("processes", async () => {
+        const result = await this.processes.stopAll();
+        if (!result.stopped) throw new Error("Owned processes remain active");
+      });
     // Cancel owned connections before draining accepted actions. No new action
     // enters while maintenance is active; awaited apply/save still finish.
     await Promise.allSettled([...this.#pending]);
@@ -307,7 +320,7 @@ export class Controller {
     return prepared;
   }
 
-  async route(action, payload = {}) {
+  async route(action, payload = {}, execution) {
     const cleanupOrStatus =
       [
         "workflow.status",
@@ -342,7 +355,13 @@ export class Controller {
         if (!this.admission) return unavailable("演练入场确认服务未加载");
         const result = this.admission.dispatch(action, payload);
         const errors = [];
-        for (const service of [this.connectionChecks, this.networkScope, this.plans, this.workflow])
+        for (const service of [
+          this.connectionChecks,
+          this.networkScope,
+          this.processes,
+          this.plans,
+          this.workflow,
+        ])
           try {
             const stopped = await service?.stopAll();
             if (stopped?.stopped === false) errors.push(new Error("执行计划仍有未确认清理的收据"));
@@ -568,6 +587,10 @@ export class Controller {
         if (action.startsWith("environment.")) {
           if (!this.environment) return unavailable("本地环境配置服务未加载");
           return this.environment.dispatch(action, payload);
+        }
+        if (action.startsWith("processes.")) {
+          if (!this.processes) return unavailable("本地进程服务未加载");
+          return this.processes.dispatch(action, payload, execution);
         }
         if (action.startsWith("workflow.plan.")) {
           if (!this.plans) return unavailable("多任务计划服务未加载");

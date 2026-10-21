@@ -62,6 +62,44 @@ function controlFixture() {
   return { controller, store, runtime, repeat, calls, save };
 }
 
+test("revoking admission stops owned processes and reports unconfirmed cleanup", async () => {
+  const f = controlFixture();
+  let stops = 0;
+  let stopped = true;
+  f.controller.admission = { dispatch: () => ({ accepted: false, revision: 2 }) };
+  f.controller.processes = {
+    async stopAll() {
+      stops++;
+      return { stopped };
+    },
+  };
+  assert.equal((await f.controller.dispatch("admission.revoke", {})).accepted, false);
+  stopped = false;
+  await assert.rejects(f.controller.dispatch("admission.revoke", {}), {
+    code: "ADMISSION_REVOKED_PARTIAL",
+  });
+  assert.equal(stops, 2);
+});
+
+test("uninstall aborts preparing processes before draining accepted tool actions", async () => {
+  const f = controlFixture();
+  const pending = Promise.withResolvers();
+  f.controller.processes = {
+    dispatch: () => pending.promise,
+    async stopAll() {
+      f.calls.push("process.stopAll");
+      pending.reject(new Error("synthetic process preparation aborted"));
+      return { stopped: true };
+    },
+  };
+  const start = f.controller.dispatch("processes.start", {}, { agent: {} });
+  const rejected = assert.rejects(start, /preparation aborted/);
+  const receipt = await f.controller.prepareUninstall();
+  await rejected;
+  assert.equal(receipt.steps.find(({ id }) => id === "processes").status, "completed");
+  assert.equal(f.calls[0], "process.stopAll");
+});
+
 test("concurrent applies finish in acceptance order without stale revision rollback", async () => {
   const f = controlFixture();
   const entered = Promise.withResolvers();

@@ -151,6 +151,8 @@ PNG/JPEG/WebP/GIF 的预览先检查格式结构与尺寸，最长边 16384 像�
 
 ## 本地工具路径
 
+通用运行入口为模型工具 `unlimit_process` 与内部 `processes.*`，其会话、审批、输出和停止约定见 [本地工具进程接口](environment-contract.md#本地工具进程接口)。UI 只读取和停止所选项目内本插件拥有的记录；HTTP 不接受伪造的模型执行上下文来启动进程。
+
 `toolkit.save` 部分更新 `{root, searchDirs, toolPaths, templateDir}`；`toolPaths` 为工具 ID 到绝对可执行文件路径的映射，替换整张映射。查找优先级为逐工具路径、工具根、按顺序列出的额外目录，各目录只枚举根及一层子目录，不自动搜索环境 PATH。失效的逐工具路径不静默回退；此配置动作只校验和登记模板目录，正文由下述 `templates.*` 明确读取。
 
 `toolkit.status` 返回完整配置、`tools` 和空 `runs`。每项分开返回 `path/source/identity/available/detail`；存在文件不一定确认了产品。`httpx` 在版本/帮助输出被识别为 ProjectDiscovery 产品前不可标可用，Python HTTPX 标为不匹配。身份随文件指纹变化撤回，不能当作代码签名或文件可信证明。

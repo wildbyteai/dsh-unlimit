@@ -154,6 +154,38 @@ export async function installTools(ctx, controller, host) {
     disposers.push(
       ctx.tools.register(
         defineTool({
+          name: "unlimit_process",
+          description:
+            "在本会话绑定的项目中启动已配置本地工具，读取输出或停止自己启动的进程。只执行用户授权的操作，沿用宿主沙箱与审批；不使用 shell。开始后后台运行，可在工具与环境页查看和停止。",
+          parameters: {
+            action: { type: "string", required: true, enum: ["start", "list", "output", "stop"] },
+            payload: {
+              type: "json",
+              required: true,
+              description:
+                "start: {tool:已配置工具标识,args:字符串数组,cwd?:绝对目录,timeoutMs?:50到86400000,sandbox_permissions?:权限模式,justification?:审批理由}；list: {}；output: {id,stdoutOffset?,stderrOffset?}；stop: {id}。项目与会话取真实调用上下文。输出可能截断，停止未确认时返回 cleanup-pending。",
+            },
+          },
+          output,
+          execute({ action, payload }, execution) {
+            if (!["start", "list", "output", "stop"].includes(action))
+              throw new Error("未知本地进程操作");
+            if (!payload || typeof payload !== "object" || Array.isArray(payload))
+              throw new Error("payload 必须是对象");
+            if (!execution?.agent?.session) throw new Error("调用缺少会话上下文");
+            return controller.dispatch(`processes.${action}`, payload, {
+              agent: execution.agent,
+              signal: execution.signal,
+              callId: execution.callId,
+              toolName: "unlimit_process",
+            });
+          },
+        }),
+      ),
+    );
+    disposers.push(
+      ctx.tools.register(
+        defineTool({
           name: "unlimit_status",
           description: "读取本地桌面适配状态、有效配置与未支持能力；不更改权限。",
           parameters: {},

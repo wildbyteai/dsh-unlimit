@@ -25,6 +25,64 @@ const hostOnly = {
 };
 let official;
 test(
+  "official process tool receives trusted execution while HTTP cannot supply it",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const agent = f.agent("synthetic-process-session");
+    let invocation;
+    f.controller.processes.dispatch = async (action, payload, execution) => {
+      invocation = { action, payload, execution };
+      return { items: [] };
+    };
+    const signal = new AbortController().signal;
+    const result = await f.ctx.tools.execute({
+      name: "unlimit_process",
+      callId: "synthetic-process-call",
+      arguments: { action: "list", payload: {} },
+      agent,
+      signal,
+    });
+    assert.notEqual(result.isError, true);
+    assert.equal(invocation.action, "processes.list");
+    assert.equal(invocation.execution.agent, agent);
+    assert.equal(invocation.execution.callId, "synthetic-process-call");
+    assert.equal(invocation.execution.toolName, "unlimit_process");
+    assert.equal(invocation.execution.signal, signal);
+    await f.request({
+      action: "processes.start",
+      payload: { tool: "nmap", execution: { agent: { session: { id: agent.session.id } } } },
+      raw: JSON.stringify({
+        action: "processes.start",
+        payload: { tool: "nmap" },
+        execution: { agent: { session: { id: agent.session.id } } },
+      }),
+    });
+    assert.equal(
+      invocation.execution,
+      undefined,
+      "HTTP never forwards untrusted execution context",
+    );
+    assert.equal((await f.execute(agent, "processes.start", {})).isError, true);
+    const asset = await f.request({ method: "GET", url: "/dsh-unlimit/ui/processes.js" });
+    assert.equal(asset.status, 200);
+    assert.match(asset.body, /export async function processMonitor/);
+  },
+);
+
+test("plugin unload closes owned process service before its database", hostOnly, async (t) => {
+  const f = await fixture(t);
+  let closed = false;
+  f.controller.processes.close = async () => {
+    assert.ok(f.controller.store.dispatch("settings.get"));
+    closed = true;
+  };
+  await f.dispose();
+  assert.equal(closed, true);
+  assert.equal(f.ctx.tools.get("unlimit_process"), undefined);
+});
+
+test(
   "mounted local scope import and DNS snapshots use HTTP receipts while model tools cannot invoke them",
   hostOnly,
   async (t) => {
