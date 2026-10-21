@@ -513,27 +513,47 @@ test(
     const observed = join(directory, "environment.json");
     tool(
       "httpx",
-      `require('node:fs').writeFileSync(${JSON.stringify(observed)}, JSON.stringify({ pid: process.pid, home: process.env.HOME, cwd: process.cwd(), xdg: process.env.XDG_CONFIG_HOME })); setInterval(() => {}, 1000);`,
+      `const fs = require('node:fs'); const observed = ${JSON.stringify(observed)}; fs.writeFileSync(observed + '.tmp', JSON.stringify({ pid: process.pid, home: process.env.HOME, cwd: process.cwd(), xdg: process.env.XDG_CONFIG_HOME })); fs.renameSync(observed + '.tmp', observed); setInterval(() => {}, 1000);`,
     );
     call("toolkit.save", { root });
-    const checking = call("toolkit.probe", { tool: "httpx" });
-    const rejected = assert.rejects(checking, code("CANCELLED"));
-    for (let attempt = 0; !existsSync(observed) && attempt < 100; attempt++)
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    const environment = JSON.parse(readFileSync(observed, "utf8"));
-    assert.equal(realpathSync(environment.home), realpathSync(environment.cwd));
-    assert.equal(environment.xdg, environment.home);
-    assert.notEqual(environment.home, root);
-    const cleared = call("toolkit.save", {
-      root: "",
-      searchDirs: [],
-      toolPaths: {},
-      templateDir: "",
+    let readyListener;
+    const ready = new Promise((resolve, reject) => {
+      readyListener = (current) => {
+        if (current.nlink === 0) return;
+        try {
+          resolve(JSON.parse(readFileSync(observed, "utf8")));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      watchFile(observed, { interval: 10 }, readyListener).on("error", reject);
     });
-    await rejected;
-    assert.equal(toolkit.pending.size, 0);
-    assert.equal(existsSync(environment.home), false);
-    assert.throws(() => process.kill(environment.pid, 0), code("ESRCH"));
-    assert.ok(cleared.tools.every((item) => item.path === null && !item.available));
+    const checking = call("toolkit.probe", { tool: "httpx" });
+    try {
+      const environment = await Promise.race([
+        ready,
+        checking.then(() => assert.fail("synthetic probe completed before readiness")),
+      ]);
+      assert.doesNotThrow(() => process.kill(environment.pid, 0));
+      assert.equal(realpathSync(environment.home), realpathSync(environment.cwd));
+      assert.equal(environment.xdg, environment.home);
+      assert.notEqual(environment.home, root);
+      const rejected = assert.rejects(checking, code("CANCELLED"));
+      const cleared = call("toolkit.save", {
+        root: "",
+        searchDirs: [],
+        toolPaths: {},
+        templateDir: "",
+      });
+      await rejected;
+      assert.equal(toolkit.pending.size, 0);
+      assert.equal(existsSync(environment.home), false);
+      assert.throws(() => process.kill(environment.pid, 0), code("ESRCH"));
+      assert.ok(cleared.tools.every((item) => item.path === null && !item.available));
+    } finally {
+      unwatchFile(observed, readyListener);
+      await toolkit.cancelProbes();
+      await checking.catch(() => {});
+    }
   },
 );

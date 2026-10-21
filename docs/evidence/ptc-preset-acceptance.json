@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "behaviorId": "CORE-MODES",
   "developmentBasis": "d455551d169c977e7cd405cea468275a91c4d6d6",
-  "generatedAt": "2026-10-21T07:35:39.745Z",
+  "generatedAt": "2026-10-21T08:00:45.740Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2787,7 +2787,9 @@
         "actualLoads": 1,
         "verifiedBeforeLoadAndAfterDispose": true
       },
-      "programSha256": "69e13b54c1f094e7714b858dc7c842c4e52c9298ec69db000382166d2a67b04a",
+      "programSha256": "9be0c64500276b886177524a3b5567fbde30c2655d582c7c50055ed26feb5be6",
+      "availableReviewProgramSha256": "2a75901f223b31c0232b99e23df4a3dcb45b3cefad1f4d465359622248eb4529",
+      "reviewPlanSha256": "d86708282802e00013fcbb48ac776872de261a2e61d2cf6a8220ddb648675832",
       "originalReadOnlySeatbeltSha256": "bd20ec0dde1b8a9e662c792110ee4134b0fc4c6e4c257e1fc35caf7c1f3c7e9c",
       "cleanup": {
         "verified": true,
@@ -2872,7 +2874,7 @@
       ],
       "persistedEvents": 21,
       "physicalJsonlRows": 22,
-      "jsonlSha256": "6b9255b85a83a8c3e5458d08f38b4547963a35cde348a62cd6f23c543be41986",
+      "jsonlSha256": "8dc07c9f9ac1a17b0ca2e299d8c38eedeaafd400fc635cc46f04c358f333488e",
       "actualJsonlEventsEqual": true,
       "nextModelToolResultEqual": true
     },
@@ -2915,7 +2917,7 @@
       ],
       "persistedEvents": 21,
       "physicalJsonlRows": 22,
-      "jsonlSha256": "d249ab90be96c822740222ec9a66916e8ba89fad65bbe46e0717a80a83d88965",
+      "jsonlSha256": "aedeb17af63ce6006a2c9453c30c9ff96bab7f3aaa01f4fb556a2059bdf04cd5",
       "actualJsonlEventsEqual": true,
       "nextModelToolResultEqual": true
     }
@@ -2964,7 +2966,7 @@
     },
     {
       "path": "tests/helpers/ptc-process-guard.mjs",
-      "sha256": "a996e7ea4a2159cb8fbca572b98652137e57b7ee7b3e37c78e72cba26e5272dd"
+      "sha256": "5ca2ab682d1e1d1695fad4d2c9972e768f048f16be6bd8d9740df2f2b8c3a6a4"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

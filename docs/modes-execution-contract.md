@@ -163,11 +163,25 @@ node-pty 的 native `pty.fork` 不经过 `child_process.spawn`，验收不能只
 
 复验使用上述白名单环境命令，将脚本替换为 `scripts/probe-minimal-terminal.mjs`，并通过正式允许实际子进程的执行入口运行。它独立于普通 `npm test`，只覆盖固定发行/macOS arm64 下的合成文本任务与适配撤销；没有执行真实模型、桌面安装、压力压缩、其他命令或写入拒绝验收。
 
+## 完整 PTC 计划审阅与后续明确实施（2026-10-21）
+
+[计划专项](../scripts/probe-ptc-plan.mjs) 继续使用未经删减的完整 PTC 预设：30 个叶条目、25 个活动项，533 个实际导入官方文件通过发行库存核对。模型仅看到 `run_code`，内层 SDK 的 29 个工具 schema 保持一致。测试使用同一个真实 Agent 的两个 turn，模型响应和审阅回答均为明确的原创合成输入。
+
+第一轮用户消息只要求计划审阅。真实 `AgentLoop → run_code → NodePtcRuntime → tools.exit_plan_mode` 传入完整原创计划；官方 UserQuestionService 发出的 `plan-review` 问题按 live Agent/Session 身份、完整计划正文和内层 subCallId 核对，再由测试 answerer 明确选择批准。外层工具结果返回 `{approved:true}` 时，Controller 仍为 `{active:true,pending:false}`；随后真实 pre-step 提交退出，事件顺序为工具结果、`plan/mode:false`、第二步 `step/start`。这一轮没有读取文件，第二步请求保留替换提示词并移除计划段。
+
+第二轮先 revert 本插件，再发送明确的实施消息，通过另一次真实 PTC 后端调用 `tools.read` 读取临时合成文件。官方 persona 恢复，计划状态保持关闭，PTC 指导、SDK 段和模型工具 schema 在四个请求中一致。两次工具调用均核对外层 callId、内层 parent/root/subCallId、实际参数、返回内容与下一请求的工具消息。两个独立 `f.ptc.run` 各只允许启动一个固定官方进程；没有在同一程序内先批准再立即实施。
+
+两个场景及父测试共 **3 项通过，进程 exit 0**；合计 4 次合成模型请求、2 次 AgentLoop run_code、1 次计划审阅、1 次读取、2 次真实 Node/Seatbelt 启动。官方 reader 全事件读回一致；独立解析物理 JSONL 后，42 个 Session 事件与文件头之外的全部 42 行逐项一致。证据包含两次明确用户消息、合成回答、模式/步骤事件、实际固定程序摘要和 9 项源码摘要，见 [ptc-plan-acceptance.json](evidence/ptc-plan-acceptance.json)。只在整个测试进程 exit 0 时发布通过记录。
+
+共享守卫新增固定的计划程序，保留每次 run 单启动和全局两启动上限；原读取程序、官方只读 Seatbelt、测试 Host 资源限制均不变。实际观察到两个 child close、控制通道关闭，三个运行集合归零，临时根删除，禁止操作与清理错误为空。旧完整 PTC 读取/撤销专项也重新通过并更新其守卫源码摘要。复验沿用前述 `env -i` 与官方 Node 命令，将脚本改为 `scripts/probe-ptc-plan.mjs`。
+
+这份证据验证合成批准后的真实循环时序与后续读取，不代表真实用户 UI/Gateway 审批、模型生成计划的质量、拒绝/取消的 PTC 后端路径、冷启动或桌面安装验收。守卫记录的可用程序摘要不单独证明执行；实际执行对应关系由调用参数、分派事件、工具结果与物理 JSONL 共同核对。官方 Seatbelt 仍不提供内核读取/网络白名单或逃离进程组后代的追踪保证。
+
 ## 保留差距
 
 - 完整 standard 的读取/计划切换、minimal 图片/持久终端文本及完整 PTC 的 AgentLoop 读取/replace/revert 已有隔离证据。真实用户默认预设选择及桌面仍未验，不能把已执行的读取扩展为全部工具能力。
 - ToolRuntime 的呈现值是 native/ptc；极简是另一份工具组合，其原生配置关闭文本 `read`，依赖持久 shell 读取文本。已验证固定合成内建命令，不代表任意命令、写入拒绝或终端 UI 通过。
-- PTC 组件探针与完整预设读取已验证真实受限后端；PTC 内的计划切换、其他工具和桌面仍未验证，不再将旧 Node 26 的失败外推为当前环境阻碍。
+- PTC 组件、完整预设读取与计划审阅到后续明确实施均已验证真实受限后端；其他工具、PTC 拒绝/取消后端路径和桌面仍未验证，不再将旧 Node 26 的失败外推为当前环境阻碍。
 - 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复及桌面计划 UI 仍未验证。
 - 合成人答没有执行真实 UI/Gateway 路由或 UI 所拥有的提问审计事件；本证据只声称已读回的 `plan/mode` Session 事件。
 - 本回归没有增加网页抓取或浏览器路径覆盖；`CORE-WEBTOOLS` 的本地页面检索和完整四模式工具能力仍需独立验收。

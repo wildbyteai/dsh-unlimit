@@ -208,7 +208,7 @@ export function createPtcProcessGuard(t, { installedRoot, runtime, workspace, fo
     return row.child;
   });
   syncBuiltinESMExports();
-  const program = `
+  const childPrelude = `
 const attempts = [];
 const deny = (name) => () => { attempts.push(name); throw new Error("fixed child forbids " + name); };
 const net = (await import("node:net")).default;
@@ -227,7 +227,26 @@ for (const module of ["node:http", "node:https"]) { const api = (await import(mo
 globalThis.fetch = deny("fetch"); if (globalThis.WebSocket) globalThis.WebSocket = deny("WebSocket"); process.dlopen = deny("process.dlopen");
 (await import("node:module")).syncBuiltinESMExports();
 if (Object.keys(process.env).length !== 0) throw new Error("program environment is not empty");
+`;
+  const program = `${childPrelude}\
 const value = await tools.read({ file_path: ${JSON.stringify(join(workspace, "evidence.txt"))} });
+return { value, networkAndSpawnAttempts: attempts, environmentNames: Object.keys(process.env) };
+`;
+  const reviewPlan = `# Read one disposable fixture
+
+## Scope
+Read only the synthetic evidence.txt file in this test workspace after approval.
+Do not change files, application configuration, or user sessions. Do not use a network.
+
+## Execution
+Finish this review turn after approval. On a subsequent explicit implementation turn,
+use the official read tool to read evidence.txt and report its synthetic contents.
+
+## Verification
+Check the tool result, next model request, and persisted synthetic session events.
+`;
+  const reviewProgram = `${childPrelude}\
+const value = await tools.exit_plan_mode({ plan: ${JSON.stringify(reviewPlan)} });
 return { value, networkAndSpawnAttempts: attempts, environmentNames: Object.keys(process.env) };
 `;
   return {
@@ -244,6 +263,8 @@ return { value, networkAndSpawnAttempts: attempts, environmentNames: Object.keys
       launch: { kind: "node-script", executable: NODE, bootstrapPath: bootstrap },
     },
     program,
+    reviewPlan,
+    reviewProgram,
     bind(ctx) {
       subprocessProvider = unwrap(ctx.subprocess);
       ptcProvider = unwrap(ctx.ptcRuntime);
@@ -308,6 +329,8 @@ return { value, networkAndSpawnAttempts: attempts, environmentNames: Object.keys
         verifiedBeforeLoadAndAfterDispose: disposed,
       },
       programSha256: hash(program),
+      availableReviewProgramSha256: hash(reviewProgram),
+      reviewPlanSha256: hash(reviewPlan),
       originalReadOnlySeatbeltSha256: hash(SEATBELT),
       cleanup: {
         verified: disposed,
