@@ -844,6 +844,7 @@ test(
     for (const action of [
       "workflow.plan.create",
       "workflow.plan.propose",
+      "workflow.plan.run",
       "workflow.plan.status",
       "workflow.plan.stop",
     ]) {
@@ -860,7 +861,7 @@ test(
         true,
       );
     }
-    assert.equal(calls.length, 4);
+    assert.equal(calls.length, 5);
   },
 );
 

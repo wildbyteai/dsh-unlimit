@@ -223,6 +223,66 @@ test("unavailable, invalid and late proposals cannot fill an unrelated plan", as
   assert.equal(invalid.host.node("use-draft").disabled, true);
 });
 
+test("automatic goal execution is a separate explicit action and its generated plan cannot be submitted again by the fill button", async () => {
+  const ui = await setup({
+    respond(action) {
+      if (action === "workflow.plan.capabilities")
+        return {
+          available: true,
+          planDrafting: true,
+          automaticTaskMatching: true,
+          evidenceSummary: true,
+        };
+      return {
+        item: plan("automatic-one", {
+          proposal: { state: "ready", execute: true, tasks: [{ ...task, dependsOn: [] }] },
+        }),
+      };
+    },
+  });
+  assert.equal(ui.host.node("run-goal").disabled, false);
+  ui.host.node("goal").value = "只整理明确提供的合成材料";
+  ui.host.node("summarize").checked = true;
+  await ui.emit("run-goal", "click");
+  assert.deepEqual(ui.calls.at(-1), {
+    action: "workflow.plan.run",
+    payload: {
+      workspaceId: "workspace-one",
+      parentSessionId: "parent-one",
+      goal: "只整理明确提供的合成材料",
+      summarize: true,
+    },
+  });
+  assert.match(ui.host.node("result").innerHTML, /自动执行计划/);
+  assert.match(ui.host.node("result").innerHTML, /不要重复提交/);
+  assert.equal(ui.host.node("use-draft").disabled, true);
+  await ui.emit("use-draft", "click");
+  assert.deepEqual(JSON.parse(ui.host.node("json").value), [task]);
+  assert.equal(
+    ui.calls.some(({ action }) => action === "workflow.plan.create"),
+    false,
+  );
+});
+
+test("missing or withdrawn automatic execution capability does not silently fall back to another action", async () => {
+  const missing = await setup();
+  assert.equal(missing.host.node("run-goal").disabled, true);
+  let calls = 0;
+  const ui = await setup({
+    respond(action) {
+      assert.equal(action, "workflow.plan.capabilities");
+      return { available: true, planDrafting: true, automaticTaskMatching: ++calls === 1 };
+    },
+  });
+  ui.host.node("goal").value = "Synthetic goal";
+  await ui.emit("run-goal", "click");
+  assert.equal(ui.errors.length, 1);
+  assert.equal(
+    ui.calls.some(({ action }) => action === "workflow.plan.run"),
+    false,
+  );
+});
+
 test("summary is opt-in, discloses the extra model call and never changes the default create payload", async () => {
   const ui = await setup();
   assert.equal(ui.host.node("summarize").checked, false);

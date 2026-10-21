@@ -155,6 +155,10 @@ export class Controller {
       ["workflow.presets", this.host.supported && workflowCapabilities.presets],
       ["workflow.plan.create", this.host.supported && this.plans?.capabilities().available],
       ["workflow.plan.propose", this.host.supported && this.plans?.capabilities().planDrafting],
+      [
+        "workflow.plan.run",
+        this.host.supported && this.plans?.capabilities().automaticTaskMatching,
+      ],
       ["workflow.plan.status", Boolean(this.plans)],
       ["workflow.plan.stop", Boolean(this.plans)],
       ["environment.status", Boolean(this.environment)],
@@ -608,10 +612,13 @@ export class Controller {
               ...this.plans.capabilities(),
               available: false,
               planDrafting: false,
+              automaticTaskMatching: false,
               reasons: ["此宿主版本尚未通过多任务调度适配验证"],
             };
           if (
-            ["workflow.plan.create", "workflow.plan.propose"].includes(action) &&
+            ["workflow.plan.create", "workflow.plan.propose", "workflow.plan.run"].includes(
+              action,
+            ) &&
             !this.host.supported
           )
             return unavailable("此宿主版本尚未通过多任务调度适配验证");

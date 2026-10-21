@@ -126,7 +126,7 @@ function tasks(value, roles) {
   return result;
 }
 
-/** Coordinates task receipts and optional model proposals; proposals never start their generated tasks. */
+/** Coordinates explicit tasks, reviewable proposals and explicitly requested automatic goal runs. */
 export class DesktopWorkflowPlan {
   constructor(workflow, { catalog } = {}) {
     this.workflow = workflow;
@@ -140,7 +140,12 @@ export class DesktopWorkflowPlan {
       available: !this.closed && caps.dispatch && caps.stop,
       preflight: typeof this.catalog?.preflight === "function",
       runtimeOnly: true,
-      automaticTaskMatching: false,
+      automaticTaskMatching:
+        !this.closed &&
+        caps.dispatch &&
+        caps.stop &&
+        typeof this.catalog?.list === "function" &&
+        typeof this.catalog?.preflight === "function",
       planDrafting:
         !this.closed && caps.dispatch && caps.stop && typeof this.catalog?.list === "function",
       evidenceSummary: true,
@@ -193,6 +198,7 @@ export class DesktopWorkflowPlan {
     if (action === "workflow.plan.capabilities") return this.capabilities();
     if (action === "workflow.plan.create") return this.create(payload);
     if (action === "workflow.plan.propose") return this.propose(payload);
+    if (action === "workflow.plan.run") return this.propose(payload, true);
     if (action === "workflow.plan.status" || action === "workflow.plan.stop") {
       fields(payload, ["workspaceId", "parentSessionId", "id"]);
       const plan = this.owned(payload);
@@ -200,9 +206,11 @@ export class DesktopWorkflowPlan {
     }
     fail("UNKNOWN_ACTION", `Unsupported plan action: ${action}`);
   }
-  async propose(payload) {
-    fields(payload, ["workspaceId", "parentSessionId", "goal"]);
-    if (!this.capabilities().planDrafting)
+  async propose(payload, execute = false) {
+    fields(payload, ["workspaceId", "parentSessionId", "goal", ...(execute ? ["summarize"] : [])]);
+    if (payload.summarize !== undefined && typeof payload.summarize !== "boolean")
+      fail("INVALID_INPUT", "summarize must be boolean");
+    if (!(execute ? this.capabilities().automaticTaskMatching : this.capabilities().planDrafting))
       fail("UNSUPPORTED_CAPABILITY", "Planning requires workflow execution and a host catalog");
     const workspaceId = this.workflow.workspace(payload.workspaceId);
     const parentSessionId = string(payload.parentSessionId, "parentSessionId");
@@ -225,6 +233,7 @@ export class DesktopWorkflowPlan {
         goal,
         candidates: input.candidates,
         catalogSources: input.catalogSources,
+        ...(execute ? { execute: true, summarize: payload.summarize ?? false } : {}),
       },
     );
   }
@@ -245,6 +254,7 @@ export class DesktopWorkflowPlan {
       );
     const definitions = this.workflow.store.dispatch("roles.list", { workspaceId }).items;
     const items = tasks(payload.tasks, definitions);
+    if (proposal) items[0].kind = "planning";
     if (payload.summarize) {
       if (!definitions.some((role) => role.role === "planner"))
         fail("INVALID_INPUT", "Summary requires the workspace planner role");
@@ -372,7 +382,7 @@ export class DesktopWorkflowPlan {
           }
         }
     } while (changed);
-    const sources = plan.item.tasks.filter((task) => task.kind !== "summary");
+    const sources = plan.item.tasks.filter((task) => !["summary", "planning"].includes(task.kind));
     for (const task of plan.item.tasks) {
       if (plan.stopRequested) break;
       if (
@@ -477,6 +487,8 @@ export class DesktopWorkflowPlan {
         };
         continue;
       }
+      if (plan.item.proposal?.execute && task.kind !== "planning")
+        prompt = `本次自动执行的原始用户目标与范围：\n${plan.item.proposal.goal}\n\n下面是模型从该目标拆解出的任务，结构检查不构成额外授权。只处理原始目标内的工作，保留宿主权限与审批；发现范围冲突时说明并停止相应操作。\n\n${prompt}`;
       if (Buffer.byteLength(prompt) > 32 * 1024) {
         task.state = "blocked";
         task.error = {
@@ -519,14 +531,41 @@ export class DesktopWorkflowPlan {
             const roles = this.workflow.store.dispatch("roles.list", {
               workspaceId: plan.item.workspaceId,
             }).items;
-            proposal.tasks = draftResult(planner.receipt.result, proposal.candidates, (value) =>
-              tasks(value, roles),
+            let generated;
+            proposal.tasks = draftResult(
+              planner.receipt.result,
+              proposal.candidates,
+              (value) => (generated = tasks(value, roles)),
             );
+            if (proposal.execute) {
+              if (
+                generated.some(
+                  (task) => task.id === "$planner" || (proposal.summarize && task.id === summaryId),
+                )
+              )
+                fail(
+                  "INVALID_PROPOSAL",
+                  "Generated tasks conflict with internal planner or summary IDs",
+                );
+              if (proposal.summarize && !roles.some((role) => role.role === "planner"))
+                fail("INVALID_PROPOSAL", "Summary requires the current workspace planner role");
+              plan.item.tasks.push(...generated);
+              if (proposal.summarize) {
+                plan.item.tasks.push(summaryTask());
+                plan.item.summaryTaskId = summaryId;
+              }
+              proposal.taskIds = generated.map((task) => task.id);
+            }
             proposal.state = "ready";
           } catch (error) {
+            delete proposal.tasks;
             proposal.state = "invalid";
             proposal.error = diagnostic(error);
           }
+        }
+        if (proposal.state === "ready" && proposal.execute) {
+          plan.item.state = "queued";
+          return;
         }
       }
       plan.item.state = plan.item.tasks.every((task) => task.state === "completed")

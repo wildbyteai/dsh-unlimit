@@ -65,6 +65,158 @@ const modelOutput = (value) => ({
   output: [{ type: "text", text: JSON.stringify(value) }],
 });
 
+test("explicit goal run waits for planner disposal, executes generated dependencies and summarizes only task evidence", async (t) => {
+  const f = fixture(t, planningCatalog());
+  const goal = "在用户提供的两份合成清单内盘点文件，再汇总出处。";
+  const { item } = await f.plans.dispatch("workflow.plan.run", {
+    ...f.owner,
+    goal,
+    summarize: true,
+  });
+  assert.equal(item.proposal.execute, true);
+  assert.equal(item.tasks.length, 1);
+  await until(() => f.starts.length === 1);
+  const gate = deferred();
+  f.gates.set(f.starts[0].childId, gate);
+  const generated = [
+    task("alpha"),
+    task("beta", {
+      dependsOn: ["alpha"],
+      requirements: [{ kind: "tool", name: "synthetic_read" }],
+    }),
+  ];
+  f.pending.get(f.starts[0].childId).resolve(modelOutput({ tasks: generated }));
+  await until(async () => (await f.status(item.id)).tasks[0].state === "completed");
+  assert.equal(f.starts.length, 1);
+  gate.resolve();
+  await until(() => f.starts.length === 2);
+  const state = await f.status(item.id);
+  assert.deepEqual(state.proposal.taskIds, ["alpha", "beta"]);
+  assert.equal(state.tasks[0].kind, "planning");
+  assert.match(f.starts[1].request.prompt[0].text, /本次自动执行的原始用户目标与范围/);
+  assert.ok(f.starts[1].request.prompt[0].text.includes(goal));
+  f.pending.get(f.starts[1].childId).resolve(modelOutput({ evidence: "alpha original" }));
+  await until(() => f.starts.length === 3);
+  assert.match(f.starts[2].request.prompt[0].text, /alpha original/);
+  assert.ok(f.starts[2].request.prompt[0].text.includes(goal));
+  f.pending.get(f.starts[2].childId).resolve(modelOutput({ evidence: "beta original" }));
+  await until(() => f.starts.length === 4);
+  const summary = (await f.status(item.id)).tasks[3];
+  assert.deepEqual(
+    summary.sources.map((row) => row.taskId),
+    ["alpha", "beta"],
+  );
+  assert.equal(
+    summary.sources.some((row) => row.taskId === "$planner"),
+    false,
+  );
+  f.pending.get(f.starts[3].childId).resolve(modelOutput({ report: "Unverified summary" }));
+  const final = await until(async () => {
+    const state = await f.status(item.id);
+    return state.state === "completed" && state;
+  });
+  assert.equal(final.tasks.length, 4);
+  assert.equal(final.id, item.id);
+  assert.equal(f.flow.status(f.workspace.id).active.length, 0);
+});
+
+test("automatic planning rejects unknown capabilities and internal ID collisions before dispatching generated tasks", async (t) => {
+  for (const generated of [
+    [task("$planner")],
+    [task("$summary")],
+    [task("bad", { requirements: [{ kind: "tool", name: "invented" }] })],
+  ])
+    await t.test(generated[0].id, async (t) => {
+      const f = fixture(t, planningCatalog());
+      const { item } = await f.plans.dispatch("workflow.plan.run", {
+        ...f.owner,
+        goal: "Synthetic goal",
+        summarize: true,
+      });
+      await until(() => f.starts.length === 1);
+      f.pending.get(f.starts[0].childId).resolve(modelOutput({ tasks: generated }));
+      const final = await until(async () => {
+        const state = await f.status(item.id);
+        return state.state === "finished-with-errors" && state;
+      });
+      assert.equal(final.proposal.state, "invalid");
+      assert.equal(final.proposal.tasks, undefined);
+      assert.equal(final.tasks.length, 1);
+      assert.equal(f.starts.length, 1);
+    });
+});
+
+test("stopping an automatic run during planner activation or generated task preflight prevents later work", async (t) => {
+  for (const phase of ["planning", "preflight"])
+    await t.test(phase, async (t) => {
+      const check = deferred();
+      const catalog = planningCatalog();
+      let checking = false;
+      catalog.preflight = async () => {
+        checking = true;
+        return check.promise;
+      };
+      const f = fixture(t, catalog);
+      const { item } = await f.plans.dispatch("workflow.plan.run", {
+        ...f.owner,
+        goal: "Synthetic goal",
+        summarize: true,
+      });
+      await until(() => f.starts.length === 1);
+      if (phase === "preflight") {
+        f.pending.get(f.starts[0].childId).resolve(
+          modelOutput({
+            tasks: [task("worker", { requirements: [{ kind: "tool", name: "synthetic_read" }] })],
+          }),
+        );
+        await until(() => checking);
+      }
+      const stopping = f.stop(item.id);
+      check.resolve({ status: "ready" });
+      const stopped = await stopping;
+      assert.equal(stopped.stopped, true);
+      assert.equal(f.starts.length, 1);
+      assert.equal(f.flow.status(f.workspace.id).active.length, 0);
+    });
+});
+
+test("generated work still checks admission and carries the complete original goal within the execution limit", async (t) => {
+  for (const scenario of ["revoked", "context"])
+    await t.test(scenario, async (t) => {
+      const f = fixture(t, planningCatalog());
+      let allowed = true;
+      f.workflow.admission = {
+        require() {
+          if (!allowed) throw new StoreError("ADMISSION_REQUIRED", "Synthetic admission revoked");
+        },
+      };
+      const { item } = await f.plans.dispatch("workflow.plan.run", {
+        ...f.owner,
+        goal: scenario === "context" ? "G".repeat(16 * 1024) : "Synthetic goal",
+      });
+      await until(() => f.starts.length === 1);
+      if (scenario === "revoked") allowed = false;
+      f.pending.get(f.starts[0].childId).resolve(
+        modelOutput({
+          tasks: [
+            task("worker", {
+              task: scenario === "context" ? "T".repeat(20 * 1024) : "Synthetic work",
+            }),
+          ],
+        }),
+      );
+      const final = await until(async () => {
+        const state = await f.status(item.id);
+        return state.state === "finished-with-errors" && state;
+      });
+      assert.equal(
+        final.tasks[1].error.code,
+        scenario === "context" ? "DEPENDENCY_CONTEXT_LIMIT" : "ADMISSION_REQUIRED",
+      );
+      assert.equal(f.starts.length, 1);
+    });
+});
+
 test("a goal produces a checked proposal using exact catalog names, without dispatching proposed tasks", async (t) => {
   const f = fixture(t, planningCatalog());
   assert.equal(f.plans.capabilities().planDrafting, true);

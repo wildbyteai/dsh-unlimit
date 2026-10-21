@@ -9,6 +9,107 @@ import { HostCatalog } from "../src/host/catalog.js";
 import { fixture, optionalHost, waitFor } from "./helpers/workflow-host-fixture.mjs";
 
 test(
+  "one automatic goal run uses real official planning, selected skill execution, dependency handoff and source summary",
+  optionalHost,
+  async (t) => {
+    const selected = { origin: "project", id: "automatic-review" };
+    const generated = [
+      {
+        id: "inventory",
+        role: "analyst",
+        task: "Count the supplied synthetic A and B records.",
+        requirements: [],
+        skills: [selected],
+      },
+      {
+        id: "report",
+        role: "reporter",
+        task: "Report the source of the count from inventory.",
+        requirements: [],
+        dependsOn: ["inventory"],
+      },
+    ];
+    const outputs = [
+      JSON.stringify({ tasks: generated }),
+      "Synthetic count: 2, source: supplied A/B.",
+      "Synthetic report: A/B has 2 records.",
+      "Synthetic unverified summary citing inventory and report.",
+    ];
+    let requests = 0;
+    const f = await fixture(t, { textOutput: () => outputs[requests++] });
+    const parent = await f.create();
+    const library = new SkillLibrary(join(f.directory, "automatic-skills"));
+    library.dispatch("skills.save", {
+      id: selected.id,
+      content:
+        "---\nname: automatic-review\ndescription: Synthetic inventory procedure\ndsh-unlimit-requirements: []\n---\nAUTO_SKILL_BODY: Count only supplied records and cite their source.",
+    });
+    const catalog = new HostCatalog(
+      {
+        get: (key) =>
+          key === "skills"
+            ? { snapshot: async () => ({ skills: [], complete: true }) }
+            : f.ctx.get(key),
+      },
+      { library, toolkit: { status: () => ({ tools: [] }) } },
+    );
+    const plans = new DesktopWorkflowPlan(f.workflow, { catalog });
+    try {
+      const owner = { workspaceId: f.workspaceId, parentSessionId: parent.id };
+      const goal =
+        "Only inspect the supplied synthetic A/B records and report their count and source.";
+      const { item } = await plans.dispatch("workflow.plan.run", {
+        ...owner,
+        goal,
+        summarize: true,
+      });
+      const done = (
+        await waitFor(
+          () => plans.dispatch("workflow.plan.status", { ...owner, id: item.id }),
+          (result) => result.item.state === "completed",
+        )
+      ).item;
+      assert.equal(done.id, item.id);
+      assert.equal(f.requests.length, 4);
+      assert.deepEqual(
+        done.tasks.map((task) => task.id),
+        ["$planner", "inventory", "report", "$summary"],
+      );
+      assert.deepEqual(
+        done.tasks[3].sources.map((source) => source.taskId),
+        ["inventory", "report"],
+      );
+      for (let index = 0; index < 4; index++) {
+        const task = done.tasks[index];
+        assert.equal(task.receipt.disposed, true);
+        assert.equal(task.receipt.slotReleased, true);
+        assert.deepEqual(task.receipt.result.output, [{ type: "text", text: outputs[index] }]);
+        const serialized = JSON.stringify(f.requests[index].messages);
+        assert.ok(serialized.includes(goal));
+        assert.equal(serialized.includes("AUTO_SKILL_BODY"), index === 1);
+        if (index === 2) assert.ok(serialized.includes(outputs[1]));
+      }
+      await f.ctx.sessionPersistence.flush();
+      for (const task of done.tasks) {
+        const reader = await f.ctx.sessionPersistence.open(task.receipt.sessionId, "read");
+        try {
+          assert.ok(
+            (await reader.read()).events.some(
+              (event) => event.type === "turn/end" && event.data.reason.kind === "completed",
+            ),
+          );
+        } finally {
+          await reader.close();
+        }
+      }
+      assert.equal(f.flow.status(f.workspaceId).active.length, 0);
+    } finally {
+      await plans.close();
+    }
+  },
+);
+
+test(
   "official executors receive selected project skill text with its checked declaration and durable source, without leaking into sibling tasks",
   optionalHost,
   async (t) => {
