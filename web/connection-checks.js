@@ -7,7 +7,7 @@ const esc = (value) =>
 
 const states = {
   ready: "可检查",
-  denied: "范围未确认，未检查",
+  denied: "范围拒绝，未检查",
   unsupported: "暂不支持",
   reachable: "连接有响应",
   unreachable: "连接未成功",
@@ -23,6 +23,14 @@ const reasons = {
   "dns-error": "域名解析失败",
   cancelled: "检查已取消",
   "scope-unverified": "目标尚未通过精确自有服务器清单验证",
+  "exact-host": "精确自有主机例外允许",
+  "resolved-exception": "已刷新解析快照中的派生 IP 例外允许",
+  "country-allowed": "本地国家数据库允许",
+  "region-pending": "确认后需解析实际地址并判定国家，预览尚未联网",
+  "country-denied": "CN / HK / MO 地区无例外，拒绝检查",
+  "special-address": "特殊或私网地址无例外，拒绝检查",
+  "country-unknown": "国家未知且无例外，拒绝检查",
+  "database-unavailable": "本地国家数据库不可用且无例外，拒绝检查",
   "invalid-url": "登记 URL 无效",
   "invalid-listener": "监听地址或端口无效",
   "unsupported-protocol": "暂不支持此协议",
@@ -31,21 +39,26 @@ const reasons = {
   "admission-changed": "演练确认已变化",
 };
 export const connectionCheckNotice =
-  "仅检查精确自有服务器清单允许且你本次确认的目标；地区数据库与通用出口尚未适配，其他范围无法验证时拒绝检查。登记 URL 的查询参数会原样发送，不附加凭据、Cookie 或请求正文。HTTP 收到任意状态码仅证明有响应，不代表 WebShell 可用；TCP 仅检查明确登记的监听端，不证明终端或整条隧道可用。";
+  "仅检查你本次确认的目标：精确自有服务器例外、已刷新的解析快照派生 IP，或本地数据库判定为其他国家的地址。CN / HK / MO 无例外时拒绝；未知国家、私网或特殊地址无例外时拒绝。此范围判定尚未覆盖通用工具出口。登记 URL 的查询参数会原样发送，不附加凭据、Cookie 或请求正文。HTTP 仅发送 HEAD；收到任意状态码仅证明有响应，不代表 WebShell 可用；TCP 仅检查明确登记的监听端，不证明终端或整条隧道可用。";
 const label = (value, labels) => labels[value] || value || "未返回";
+export function connectionScopeText(scope) {
+  if (!scope) return "";
+  const country = scope.country || (scope.matchedHost ? "未查询（精确例外）" : "未知");
+  return `${scope.allowed ? "范围允许" : "范围拒绝"} · ${label(scope.reason, reasons)} · 国家 ${country} · 判定地址 ${scope.address || "尚未解析"}${scope.matchedHost ? ` · 匹配主机 ${scope.matchedHost}` : ""}`;
+}
 export function connectionResultText(item) {
   const result = item?.lastCheck;
   if (!result) return "尚未检查";
-  return `${item.stale ? "已过期 · " : ""}${label(result.state, states)} · ${label(result.reason, reasons)}${result.checkedAt ? ` · ${result.checkedAt}` : ""}`;
+  return `${item.stale ? "已过期 · " : ""}${label(result.state, states)} · ${label(result.reason, reasons)}${result.checkedAt ? ` · ${result.checkedAt}` : ""}${result.scope ? ` · ${connectionScopeText(result.scope)}` : ""}`;
 }
 
 export function connectionPreview(prepared) {
-  return `<p class="info">预览只读取登记信息，尚未连接目标。确认后将检查以下允许执行的项目。</p><div class="note">${esc(connectionCheckNotice)}</div><div class="tablewrap"><table><thead><tr><th>记录</th><th>本次目标</th><th>类型</th><th>预检状态 / 原因</th></tr></thead><tbody>${prepared.items.map((item) => `<tr><td>${esc(item.name || item.recordId)}</td><td>${esc(item.target)}</td><td>${esc(item.checkType || "无可执行检查")}</td><td>${esc(label(item.state, states))}${item.reason ? `<br>${esc(label(item.reason, reasons))}` : ""}</td></tr>`).join("")}</tbody></table></div>${prepared.items.some((item) => item.state === "ready") ? "" : '<p class="info">没有可执行项目。请核对以上原因；本次不会发起连接。</p>'}`;
+  return `<p class="info">预览只读取登记信息，尚未连接目标。确认后将检查以下允许执行的项目。</p><div class="note">${esc(connectionCheckNotice)}</div><div class="tablewrap"><table><thead><tr><th>记录</th><th>本次目标</th><th>类型</th><th>预检状态 / 原因</th></tr></thead><tbody>${prepared.items.map((item) => `<tr><td>${esc(item.name || item.recordId)}</td><td>${esc(item.target)}</td><td>${esc(item.checkType || "无可执行检查")}</td><td>${esc(label(item.state, states))}${item.reason ? `<br>${esc(label(item.reason, reasons))}` : ""}${item.scope ? `<br>${esc(connectionScopeText(item.scope))}` : ""}</td></tr>`).join("")}</tbody></table></div>${prepared.items.some((item) => item.state === "ready") ? "" : '<p class="info">没有可执行项目。请核对以上原因；本次不会发起连接。</p>'}`;
 }
 
 export function connectionResults(result) {
   if (!result) return "";
-  return `${result.cancelled ? '<p class="info">检查已取消。下表保留已观察的结果。</p>' : ""}<div class="tablewrap"><table><thead><tr><th>记录 / 本次目标</th><th>观察结果</th><th>时间 / 耗时</th><th>保存状态</th></tr></thead><tbody>${result.items.map((item) => `<tr><td>${esc(item.name || item.recordId)}<br>${esc(item.target)}</td><td>${esc(label(item.state, states))}<br>${esc(label(item.reason, reasons))}${item.transport ? `<br>${esc(item.transport.type)} · ${esc(item.transport.address)} · ${esc(item.transport.family)}${item.transport.httpStatus !== undefined ? ` · HTTP ${esc(item.transport.httpStatus)}` : ""}` : ""}</td><td>${esc(item.checkedAt)}<br>${esc(item.latencyMs)} ms</td><td>${item.persisted ? "已保存" : "已观察，未保存"}${item.discardReason ? `<br>${esc(label(item.discardReason, reasons))}` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+  return `${result.cancelled ? '<p class="info">检查已取消。下表保留已观察的结果。</p>' : ""}<div class="tablewrap"><table><thead><tr><th>记录 / 本次目标</th><th>观察结果</th><th>时间 / 耗时</th><th>保存状态</th></tr></thead><tbody>${result.items.map((item) => `<tr><td>${esc(item.name || item.recordId)}<br>${esc(item.target)}</td><td>${esc(label(item.state, states))}<br>${esc(label(item.reason, reasons))}${item.scope ? `<br>${esc(connectionScopeText(item.scope))}` : ""}${item.transport ? `<br>${esc(item.transport.type)} · ${esc(item.transport.address)} · ${esc(item.transport.family)}${item.transport.httpStatus !== undefined ? ` · HTTP ${esc(item.transport.httpStatus)}` : ""}` : ""}</td><td>${esc(item.checkedAt)}<br>${esc(item.latencyMs)} ms</td><td>${item.persisted ? "已保存" : "已观察，未保存"}${item.discardReason ? `<br>${esc(label(item.discardReason, reasons))}` : ""}</td></tr>`).join("")}</tbody></table></div>`;
 }
 
 /** A single page's explicit attempts. No network is started before prepare and confirmation. */

@@ -25,6 +25,8 @@ import { RepeatReminder } from "./repeat-reminder.js";
 import { ReadLimits } from "./read-limits.js";
 import { DesktopMaintenance } from "./maintenance.js";
 import { ConnectionChecks } from "../core/connection-checks.js";
+import { NetworkScope } from "../core/network-scope.js";
+import { CountryDatabase } from "../core/country-database.js";
 
 export const name = "dsh-unlimit";
 export const inject = ["webServer", "connection"];
@@ -46,7 +48,9 @@ export function mount(ctx, host) {
   const repeat = new RepeatReminder(ctx, store, host);
   const readLimits = new ReadLimits(ctx, store, host);
   const admission = new DrillAdmission(store, host.dataRoot);
-  const connectionChecks = new ConnectionChecks(store, { admission });
+  const countryDatabase = new CountryDatabase(realpathSync(host.dataRoot));
+  const networkScope = new NetworkScope(store, { database: countryDatabase, admission });
+  const connectionChecks = new ConnectionChecks(store, { admission, scope: networkScope });
   const workflow = new DesktopWorkflow(ctx, store, flow, { admission });
   const environment = new LocalEnvironment(realpathSync(host.dataRoot));
   const catalog = new HostCatalog(ctx, { library: skills, toolkit, environment });
@@ -72,6 +76,7 @@ export function mount(ctx, host) {
     continuation,
     admission,
     connectionChecks,
+    networkScope,
     plans,
     environment,
     host,
@@ -82,6 +87,8 @@ export function mount(ctx, host) {
     const errors = [];
     for (const cleanup of [
       () => connectionChecks.close(),
+      () => networkScope.close(),
+      () => countryDatabase.close(),
       () => controller.revertControls(),
       async () => {
         const result = await plans.close();

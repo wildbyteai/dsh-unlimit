@@ -43,7 +43,9 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 记录类型：`credential`、`access`、`webshell`、`tunnel`、`screenshot`、`http`、`chain`、`file`、`score-point`、`score-hit`、`stage`、`session`。这些是本地证据记录，写入记录不执行远程操作。
 
-连接检查使用独立的 `connectionChecks.prepare/run/status/stop` 接口，不向模型工具开放；只有预览后明确确认才检查精确登记目标。WebShell 使用 HTTP HEAD，隧道使用明确的 `listenHost/listenPort`，不解析备注或命令。实际回执独立存储，不覆盖手工登记状态；撤销入场、清单变化与退出停止所属连接。范围、失败和结果字段见 [连接检查合同](connection-checks-contract.md)。
+连接检查使用独立的 `connectionChecks.prepare/run/status/stop` 接口，不向模型工具开放；只有预览后明确确认才检查目标。精确主机、保存的派生 IP 与本地国家库共同判定本次可选地址。WebShell 使用 HTTP HEAD，隧道使用明确的 `listenHost/listenPort`，不解析备注或命令。实际回执独立存储，不覆盖手工登记状态；撤销入场、范围变化与退出停止所属连接。范围、失败和结果字段见 [连接检查合同](connection-checks-contract.md)。
+
+`networkScope.status/import/resolve/stop` 仅供本机同源 UI：状态读取和 CSV/gzip 导入不联网，域名解析需入场与明确确认。`region.sqlite` 保存独立国家索引，私有 metadata 保存解析快照；完整 API、版本校验、来源说明及未覆盖出口见 [范围合同](network-scope-contract.md)。
 
 凭据的字段白名单、安全读回、秘密保留/替换/清空及旧字段处理见 [credentials-contract.md](credentials-contract.md)。`records.list/save` 只返回非秘密元数据和 `secretState`，同 ID 不能变换记录类型、项目或数据域绕过投影。数据库仍为本地明文存储。
 

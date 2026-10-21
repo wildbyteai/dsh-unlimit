@@ -22,6 +22,7 @@ const ASSETS = new Map([
     ["connection-checks.js", "text/javascript; charset=utf-8"],
   ],
   ["/dsh-unlimit/ui/styles.css", ["styles.css", "text/css; charset=utf-8"]],
+  ["/dsh-unlimit/ui/network-scope.js", ["network-scope.js", "text/javascript; charset=utf-8"]],
 ]);
 
 function respond(res, status, value) {
@@ -134,6 +135,7 @@ export function createHandler(controller, getOrigin, { rejectRequest } = {}) {
             "UNINSTALL_INCOMPLETE",
             "UNINSTALL_UNKNOWN",
             "CONNECTION_CHECK_PARTIAL",
+            "NETWORK_SCOPE_PARTIAL",
           ].includes(error.code) && error.partial
             ? { partial: error.partial }
             : {}),

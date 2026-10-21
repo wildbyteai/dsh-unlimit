@@ -31,6 +31,7 @@ export class Controller {
     environment,
     maintenance,
     connectionChecks,
+    networkScope,
     onSkillsChanged,
   }) {
     Object.assign(this, {
@@ -55,6 +56,7 @@ export class Controller {
       environment,
       maintenance,
       connectionChecks,
+      networkScope,
       onSkillsChanged,
     });
   }
@@ -131,6 +133,10 @@ export class Controller {
       ...["prepare", "run", "status", "stop"].map((operation) => [
         `connectionChecks.${operation}`,
         Boolean(this.connectionChecks),
+      ]),
+      ...["status", "resolve", "import", "stop"].map((operation) => [
+        `networkScope.${operation}`,
+        Boolean(this.networkScope),
       ]),
     ];
     return {
@@ -220,6 +226,7 @@ export class Controller {
       }
     };
     if (this.connectionChecks) await step("checks", () => this.connectionChecks.stopAll());
+    if (this.networkScope) await step("scope", () => this.networkScope.stopAll());
     // Cancel owned connections before draining accepted actions. No new action
     // enters while maintenance is active; awaited apply/save still finish.
     await Promise.allSettled([...this.#pending]);
@@ -303,7 +310,7 @@ export class Controller {
         if (!this.admission) return unavailable("演练入场确认服务未加载");
         const result = this.admission.dispatch(action, payload);
         const errors = [];
-        for (const service of [this.connectionChecks, this.plans, this.workflow])
+        for (const service of [this.connectionChecks, this.networkScope, this.plans, this.workflow])
           try {
             const stopped = await service?.stopAll();
             if (stopped?.stopped === false) errors.push(new Error("执行计划仍有未确认清理的收据"));
@@ -386,7 +393,7 @@ export class Controller {
         const errors = [];
         for (const change of [
           ...(JSON.stringify(current.value.ownServers) !== JSON.stringify(result.value.ownServers)
-            ? [() => this.connectionChecks?.stopAll()]
+            ? [() => this.networkScope?.changed(), () => this.connectionChecks?.stopAll()]
             : []),
           () => this.continuation?.changed(),
           ...(this.runtime.enabled
@@ -463,6 +470,15 @@ export class Controller {
       case "maintenance.install":
         return unavailable("此版尚未验证桌面端的本地包安装接口，请使用宿主插件管理器");
       default:
+        if (action.startsWith("networkScope.")) {
+          if (!this.networkScope) return unavailable("范围管理服务未加载");
+          const changesScope = ["networkScope.resolve", "networkScope.import"].includes(action);
+          const before = changesScope ? this.networkScope.status().revision : null;
+          const result = await this.networkScope.dispatch(action, payload);
+          if (changesScope && this.networkScope.status().revision !== before)
+            await this.connectionChecks?.stopAll();
+          return result;
+        }
         if (action.startsWith("connectionChecks.")) {
           if (!this.connectionChecks) return unavailable("连接检查服务未加载");
           return this.connectionChecks.dispatch(action, payload);

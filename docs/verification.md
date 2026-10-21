@@ -26,7 +26,11 @@
 | V-TOOLKIT    | [toolkit.test.mjs](../tests/toolkit.test.mjs)       | 逐工具路径→工具根→有序目录优先级；原子配置与空值清除；拒绝失效精确路径静默回退和 PATH 扩张；httpx 版本/帮助产品识别及指纹变化失效；固定参数、总超时/64KiB/取消/临时 HOME 清理                                            | 真正工具扫描、联网安装、任意命令运行；Windows 原生探测及进程树实机验证                              |
 | V-EXTENSIONS | [extensions.test.mjs](../tests/extensions.test.mjs) | 日志动态引用不可变而外层字段可替换时的关闭/禁用/精确还原；接口缺失、冲突和失败回滚；对无接口能力明确报告 unsupported                                                                                                     | 关闭所有遥测或已在途上传；Hook/记忆/全局字节读取；重试策略另见 V-RETRY                              |
 
-新增 **V-CONNECTION**：[连接服务测试](../tests/connection-checks.test.mjs) 13项、[传输测试](../tests/connection-transport.test.mjs) 13项、[页面交互测试](../tests/connection-checks-ui.test.mjs) 16项，以及1项真实官方挂载测试。系统DNS返回固定地址后仅连接一次；HEAD/Host/查询路径、正常TLS证书与原主机名校验、无代理/跳转、拒绝/超时/取消、实际socket/request关闭后读回；精确范围、零网络读取、陈旧确认拒绝、记录修改竞态、可信回执与写库失败均有断言。真实ToolRuntime拒绝模型检查入口，HTTP保留已观察未保存的partial。测试仅用临时合成库、自建回环服务和临时证书；没有真实DNS域名、IPv6传输、地区库或通用宿主出口证据。来源合同见 [connection-checks-contract.md](connection-checks-contract.md)，公开汇总见 [connection-checks-acceptance.json](evidence/connection-checks-acceptance.json)。
+前一阶段 **V-CONNECTION**：[连接服务测试](../tests/connection-checks.test.mjs) 13项、[传输测试](../tests/connection-transport.test.mjs) 13项、[页面交互测试](../tests/connection-checks-ui.test.mjs) 初始16项，以及1项真实官方挂载测试。系统DNS返回固定地址后仅连接一次；HEAD/Host/查询路径、正常TLS证书与原主机名校验、无代理/跳转、拒绝/超时/取消、实际socket/request关闭后读回；精确范围、零网络读取、陈旧确认拒绝、记录修改竞态、可信回执与写库失败均有断言。真实ToolRuntime拒绝模型检查入口，HTTP保留已观察未保存的partial。该阶段仅用临时合成库、自建回环服务和临时证书，不含真实DNS域名、IPv6传输、地区库或通用宿主出口证据。来源合同见 [connection-checks-contract.md](connection-checks-contract.md)，历史汇总见 [connection-checks-acceptance.json](evidence/connection-checks-acceptance.json)；当前地区扩展见下方 V-SCOPE。
+
+新增 **V-SCOPE**：[国家数据库测试](../tests/country-database.test.mjs)16项、[范围服务测试](../tests/network-scope.test.mjs)14项、[范围UI测试](../tests/network-scope-ui.test.mjs)16项、连接UI新增1项和官方挂载新增1项。覆盖CSV/gzip/UTF-8/范围/国家校验、索引查询、原始摘要、版本冲突、替换失败保留旧库、IPv6/映射/特殊地址、明确解析与派生IP、CN/HK/MO/其他/未知、混合DNS选定允许IP、别名不继承、取消/撤销/卸载清理、陈旧确认与历史回执、HTTP部分失败及模型入口拒绝。最终措辞改为“判定地址”，精确例外显示“未查询国家”，对应33项UI测试重跑通过。
+
+V-SCOPE 浏览器预览为1280×720，临时合成CSV和SQLite、假DNS/假传输。选择文件不自动导入，取消确认零解析；一次有效导入、一次无效导入保留旧库；明确刷新保存快照，在途停止不保存；一个5项检查批次阻止未登记CN与共享IP别名，只为混合地址的US项、精确主机及派生字面IP调用假传输。共6次假DNS、3次假传输，真实目标DNS/网络为0。刷新页面读回，修改清单清空快照并使5条旧回执过期。重载后的控制台警告/错误0；任务页面、服务及临时数据已清理。[范围面板](network-scope-preview.jpg)、[结果页](network-scope-results-preview.jpg)、[合同](network-scope-contract.md)和[结构化证据](evidence/network-scope-acceptance.json)可复核。未导入供应商真实月度数据，未验证地理准确性、实际桌面、其他工具或通用出口。
 
 新增的本地路径与失败边界：
 
@@ -50,7 +54,7 @@
 | V-PLAN        | [workflow-plan.test.mjs](../tests/workflow-plan.test.mjs) | 16项合成收据检查：单槽排队、目录及环境依赖、原始结果只传直接依赖、上下文超限阻断、失败及清理保槽、父/项目隔离、停止/撤销/启动竞态 | 真实Store/Flow/DesktopWorkflow，activation结果为合成；官方计划执行另见 V-WORKFLOW，无自动拆解或跨重启恢复 |
 | V-CLIENT      | [client-bridge.test.mjs](../tests/client-bridge.test.mjs) | 13项桥验证：同源/指定iframe、文字/图片/文件草稿、字节与元信息、已有输入保护、部分失败、取消/关闭/过期、晚写拒绝、批次释放         | DOM为最小合成模型；官方客户端路径另见下节                                                                 |
 
-2026-10-21，在 `e540d76` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，完整运行 `node --expose-internals --test tests/*.test.mjs`，退出码0，结果为 **434通过、0失败、0跳过**。JavaScript 语法检查 **109/109通过**。这些是合成、官方模块隔离和入口集成测试，不是434项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。
+2026-10-21，在 `a7d4ab9` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，完整运行 `node --expose-internals --test tests/*.test.mjs`，退出码0，结果为 **482通过、0失败、0跳过**。JavaScript 语法检查 **115/115通过**。范围措辞调整与判定期间数据库替换的竞态回归均包含在最终完整运行中。这些是合成、官方模块隔离和入口集成测试，不是482项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。117项行为的目标及最低验收场景保持不变，局部新增证据不将整项范围执行标为完成。
 
 新增凭据与环境预检：
 

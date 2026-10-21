@@ -62,9 +62,13 @@ export class ConnectionChecks {
   #active = new Map();
   #closed = false;
 
-  constructor(store, { admission, resolve = resolveAddresses, transport = checkEndpoint } = {}) {
+  constructor(
+    store,
+    { admission, scope, resolve = resolveAddresses, transport = checkEndpoint } = {},
+  ) {
     this.store = store;
     this.admission = admission;
+    this.scope = scope;
     this.resolve = resolve;
     this.transport = transport;
   }
@@ -76,7 +80,7 @@ export class ConnectionChecks {
   policy() {
     const servers = this.store.dispatch("settings.get", {}).value.ownServers;
     return {
-      fingerprint: digest(servers),
+      fingerprint: this.scope?.status().revision ?? digest(servers),
       hosts: new Set(servers.map((entry) => unbracket(entry.split("@").at(-1)))),
       admissionRevision: this.admission?.status().revision ?? null,
     };
@@ -86,7 +90,12 @@ export class ConnectionChecks {
     const saved = this.store.meta(key(record.id));
     if (!saved || saved.workspaceId !== record.workspaceId)
       return { lastCheck: null, stale: false };
-    return { lastCheck: saved.result, stale: saved.fingerprint !== digest(record) };
+    return {
+      lastCheck: saved.result,
+      stale:
+        saved.fingerprint !== digest(record) ||
+        ((this.scope || saved.policy !== undefined) && saved.policy !== this.policy().fingerprint),
+    };
   }
 
   status(payload) {
@@ -124,7 +133,10 @@ export class ConnectionChecks {
     const policy = this.policy();
     const items = selected.map((record) => {
       const address = endpoint(record);
-      const permitted = !address.reason && policy.hosts.has(address.hostname);
+      const scope = address.reason ? null : this.scope?.preview(address.hostname);
+      const permitted =
+        !address.reason && (scope ? scope.state === "ready" : policy.hosts.has(address.hostname));
+      const { state: _previewState, ...decision } = scope ?? {};
       return {
         record,
         endpoint: address,
@@ -136,7 +148,8 @@ export class ConnectionChecks {
           target: address.target ?? "",
           checkType: address.checkType ?? null,
           state: address.reason ? "unsupported" : permitted ? "ready" : "denied",
-          reason: address.reason ?? (permitted ? "" : "scope-unverified"),
+          reason: address.reason ?? scope?.reason ?? (permitted ? "" : "scope-unverified"),
+          ...(decision.address ? { scope: decision } : {}),
           ...this.previous(record),
         },
       };
@@ -228,12 +241,37 @@ export class ConnectionChecks {
         reason: "cancelled",
         latencyMs: Math.round(performance.now() - started),
       };
-    // One address from this lookup, one attempt. No implicit secondary DNS, redirect or retry.
+    const decisions = this.scope
+      ? addresses.map((candidate) => ({
+          candidate,
+          scope: this.scope.decide(item.endpoint.hostname, candidate.address),
+        }))
+      : addresses.map((candidate) => ({ candidate, scope: null }));
+    const selected = decisions.find((decision) => !decision.scope || decision.scope.allowed);
+    if (!selected)
+      return {
+        state: "denied",
+        reason: decisions[0].scope.reason,
+        scope: decisions[0].scope,
+        latencyMs: Math.round(performance.now() - started),
+      };
+    // Local database handles can observe replacements by another process during lookup.
+    if (signal.aborted || changed())
+      return {
+        state: "cancelled",
+        reason: "cancelled",
+        latencyMs: Math.round(performance.now() - started),
+      };
+    // Select one permitted address from this lookup. No second DNS, redirect or retry.
     const result = await this.transport(
-      { ...item.endpoint, ...addresses[0] },
+      { ...item.endpoint, ...selected.candidate },
       { signal, timeoutMs: remaining() },
     );
-    return { ...result, latencyMs: Math.round(performance.now() - started) };
+    return {
+      ...result,
+      ...(selected.scope ? { scope: selected.scope } : {}),
+      latencyMs: Math.round(performance.now() - started),
+    };
   }
 
   async execute(plan, active, timeoutMs) {
@@ -261,6 +299,7 @@ export class ConnectionChecks {
           this.store.setMeta(key(item.record.id), {
             workspaceId: plan.workspaceId,
             fingerprint: item.fingerprint,
+            policy: plan.policy.fingerprint,
             result: { ...result, persisted: true },
           });
           result.persisted = true;

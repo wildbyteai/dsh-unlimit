@@ -25,6 +25,73 @@ const hostOnly = {
 };
 let official;
 test(
+  "mounted local scope import and DNS snapshots use HTTP receipts while model tools cannot invoke them",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    let dnsCalls = 0;
+    f.controller.networkScope.resolveAddresses = async () => {
+      dnsCalls++;
+      return [{ address: "1.0.1.1", family: 4 }];
+    };
+    const initial = await f.request({ action: "networkScope.status" });
+    assert.equal(initial.json.data.database.available, false);
+    const imported = await f.request({
+      action: "networkScope.import",
+      payload: {
+        filename: "synthetic.csv",
+        release: "2026-10",
+        revision: "empty",
+        contentBase64: Buffer.from("1.0.1.0,1.0.1.255,CN\n8.8.8.0,8.8.8.255,US\n").toString(
+          "base64",
+        ),
+      },
+    });
+    assert.equal(imported.status, 200);
+    assert.equal(imported.json.data.database.records, 2);
+    assert.equal(dnsCalls, 0);
+    const settings = f.controller.store.dispatch("settings.get");
+    await f.request({
+      action: "settings.save",
+      payload: {
+        revision: settings.revision,
+        value: { ...settings.value, ownServers: ["owned.example.invalid"] },
+      },
+    });
+    const status = (await f.request({ action: "networkScope.status" })).json.data;
+    const payload = {
+      hosts: ["owned.example.invalid"],
+      revision: status.revision,
+      confirmed: true,
+    };
+    const parent = f.agent("synthetic-scope-parent");
+    assert.equal((await f.execute(parent, "networkScope.resolve", payload)).isError, true);
+    assert.equal((await f.execute(parent, "networkScope.import", {})).isError, true);
+    assert.equal(dnsCalls, 0);
+    const refreshed = await f.request({ action: "networkScope.resolve", payload });
+    assert.equal(refreshed.json.data.items[0].persisted, true);
+    assert.equal(dnsCalls, 1);
+    assert.equal(
+      f.controller.networkScope.decide("1.0.1.1", "1.0.1.1").reason,
+      "resolved-exception",
+    );
+    const current = refreshed.json.data.status;
+    const setMeta = f.controller.store.setMeta.bind(f.controller.store);
+    f.controller.store.setMeta = (key, value) => {
+      if (key === "network-scope:dns") throw new Error("synthetic private failure");
+      return setMeta(key, value);
+    };
+    const partial = await f.request({
+      action: "networkScope.resolve",
+      payload: { ...payload, revision: current.revision },
+    });
+    assert.equal(partial.json.error.code, "NETWORK_SCOPE_PARTIAL");
+    assert.equal(partial.json.error.partial.items[0].persisted, false);
+    assert.equal(partial.json.error.partial.status.active, false);
+    assert.doesNotMatch(partial.body, /private failure/);
+  },
+);
+test(
   "mounted connection checks preserve HTTP partial receipts and reject model-initiated network work",
   hostOnly,
   async (t) => {
@@ -634,6 +701,10 @@ test(
       "connectionChecks.prepare",
       "connectionChecks.run",
       "connectionChecks.stop",
+      "networkScope.status",
+      "networkScope.resolve",
+      "networkScope.import",
+      "networkScope.stop",
     ])
       assert.equal((await f.execute(parent, action, {})).isError, true);
     let result = await f.request({

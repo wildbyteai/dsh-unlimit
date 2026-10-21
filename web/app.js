@@ -1,4 +1,5 @@
 import { rewindSummary, rewindNotice } from "./rewind.js";
+import { networkScopeFlow, networkScopePanel, networkScopePreview } from "./network-scope.js";
 import { MemoryDrafts } from "./drafts.js";
 import { admissionPage } from "./admission.js";
 import { environmentSettings } from "./environment-settings.js";
@@ -1546,6 +1547,73 @@ async function overviewPage() {
   };
 }
 async function controlPage() {
+  const serial = state.request;
+  const scopeReads = await Promise.allSettled([
+    api("networkScope.status", {}),
+    api("admission.status"),
+  ]);
+  let scopeRoot;
+  let scopeDialog;
+  const inScopeContext = () =>
+    state.page === "control" && state.request === serial && scopeRoot?.isConnected;
+  const scope = networkScopeFlow({
+    api,
+    initialStatus: scopeReads[0].status === "fulfilled" ? scopeReads[0].value : null,
+    initialError: scopeReads[0].status === "rejected" ? scopeReads[0].reason.message : "",
+    admissionAccepted:
+      scopeReads[1].status === "fulfilled" && scopeReads[1].value.accepted === true,
+    isCurrent: inScopeContext,
+    confirm: (hosts) => {
+      if (!canLeaveEditor() || !inScopeContext()) return Promise.resolve(false);
+      const dialog = $("#editor");
+      scopeDialog = dialog;
+      dialog.innerHTML = `<div class="dialoghead"><h2>确认本次域名解析</h2></div>${networkScopePreview(hosts)}<div class="dialogfoot"><button type="button" data-scope-cancel>取消</button><button type="button" class="primary" data-scope-accept>确认并解析这些域名</button></div>`;
+      dialog.oncancel = null;
+      return new Promise((resolve) => {
+        dialog.addEventListener(
+          "close",
+          () => {
+            scopeDialog = null;
+            resolve(false);
+          },
+          { once: true },
+        );
+        $("[data-scope-cancel]", dialog).onclick = () => dialog.close();
+        $("[data-scope-accept]", dialog).onclick = (event) => {
+          event.target.disabled = true;
+          resolve(true);
+          dialog.close();
+        };
+        dialog.showModal();
+      });
+    },
+    changed(view) {
+      const release = $("[name=release]", scopeRoot)?.value || "";
+      scopeRoot.innerHTML = networkScopePanel(view);
+      $("[name=release]", scopeRoot).value = release;
+      bindScope();
+    },
+  });
+  function bindScope() {
+    $("[data-scope-refresh]", scopeRoot).onclick = () => scope.refresh();
+    $("[data-scope-stop]", scopeRoot).onclick = () => scope.stop();
+    $("[data-scope-batch]", scopeRoot).onclick = () =>
+      scope.resolve(
+        scope
+          .view()
+          .status.hosts.filter((host) => host.type === "hostname")
+          .map((host) => host.hostname),
+      );
+    $$("[data-scope-host]", scopeRoot).forEach((button) => {
+      button.onclick = () =>
+        scope.resolve([scope.view().status.hosts[Number(button.dataset.scopeHost)].hostname]);
+    });
+    $("[data-scope-import]", scopeRoot).onsubmit = (event) => {
+      event.preventDefault();
+      const form = event.target;
+      scope.importFile(form.elements.file.files[0], form.elements.release.value);
+    };
+  }
   const settings = await api("settings.get");
   state.settings = settings;
   const v = { ...defaults, ...settings.value };
@@ -1658,8 +1726,11 @@ async function controlPage() {
             );
           })
           .join("")}</div>`,
-      )}${panel("截断后继续", `${switchRow("autoContinue", "自动继续截断输出", "仅处理根会话明确的输出长度截断；用户停止、传输错误和限流不会触发新轮次。")}<div class="fields">${renderField(field("continueLimit", "每次人工输入的自动继续上限", "number", { min: 0, max: 20, step: 1, disabled: !can("continuation.auto") }), v.continueLimit)}${renderField(field("continueText", "继续用语", "textarea", { disabled: !can("continuation.manual") }), v.continueText)}</div><p class="info">默认关闭。手动继续入口在会话管理中；消息保留本插件来源，停止只处理本模块所属的自动继续。</p>`)}<div class="panel"><div class="panelheading"><h2>保存当前配置</h2><span class="meta" id="settings-revision">revision ${settings.revision}</span></div><p class="info">配置采用版本校验。若其他窗口已修改配置，请刷新后重新编辑。</p><p id="settings-error" class="inlineerror" role="alert"></p><button class="primary" type="submit" style="width:100%">保存配置</button></div></div></div></form>`,
+      )}${panel("截断后继续", `${switchRow("autoContinue", "自动继续截断输出", "仅处理根会话明确的输出长度截断；用户停止、传输错误和限流不会触发新轮次。")}<div class="fields">${renderField(field("continueLimit", "每次人工输入的自动继续上限", "number", { min: 0, max: 20, step: 1, disabled: !can("continuation.auto") }), v.continueLimit)}${renderField(field("continueText", "继续用语", "textarea", { disabled: !can("continuation.manual") }), v.continueText)}</div><p class="info">默认关闭。手动继续入口在会话管理中；消息保留本插件来源，停止只处理本模块所属的自动继续。</p>`)}<div class="panel"><div class="panelheading"><h2>保存当前配置</h2><span class="meta" id="settings-revision">revision ${settings.revision}</span></div><p class="info">配置采用版本校验。若其他窗口已修改配置，请刷新后重新编辑。</p><p id="settings-error" class="inlineerror" role="alert"></p><button class="primary" type="submit" style="width:100%">保存配置</button></div></div></div></form>` +
+      `<div id="network-scope">${networkScopePanel(scope.view())}</div>`,
     bind() {
+      scopeRoot = $("#network-scope");
+      bindScope();
       const read = () => {
         const form = $("#settings-form");
         const values = { ...v };
@@ -1763,6 +1834,10 @@ async function controlPage() {
           commitInlineDraft("settings-form", ["workspaceFiles"]);
           toast("已更新选定规则文件");
         });
+    },
+    dispose() {
+      scope.dispose();
+      scopeDialog?.close();
     },
   };
 }

@@ -305,7 +305,7 @@ test("HTTP and TCP limitations and query parameter behavior are explicit", () =>
     "任意状态码仅证明有响应",
     "不代表 WebShell 可用",
     "不证明终端或整条隧道可用",
-    "地区数据库与通用出口尚未适配",
+    "此范围判定尚未覆盖通用工具出口",
   ])
     assert.ok(connectionCheckNotice.includes(text), text);
   assert.match(connectionResults({ ...result, cancelled: true }), /检查已取消.*已观察的结果/);
@@ -348,4 +348,57 @@ test("cancel reason does not attribute scope or cleanup cancellation to the user
   assert.match(html, /检查已取消/);
   assert.doesNotMatch(html, /用户已取消/);
   assert.doesNotMatch(connectionCheckNotice, /ownServers|listener/);
+});
+
+test("country and exception decisions distinguish the evaluated address from a connected target", () => {
+  const scope = {
+    allowed: true,
+    reason: "resolved-exception",
+    country: "US",
+    address: "192.0.2.10",
+    matchedHost: "fixture.invalid",
+  };
+  const observed = { ...result, items: [{ ...result.items[0], scope }] };
+  const html = connectionResults(observed);
+  for (const text of [
+    "范围允许",
+    "派生 IP 例外允许",
+    "国家 US",
+    "判定地址 192.0.2.10",
+    "匹配主机 fixture.invalid",
+  ])
+    assert.ok(html.includes(text), text);
+  assert.match(
+    connectionResultText({ lastCheck: observed.items[0] }),
+    /范围允许.*判定地址 192.0.2.10/,
+  );
+  const hostile = connectionResults({
+    ...result,
+    items: [
+      {
+        ...result.items[0],
+        scope: { ...scope, country: "<script>", address: '<img src="x">', matchedHost: "<svg>" },
+      },
+    ],
+  });
+  assert.doesNotMatch(hostile, /<script|<img|<svg/);
+  assert.match(hostile, /&lt;script&gt;/);
+  for (const [reason, text] of [
+    ["exact-host", "精确自有主机例外允许"],
+    ["country-allowed", "本地国家数据库允许"],
+    ["region-pending", "确认后需解析实际地址并判定国家"],
+    ["country-denied", "CN / HK / MO"],
+    ["special-address", "特殊或私网地址"],
+    ["country-unknown", "国家未知"],
+    ["database-unavailable", "本地国家数据库不可用"],
+  ]) {
+    const preview = connectionPreview({ ...prepared, items: [{ ...ready, reason }] });
+    assert.ok(preview.includes(text), reason);
+  }
+  const preview = connectionPreview({ ...prepared, items: [{ ...ready, scope }] });
+  assert.match(preview, /国家 US.*判定地址 192.0.2.10/);
+  assert.match(
+    connectionResults({ items: [{ scope: { ...scope, country: null } }] }),
+    /未查询（精确例外）/,
+  );
 });

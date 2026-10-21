@@ -1,0 +1,150 @@
+{
+  "sourceBase": "a7d4ab93fbea4425f8620d4d74c1156b1475a2f4",
+  "sourceRevision": "the commit containing this evidence; not the base revision",
+  "date": "2026-10-21",
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "hostTarget": "0.2.1-rc.2",
+    "fullSuiteNode": "24.21.0",
+    "previewNode": "26.3.1",
+    "realDesktopInstalled": false,
+    "realProfileUsed": false,
+    "actualProviderDatasetImported": false,
+    "realTargetNetwork": 0
+  },
+  "isolatedSuite": {
+    "passed": 482,
+    "failed": 0,
+    "skipped": 0,
+    "syntaxChecked": 115,
+    "newCountryTests": 16,
+    "newScopeTests": 14,
+    "newScopeUiTests": 16,
+    "newConnectionUiTest": 1,
+    "newOfficialMountTest": 1,
+    "finalUiTextTestsRerun": 33,
+    "finalUiTextTestsPassed": 33
+  },
+  "browser": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "server": "task-owned loopback with temporary SQLite and synthetic CSV",
+    "targetDnsAndTransport": "injected synthetic callbacks, not real target traffic",
+    "readAndCancelledConfirmationDns": 0,
+    "readAndCancelledConfirmationTransport": 0,
+    "selectedFileAutomaticImports": 0,
+    "explicitImportAttempts": 2,
+    "validImports": 1,
+    "invalidImportPreservedRevision": true,
+    "fakeDnsCalls": 6,
+    "fakeTransportCalls": [
+      {
+        "hostname": "mixed.example.invalid",
+        "address": "8.8.8.8",
+        "family": 4
+      },
+      {
+        "hostname": "owned.example.invalid",
+        "address": "1.0.1.1",
+        "family": 4
+      },
+      {
+        "hostname": "1.0.1.1",
+        "address": "1.0.1.1",
+        "family": 4
+      }
+    ],
+    "actualTargetDns": 0,
+    "actualTargetNetwork": 0,
+    "resolveRequests": 2,
+    "stopRequests": 1,
+    "checkBatches": 1,
+    "reloadPerformedNoNewChecks": true,
+    "inventoryEditClearedSnapshots": true,
+    "oldChecksMarkedStale": 5,
+    "consoleWarningsAndErrorsAfterReload": 0,
+    "temporaryTabClosed": true,
+    "temporaryServerClosed": true,
+    "temporaryDataRemoved": true
+  },
+  "observedDecisions": [
+    {
+      "name": "CN 未登记 · 应阻止",
+      "state": "denied",
+      "scope": {
+        "allowed": false,
+        "reason": "country-denied",
+        "country": "CN",
+        "address": "1.0.1.1",
+        "databaseRevision": "d99df438c98585d3443d6cca5b1700195f3275b83c15bdd95e0ca4f144974a55"
+      },
+      "persisted": true
+    },
+    {
+      "name": "混合 CN/US · 只选 US",
+      "state": "reachable",
+      "scope": {
+        "allowed": true,
+        "reason": "country-allowed",
+        "country": "US",
+        "address": "8.8.8.8",
+        "databaseRevision": "d99df438c98585d3443d6cca5b1700195f3275b83c15bdd95e0ca4f144974a55"
+      },
+      "persisted": true
+    },
+    {
+      "name": "已登记主机 · 精确例外",
+      "state": "reachable",
+      "scope": {
+        "allowed": true,
+        "reason": "exact-host",
+        "matchedHost": "owned.example.invalid",
+        "country": null,
+        "address": "1.0.1.1"
+      },
+      "persisted": true
+    },
+    {
+      "name": "派生 IP · 刷新后例外",
+      "state": "reachable",
+      "scope": {
+        "allowed": true,
+        "reason": "resolved-exception",
+        "matchedHost": "owned.example.invalid",
+        "country": null,
+        "address": "1.0.1.1"
+      },
+      "persisted": true
+    },
+    {
+      "name": "共享 IP 别名 · 应阻止",
+      "state": "denied",
+      "scope": {
+        "allowed": false,
+        "reason": "country-denied",
+        "country": "CN",
+        "address": "1.0.1.1",
+        "databaseRevision": "d99df438c98585d3443d6cca5b1700195f3275b83c15bdd95e0ca4f144974a55"
+      },
+      "persisted": true
+    }
+  ],
+  "dataset": {
+    "synthetic": true,
+    "providerFormat": "db-ip-lite",
+    "release": "2026-10",
+    "records": 4,
+    "sha256": "d49f7e01641761ce699a90ff488df4c2fced9d22734c1d67bd8f721959048f99",
+    "revision": "d99df438c98585d3443d6cca5b1700195f3275b83c15bdd95e0ca4f144974a55"
+  },
+  "remaining": [
+    "real supplier CSV size and accuracy acceptance",
+    "real desktop installation and embedded UI",
+    "existing host main/child tools, proxy, remote Fetch, MCP, shell and Chromium egress coverage",
+    "legacy first-step task-text gate equivalence",
+    "actual external target and IPv6 transport acceptance"
+  ]
+}
