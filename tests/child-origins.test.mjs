@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CHILD_INPUT_RECORD, ChildOrigins } from "../src/host/child-origins.js";
+import { recordedInputOrigin } from "../src/host/child-rewind.js";
 
 const entrySource = `export function appendPluginRecord(session, type, data) {
   return session.appendRecord(type, data);
@@ -334,4 +335,201 @@ test("record append failures reach the official observer without changing delive
   f.parent.session.recordFailure = false;
   f.emit();
   assert.equal(f.records().length, 1);
+});
+
+function ptcFixture(t) {
+  const f = fixture(t);
+  f.call.data = {
+    ...f.call.data,
+    callId: "synthetic-root-call",
+    name: "run_code",
+    arguments: JSON.stringify({ code: "SYNTHETIC_PROGRAM_NEVER_EXECUTED" }),
+  };
+  f.exec.parent = Symbol("synthetic-parent-token");
+  f.exec.rootCallId = f.call.data.callId;
+  const start = f.parent.session.append("tool/ptc-dispatch-start", {
+    rootCallId: f.call.data.callId,
+    parentCallId: f.call.data.callId,
+    subCallId: f.exec.callId,
+    name: "send_message",
+    arguments: structuredClone(f.exec.arguments),
+  });
+  const settle = (dispatchStart = start) =>
+    f.parent.session.append("tool/ptc-dispatch", {
+      ...structuredClone(dispatchStart.data),
+      isError: false,
+      content: [{ type: "text", text: "Synthetic delivered notice without message identity" }],
+    });
+  const finish = (isError = false) => {
+    const event = f.parent.session.append("tool/result", {
+      turn: f.call.data.turn,
+      step: f.call.data.step,
+      message: {
+        role: "tool",
+        toolCallId: f.call.data.callId,
+        source: { kind: "tool", callId: f.call.data.callId },
+        isError,
+        content: [{ type: "text", text: isError ? "Synthetic outer failure" : "Synthetic result" }],
+      },
+      ...(isError ? { error: { message: "Synthetic later program failure" } } : {}),
+    });
+    event.surfaceOp = "append";
+    event.sourceEventSeqs = [f.call.seq];
+    return event;
+  };
+  const inspected = (agent) => ({
+    meta: agent.session.header,
+    inheritedEventCount: agent.session.inheritedEventCount,
+    events: agent.session.snapshotEvents(),
+  });
+  const read = (messageId = f.accepted.id) =>
+    recordedInputOrigin(inspected(f.parent), inspected(f.child), messageId);
+  return { ...f, start, settle, finish, read };
+}
+
+test("direct PTC delivery records exact leaf and root identities before the dispatch settles", async (t) => {
+  const f = ptcFixture(t);
+  await f.tracker.connect();
+  const result = structuredClone(f.result);
+  f.emit();
+  f.emit();
+  assert.equal(f.records().length, 1);
+  const record = f.records()[0];
+  assert.deepEqual(record.data, {
+    version: 2,
+    parentSessionId: f.parent.id,
+    parentCreatedAt: 100,
+    childSessionId: f.child.id,
+    childCreatedAt: 200,
+    messageId: f.accepted.id,
+    callId: f.exec.callId,
+    callSeq: f.start.seq,
+    rootCallId: f.call.data.callId,
+    rootCallSeq: f.call.seq,
+    turnStartSeq: 0,
+    stepStartSeq: 1,
+  });
+  assert.ok(!JSON.stringify(record).includes("Synthetic private task body"));
+  assert.deepEqual(f.result, result);
+  assert.throws(f.read, { code: "AMBIGUOUS_REWIND_SOURCE" }, "Unsettled delivery is not ready");
+  const settled = f.settle();
+  f.finish();
+  assert.deepEqual(f.read(), {
+    basis: "recorded-input",
+    childSessionId: f.child.id,
+    parentSessionId: f.parent.id,
+    childCreatedAt: 200,
+    messageId: f.accepted.id,
+    callId: f.exec.callId,
+    callSeq: f.start.seq,
+    rootCallId: f.call.data.callId,
+    rootCallSeq: f.call.seq,
+    dispatchSeq: settled.seq,
+    recordSeq: record.seq,
+    turnStartSeq: 0,
+    stepStartSeq: 1,
+  });
+});
+
+test("a successful PTC send remains attributable when its outer program later fails", async (t) => {
+  const f = ptcFixture(t);
+  await f.tracker.connect();
+  f.emit();
+  f.settle();
+  f.finish(true);
+  assert.equal(f.read().messageId, f.accepted.id);
+});
+
+test("repeated PTC sends to one child remain distinct when settled events arrive out of order", async (t) => {
+  const f = ptcFixture(t);
+  await f.tracker.connect();
+  f.emit();
+  const first = { id: f.accepted.id, callId: f.exec.callId, seq: f.start.seq };
+  const second = f.message("second-accepted-input");
+  f.child.session.append("agent/inbox/spliced", { inserted: [second] });
+  f.exec.callId = "second-send-call";
+  f.result.value.messageId = second.id;
+  const secondStart = f.parent.session.append("tool/ptc-dispatch-start", {
+    ...structuredClone(f.start.data),
+    subCallId: f.exec.callId,
+  });
+  f.emit();
+  f.settle(secondStart);
+  f.settle();
+  f.finish();
+  assert.equal(f.records().length, 2);
+  assert.equal(f.read(first.id).callSeq, first.seq);
+  assert.equal(f.read(first.id).callId, first.callId);
+  assert.equal(f.read(second.id).callSeq, secondStart.seq);
+  assert.equal(f.read(second.id).callId, f.exec.callId);
+});
+
+test("PTC capture rejects unproven root or dispatch identity and disabled observers", async (t) => {
+  const cases = [
+    ["missing root id", (f) => delete f.exec.rootCallId],
+    ["different root id", (f) => (f.exec.rootCallId = "unrelated-root")],
+    ["not a root token", (f) => (f.exec.parent = f.exec.rootCallId)],
+    ["deeper parent", (f) => (f.start.data.parentCallId = "unadapted-intermediate-call")],
+    ["different tool", (f) => (f.start.data.name = "other-tool")],
+    ["different target", (f) => (f.start.data.arguments.agent_id = "other-child")],
+    ["different root tool", (f) => (f.call.data.name = "other-tool")],
+    ["duplicate root", (f) => f.parent.session.append("tool/call", f.call.data)],
+    ["duplicate dispatch start", (f) => f.parent.session.append(f.start.type, f.start.data)],
+    ["inherited root", (f) => (f.parent.session.inheritedEventCount = f.start.seq)],
+    ["closed step", (f) => f.parent.session.append("step/end", { turn: 2, step: 3 })],
+    ["failed leaf", (f) => (f.result.isError = true)],
+    ["no accepted identity", (f) => delete f.result.value.messageId],
+    ["disabled", (f) => f.setEnabled(false)],
+  ];
+  for (const [label, change] of cases)
+    await t.test(label, async (t) => {
+      const f = ptcFixture(t);
+      await f.tracker.connect();
+      change(f);
+      f.emit();
+      assert.deepEqual(f.records(), []);
+    });
+});
+
+test("PTC replay rejects missing, failed, duplicate or inconsistent settlement and root results", async (t) => {
+  const cases = [
+    ["missing settled", (f) => (f.settled.type = "ignored:synthetic")],
+    ["failed leaf", (f) => (f.settled.data.isError = true)],
+    ["leaf error", (f) => (f.settled.data.error = { message: "Synthetic failed delivery" })],
+    ["different settled parent", (f) => (f.settled.data.parentCallId = "other-root")],
+    ["different settled root", (f) => (f.settled.data.rootCallId = "other-root")],
+    ["different settled tool", (f) => (f.settled.data.name = "other-tool")],
+    ["different settled arguments", (f) => (f.settled.data.arguments.message = "Changed text")],
+    ["duplicate settled", (f) => f.parent.session.append(f.settled.type, f.settled.data)],
+    [
+      "duplicate record",
+      (f) => f.parent.session.appendRecord(CHILD_INPUT_RECORD, f.records()[0].data),
+    ],
+    [
+      "same leaf assigned to another input",
+      (f) =>
+        f.parent.session.appendRecord(CHILD_INPUT_RECORD, {
+          ...f.records()[0].data,
+          messageId: "different-input-same-call",
+        }),
+    ],
+    ["wrong root seq", (f) => (f.records()[0].data.rootCallSeq = f.start.seq)],
+    ["wrong start seq", (f) => (f.records()[0].data.callSeq = f.call.seq)],
+    ["unknown record version", (f) => (f.records()[0].data.version = 3)],
+    ["missing outer result", (f) => (f.outerResult.type = "ignored:synthetic")],
+    ["wrong outer result source", (f) => (f.outerResult.data.message.source.callId = "other-root")],
+    ["wrong outer result lineage", (f) => (f.outerResult.sourceEventSeqs = [f.start.seq])],
+    ["wrong outer result step", (f) => (f.outerResult.data.step = 4)],
+    ["inherited root", (f) => (f.parent.session.inheritedEventCount = f.start.seq)],
+  ];
+  for (const [label, change] of cases)
+    await t.test(label, async (t) => {
+      const f = ptcFixture(t);
+      await f.tracker.connect();
+      f.emit();
+      f.settled = f.settle();
+      f.outerResult = f.finish();
+      change(f);
+      assert.throws(f.read, { code: "AMBIGUOUS_REWIND_SOURCE" });
+    });
 });

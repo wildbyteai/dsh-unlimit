@@ -29,6 +29,29 @@ function targetOf(call) {
   }
 }
 
+/** A direct PTC SDK call must belong to one observable root run_code call. */
+export function ptcChildCall(events, callId, childId, rootCallId) {
+  if (!identity(rootCallId)) return;
+  const starts = events.filter(
+    (event) => event.type === "tool/ptc-dispatch-start" && event.data?.subCallId === callId,
+  );
+  const start = starts[0];
+  if (
+    starts.length !== 1 ||
+    start.data.name !== "send_message" ||
+    start.data.arguments?.agent_id !== childId ||
+    start.data.rootCallId !== rootCallId ||
+    start.data.parentCallId !== rootCallId
+  )
+    return;
+  const calls = events.filter(
+    (event) => event.type === "tool/call" && event.data?.callId === rootCallId,
+  );
+  const call = calls[0];
+  if (calls.length !== 1 || call.data.name !== "run_code" || call.seq >= start.seq) return;
+  return { call, start };
+}
+
 function matchingInput(events, messageId, parentId) {
   let inserted = 0;
   let consumed = 0;
@@ -149,7 +172,6 @@ export class ChildOrigins {
     if (
       !this.enabled() ||
       exec.name !== "send_message" ||
-      exec.parent !== undefined ||
       result.isError !== false ||
       !identity(exec.callId) ||
       !identity(exec.arguments?.agent_id) ||
@@ -179,13 +201,25 @@ export class ChildOrigins {
     if (!parentEvents || !childEvents) return;
     const messageId = result.value.messageId;
     if (!matchingInput(childEvents, messageId, parent.id)) return;
-    const calls = parentEvents.filter(
-      (event) => event.type === "tool/call" && event.data.callId === exec.callId,
-    );
-    if (calls.length !== 1 || calls[0].data.name !== exec.name || targetOf(calls[0]) !== child.id)
-      return;
-    const boundary = callBoundary(parentEvents, calls[0]);
-    const observedBoundary = callBoundary(parentEvents, calls[0], parentEvents.at(-1).seq + 1);
+    const nested = exec.parent !== undefined;
+    const ptc = nested
+      ? ptcChildCall(parentEvents, exec.callId, child.id, exec.rootCallId)
+      : undefined;
+    let call;
+    if (nested) {
+      if (typeof exec.parent !== "symbol" || !ptc) return;
+      call = ptc.call;
+    } else {
+      const calls = parentEvents.filter(
+        (event) => event.type === "tool/call" && event.data.callId === exec.callId,
+      );
+      if (calls.length !== 1 || calls[0].data.name !== exec.name || targetOf(calls[0]) !== child.id)
+        return;
+      call = calls[0];
+    }
+    const callSeq = ptc?.start.seq ?? call.seq;
+    const boundary = callBoundary(parentEvents, call, callSeq);
+    const observedBoundary = callBoundary(parentEvents, call, parentEvents.at(-1).seq + 1);
     if (
       !boundary ||
       !observedBoundary ||
@@ -204,14 +238,15 @@ export class ChildOrigins {
     // The official observer contains and reports append failures. Do not turn
     // a failed commit into a successful-looking capture or alter the tool result.
     this.#appendRecord(parent.session, CHILD_INPUT_RECORD, {
-      version: 1,
+      version: ptc ? 2 : 1,
       parentSessionId: parent.id,
       parentCreatedAt: parentHeader.createdAt,
       childSessionId: child.id,
       childCreatedAt: childHeader.createdAt,
       messageId,
       callId: exec.callId,
-      callSeq: calls[0].seq,
+      callSeq,
+      ...(ptc ? { rootCallId: call.data.callId, rootCallSeq: call.seq } : {}),
       ...boundary,
     });
   }

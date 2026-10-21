@@ -1,5 +1,5 @@
 import { fail } from "../core/validation.js";
-import { CHILD_INPUT_RECORD } from "./child-origins.js";
+import { CHILD_INPUT_RECORD, ptcChildCall } from "./child-origins.js";
 
 const ambiguous = (message) => fail("AMBIGUOUS_REWIND_SOURCE", message);
 const substantive = (message) =>
@@ -84,7 +84,7 @@ export function recordedInputOrigin(parent, child, messageId) {
   if (
     records.length !== 1 ||
     record.ignorable !== true ||
-    data.version !== 1 ||
+    ![1, 2].includes(data.version) ||
     data.parentSessionId !== parent.meta.id ||
     data.parentCreatedAt !== parent.meta.createdAt ||
     data.childSessionId !== child.meta.id ||
@@ -95,33 +95,66 @@ export function recordedInputOrigin(parent, child, messageId) {
     data.callSeq < parent.inheritedEventCount ||
     typeof data.callId !== "string" ||
     !data.callId ||
-    record.seq <= data.callSeq
+    record.seq <= data.callSeq ||
+    own.filter((event) => event.type === CHILD_INPUT_RECORD && event.data?.callId === data.callId)
+      .length !== 1
   )
     ambiguous(
       "No unique recorded parent delivery matches this child input; historical delivery cannot be inferred",
     );
-  const calls = own.filter(
-    (event) => event.type === "tool/call" && event.data?.callId === data.callId,
-  );
-  const call = calls[0];
-  let argumentsValue;
-  try {
-    argumentsValue = JSON.parse(call?.data.arguments);
-  } catch {
-    /* invalid journal arguments */
+  const ptc = data.version === 2;
+  let call;
+  let settled;
+  if (ptc) {
+    const delivery = ptcChildCall(own, data.callId, child.meta.id, data.rootCallId);
+    if (!delivery || delivery.start.seq !== data.callSeq || delivery.call.seq !== data.rootCallSeq)
+      ambiguous("The recorded PTC delivery has no matching root and dispatch start");
+    call = delivery.call;
+    const dispatches = own.filter(
+      (event) => event.type === "tool/ptc-dispatch" && event.data?.subCallId === data.callId,
+    );
+    settled = dispatches[0];
+    if (
+      dispatches.length !== 1 ||
+      settled.seq <= record.seq ||
+      settled.data.isError !== false ||
+      settled.data.error ||
+      settled.data.rootCallId !== data.rootCallId ||
+      settled.data.parentCallId !== data.rootCallId ||
+      settled.data.name !== "send_message" ||
+      JSON.stringify(settled.data.arguments) !== JSON.stringify(delivery.start.data.arguments)
+    )
+      ambiguous("The recorded PTC delivery has no unique completed successful dispatch");
+  } else {
+    const calls = own.filter(
+      (event) => event.type === "tool/call" && event.data?.callId === data.callId,
+    );
+    call = calls[0];
+    let argumentsValue;
+    try {
+      argumentsValue = JSON.parse(call?.data.arguments);
+    } catch {
+      /* invalid journal arguments */
+    }
+    if (
+      calls.length !== 1 ||
+      call.seq !== data.callSeq ||
+      call.data.name !== "send_message" ||
+      argumentsValue?.agent_id !== child.meta.id
+    )
+      ambiguous("The recorded delivery has no matching parent send_message call");
   }
-  if (
-    calls.length !== 1 ||
-    call.seq !== data.callSeq ||
-    call.data.name !== "send_message" ||
-    argumentsValue?.agent_id !== child.meta.id
-  )
-    ambiguous("The recorded delivery has no matching parent send_message call");
   const { turn, step } = parentBoundary(parent, call.seq);
+  const atDelivery = parentBoundary(parent, data.callSeq);
   const atRecord = parentBoundary(parent, record.seq);
+  const atSettled = ptc ? parentBoundary(parent, settled.seq) : atRecord;
   if (
     turn.seq !== data.turnStartSeq ||
     step.seq !== data.stepStartSeq ||
+    atDelivery.turn.seq !== turn.seq ||
+    atDelivery.step.seq !== step.seq ||
+    atSettled.turn.seq !== turn.seq ||
+    atSettled.step.seq !== step.seq ||
     atRecord.turn.seq !== turn.seq ||
     atRecord.step.seq !== step.seq ||
     !Number.isSafeInteger(call.data.turn) ||
@@ -134,23 +167,22 @@ export function recordedInputOrigin(parent, child, messageId) {
   )
     ambiguous("The recorded delivery does not match the parent execution boundary");
   const results = own.filter(
-    (event) => event.type === "tool/result" && event.data?.message?.toolCallId === data.callId,
+    (event) => event.type === "tool/result" && event.data?.message?.toolCallId === call.data.callId,
   );
   const result = results[0];
   if (
     results.length !== 1 ||
-    result.seq <= call.seq ||
+    result.seq <= (ptc ? settled.seq : call.seq) ||
     result.surfaceOp !== "append" ||
     result.data.message.source?.kind !== "tool" ||
-    result.data.message.source.callId !== data.callId ||
-    result.data.message.isError === true ||
-    result.data.error ||
+    result.data.message.source.callId !== call.data.callId ||
+    (!ptc && (result.data.message.isError === true || result.data.error)) ||
     result.data.turn !== call.data.turn ||
     result.data.step !== call.data.step ||
     result.sourceEventSeqs?.length !== 1 ||
     result.sourceEventSeqs[0] !== call.seq
   )
-    ambiguous("The parent delivery has no unique completed successful tool result");
+    ambiguous("The parent delivery has no unique completed tool result matching its execution");
   return {
     basis: "recorded-input",
     childSessionId: child.meta.id,
@@ -158,7 +190,10 @@ export function recordedInputOrigin(parent, child, messageId) {
     childCreatedAt: child.meta.createdAt,
     messageId,
     callId: data.callId,
-    callSeq: call.seq,
+    callSeq: data.callSeq,
+    ...(ptc
+      ? { rootCallId: data.rootCallId, rootCallSeq: call.seq, dispatchSeq: settled.seq }
+      : {}),
     recordSeq: record.seq,
     turnStartSeq: turn.seq,
     stepStartSeq: step.seq,
