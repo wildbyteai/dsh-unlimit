@@ -2,10 +2,12 @@ import { resolveOfficialPackage } from "./official-package.js";
 import { DEFAULT_SETTINGS, fail, object, string } from "../core/validation.js";
 
 const SOURCE = "dsh-unlimit/continuation";
+const CHILD_DELIVERY = Symbol.for("dsh.subagent.deliverPrompt");
 const isChild = (agent) =>
   Boolean(agent.session.header.parentSession || agent.session.header.origin === "subagent");
 export const DEFAULT_CONTINUE_TEXT = DEFAULT_SETTINGS.continueText;
 const service = (ctx, name) => (ctx.get ? ctx.get(name) : ctx[name]);
+const serviceIdentity = (value) => value?.[Symbol.for("cordis.original")] ?? value;
 
 function methodOf(target, key) {
   for (let current = target; current; current = Object.getPrototypeOf(current)) {
@@ -41,16 +43,26 @@ function messages(event) {
   return [];
 }
 
+const startsInputChain = (message, parentId) =>
+  message.source.kind === "user" ||
+  (parentId &&
+    message.source.kind === "agent-message" &&
+    message.source.senderSessionId === parentId);
+
 function historyState(session) {
   let automaticCount = 0;
   const messageIds = new Set(),
     usedTriggers = new Set(),
     automaticIds = new Set();
-  for (const event of session.snapshotEvents())
+  const child = Boolean(session.header.parentSession || session.header.origin === "subagent");
+  for (const event of session
+    .snapshotEvents()
+    .slice(child ? (session.inheritedEventCount ?? 0) : 0))
     for (const message of messages(event)) {
       if (messageIds.has(message.id)) continue;
       messageIds.add(message.id);
-      if (message.source.kind === "user") automaticCount = 0;
+      if (startsInputChain(message, child ? session.header.parentSession : undefined))
+        automaticCount = 0;
       if (message.source.kind !== SOURCE) continue;
       usedTriggers.add(message.source.triggerSeq);
       if (message.source.mode === "automatic") {
@@ -68,6 +80,8 @@ export class Continuation {
   #loading;
   #generation = 0;
   #createMessage;
+  #childRuntime;
+  #childActivations = new Map();
 
   constructor(ctx, store, host) {
     this.ctx = ctx;
@@ -106,7 +120,7 @@ export class Continuation {
         state: reason ? "unsupported" : this.#disposers.length ? "active" : "available",
         detail:
           reason ??
-          "默认关闭，单个人工输入链最多0–20次，仅处理max-tokens；原生停止与新输入会撤回待续。",
+          "默认关闭，每条输入链最多0–20次；支持根会话及启用后创建的受管本地子代理，仅处理max-tokens。",
       },
     ];
   }
@@ -119,6 +133,8 @@ export class Continuation {
         agent,
         ...historyState(agent.session),
         pending: null,
+        childPending: null,
+        childTrigger: null,
         stopped: false,
         interrupted: false,
         lastError: null,
@@ -132,6 +148,37 @@ export class Continuation {
   #clear(state) {
     if (state.pending !== null) clearImmediate(state.pending);
     state.pending = null;
+    state.childPending?.controller.abort();
+    state.childPending = null;
+    state.childTrigger = null;
+  }
+
+  #interruptState(state) {
+    const interrupted = state.interrupted;
+    this.#clear(state);
+    state.stopped = true;
+    state.interrupted = true;
+    if (interrupted) return;
+    const errors = [];
+    for (const activation of this.#childActivations.values())
+      if (activation.parent === state.agent) {
+        const child = this.#states.get(activation.agent.session.id);
+        if (child) {
+          try {
+            if (service(this.ctx, "agents")?.get(child.agent.session.id) === child.agent)
+              this.stop({ sessionId: child.agent.session.id });
+          } catch (error) {
+            errors.push(error);
+          }
+          try {
+            this.#interruptState(child);
+          } catch (error) {
+            errors.push(error);
+          }
+        }
+      }
+    if (errors.length)
+      throw new AggregateError(errors, "已尝试停止子代理自动继续，部分取消接口所有权发生冲突");
   }
 
   #attach(agent) {
@@ -154,10 +201,22 @@ export class Continuation {
       fail("UNSUPPORTED", "该代理不支持可撤销取消观察及正式followup提交");
     const continuation = this;
     const wrapper = function (...args) {
-      continuation.#clear(state);
-      state.stopped = true;
-      state.interrupted = true;
-      return original.apply(this, args);
+      const errors = [];
+      let result;
+      try {
+        continuation.#interruptState(state);
+      } catch (error) {
+        errors.push(error);
+      }
+      // Descendant cleanup must never suppress the host's native cancellation.
+      try {
+        result = original.apply(this, args);
+      } catch (error) {
+        errors.push(error);
+      }
+      if (errors.length === 1) throw errors[0];
+      if (errors.length > 1) throw new AggregateError(errors, "自动继续清理与原生取消均发生错误");
+      return result;
     };
     Object.defineProperty(
       agent,
@@ -191,11 +250,45 @@ export class Continuation {
       if (typeof createUserMessage !== "function") fail("UNSUPPORTED", "官方消息构造接口不兼容");
       if (generation !== this.#generation) fail("CANCELLED", "继续模块加载已撤销");
       this.#createMessage = createUserMessage;
+      const childRuntime = service(this.ctx, "subagents");
+      this.#childRuntime =
+        typeof childRuntime?.[CHILD_DELIVERY] === "function" &&
+        resolveOfficialPackage(this.host.runtimeRoot, "@deepseek-ai/dsh-subagent").url
+          ? childRuntime
+          : undefined;
       this.#states.clear();
       const disposers = [];
       try {
         disposers.push(
           this.ctx.on("session/event", (session, event) => this.#event(session, event)),
+        );
+        disposers.push(
+          this.ctx.on("agent/status", ({ agent, status }) => {
+            if (status !== "idle") return;
+            const state = this.#states.get(agent.session.id);
+            if (state?.agent !== agent || state.childTrigger === null) return;
+            const end = this.#end(agent);
+            if (end?.seq !== state.childTrigger || end.data.reason.kind !== "max-tokens") {
+              this.#clear(state);
+              return;
+            }
+            this.#continueChild(state, end, settings(this.store));
+          }),
+        );
+        disposers.push(
+          this.ctx.on("subagent/start", (event) => {
+            if (!this.#childRuntime || !event.local) return;
+            const agent = support.agents.get(event.id);
+            const parent = agent && support.agents.get(agent.session.header.parentSession);
+            if (agent && parent)
+              this.#childActivations.set(event.id, { runId: event.runId, agent, parent });
+          }),
+          this.ctx.on("subagent/end", (event) => {
+            if (this.#childActivations.get(event.id)?.runId !== event.runId) return;
+            const state = this.#states.get(event.id);
+            if (state) this.#clear(state);
+            this.#childActivations.delete(event.id);
+          }),
         );
         disposers.push(
           this.ctx.on("agent/created", ({ agent }) => {
@@ -213,6 +306,7 @@ export class Continuation {
           this.ctx.on("agent/disposed", ({ agent }) => {
             const state = this.#states.get(agent.session.id);
             if (state) {
+              this.#interruptState(state);
               this.#detach(state);
               this.#states.delete(agent.session.id);
             }
@@ -236,6 +330,8 @@ export class Continuation {
           }
         this.#states.clear();
         this.#createMessage = undefined;
+        this.#childRuntime = undefined;
+        this.#childActivations.clear();
         if (errors.length > 1)
           throw new AggregateError(errors, "继续模块半安装失败，已尝试完整撤销");
         throw error;
@@ -253,8 +349,12 @@ export class Continuation {
     const agent = service(this.ctx, "agents")?.get(session.id);
     if (!agent) return;
     const state = this.#state(agent);
+    const child = isChild(agent);
     for (const message of messages(event)) {
-      if (event.type === "user/message" && message.source.kind === "user") {
+      if (
+        event.type === "user/message" &&
+        startsInputChain(message, agent.session.header.parentSession)
+      ) {
         this.#clear(state);
         state.automaticCount = 0;
         state.stopped = false;
@@ -263,6 +363,7 @@ export class Continuation {
       if (state.messageIds.has(message.id)) continue;
       state.messageIds.add(message.id);
       if (message.source.kind === SOURCE) {
+        if (state.childPending?.triggerSeq === message.source.triggerSeq) state.childPending = null;
         state.usedTriggers.add(message.source.triggerSeq);
         if (message.source.mode === "automatic") {
           state.automaticCount++;
@@ -270,14 +371,14 @@ export class Continuation {
         }
       } else if (message.source.kind !== "runtime-context") {
         this.#clear(state);
-        if (message.source.kind === "user") {
+        if (startsInputChain(message, agent.session.header.parentSession)) {
           state.automaticCount = 0;
           state.stopped = false;
           state.interrupted = false;
         }
       }
     }
-    if (event.type !== "turn/end" || isChild(agent)) return;
+    if (event.type !== "turn/end") return;
     if (event.data.reason?.kind !== "max-tokens") {
       this.#clear(state);
       return;
@@ -289,9 +390,15 @@ export class Continuation {
       state.stopped ||
       state.automaticCount >= value.continueLimit ||
       state.usedTriggers.has(event.seq) ||
-      state.pending !== null
+      state.pending !== null ||
+      state.childPending !== null
     )
       return;
+    if (child) {
+      state.childTrigger = event.seq;
+      if (agent.status === "idle") this.#continueChild(state, event, value);
+      return;
+    }
     state.pending = setImmediate(() => {
       state.pending = null;
       try {
@@ -300,6 +407,71 @@ export class Continuation {
         state.lastError = { code: error.code ?? "CONTINUATION_FAILED", message: error.message };
       }
     });
+  }
+
+  #childActivation(state) {
+    const activation = this.#childActivations.get(state.agent.session.id);
+    const agents = service(this.ctx, "agents");
+    return this.#childRuntime &&
+      serviceIdentity(service(this.ctx, "subagents")) === serviceIdentity(this.#childRuntime) &&
+      activation?.agent === state.agent &&
+      agents?.get(state.agent.session.id) === state.agent &&
+      agents.get(activation.parent.session.id) === activation.parent
+      ? activation
+      : null;
+  }
+
+  #continueChild(state, event, value) {
+    state.childTrigger = null;
+    const activation = this.#childActivation(state);
+    if (
+      !activation ||
+      !value.enabled ||
+      !value.autoContinue ||
+      state.stopped ||
+      state.automaticCount >= value.continueLimit ||
+      state.usedTriggers.has(event.seq) ||
+      state.childPending !== null ||
+      !state.cancel ||
+      state.interrupted ||
+      Object.getOwnPropertyDescriptor(state.agent, "cancel")?.value !== state.cancel.wrapper ||
+      state.agent.inbox.hasPending
+    )
+      return;
+    const pending = { triggerSeq: event.seq, controller: new AbortController() };
+    state.childPending = pending;
+    // Idle status is emitted before whenIdle resolves. Queue here so delivery
+    // wakes the idle driver before settlement, retaining its receipt and slot.
+    // turn/end itself is too early: asynchronous admission can miss its queue check.
+    let delivery;
+    try {
+      delivery = this.#childRuntime[CHILD_DELIVERY](
+        activation.parent,
+        state.agent.session.id,
+        [{ type: "text", text: value.continueText }],
+        { kind: SOURCE, mode: "automatic", triggerSeq: event.seq },
+        pending.controller.signal,
+        "queue",
+      );
+    } catch (error) {
+      delivery = Promise.reject(error);
+    }
+    Promise.resolve(delivery)
+      .then((messageId) => {
+        if (!state.messageIds.has(messageId))
+          fail(
+            "CONTINUATION_PARTIAL",
+            "官方子代理返回接纳结果，但未观察到对应消息；未宣称继续成功",
+          );
+        state.lastError = null;
+      })
+      .catch((error) => {
+        if (!pending.controller.signal.aborted)
+          state.lastError = { code: error.code ?? "CONTINUATION_FAILED", message: error.message };
+      })
+      .finally(() => {
+        if (state.childPending === pending) state.childPending = null;
+      });
   }
 
   #agent(payload) {
@@ -318,7 +490,7 @@ export class Continuation {
 
   #submit(state, triggerSeq, mode) {
     if (isChild(state.agent))
-      fail("UNSUPPORTED", "子代理的继续需要重新获取workflow执行槽，本版仅支持根会话");
+      fail("UNSUPPORTED", "子代理目前仅支持当前受管运行中的自动继续；手动恢复尚未接入");
     if (!this.#disposers.length || !state.cancel || !this.#createMessage)
       fail("UNSUPPORTED", "继续模块未就绪或该代理不支持安全提交");
     const value = settings(this.store),
@@ -403,7 +575,8 @@ export class Continuation {
 
   stop(payload) {
     const state = this.#state(this.#agent(payload));
-    const pending = state.pending !== null;
+    const pending =
+      state.pending !== null || state.childPending !== null || state.childTrigger !== null;
     this.#clear(state);
     state.stopped = true;
     if (!this.#disposers.length || !state.cancel)
@@ -452,6 +625,9 @@ export class Continuation {
     const value = settings(this.store);
     if (!value.enabled || !value.autoContinue)
       for (const state of this.#states.values()) this.stop({ sessionId: state.agent.session.id });
+    else
+      for (const state of this.#states.values())
+        if (state.automaticCount >= value.continueLimit) this.#clear(state);
   }
 
   status(payload) {
@@ -463,13 +639,14 @@ export class Continuation {
       automaticCount: state.automaticCount,
       limit: value.continueLimit,
       autoEnabled: Boolean(value.enabled && value.autoContinue),
-      pending: state.pending !== null,
+      pending: state.pending !== null || state.childPending !== null || state.childTrigger !== null,
+      childAutomaticAvailable: Boolean(this.#childActivation(state)),
       stopped: state.stopped,
       eligibleReason: end?.data.reason?.kind ?? null,
       unsupportedReason: state.interrupted
         ? "已观察到原生停止或取消，不能当作模型截断继续"
         : isChild(state.agent)
-          ? "子代理须通过workflow重新获取执行槽，本版仅支持根会话"
+          ? "子代理目前仅支持当前受管运行中的自动继续；手动恢复尚未接入"
           : !state.cancel
             ? "该代理没有可撤销取消观察接口"
             : null,
@@ -513,6 +690,8 @@ export class Continuation {
       }
     this.#states.clear();
     this.#createMessage = undefined;
+    this.#childRuntime = undefined;
+    this.#childActivations.clear();
     if (errors.length)
       throw new AggregateError(errors, "继续模块已尝试撤销全部监听与取消观察，部分所有权已改变");
   }

@@ -29,6 +29,11 @@ function fixture(t) {
   const moduleSource =
     'import {randomUUID} from "node:crypto"; export const createUserMessage = input => Object.freeze({...input,role:"user",id:randomUUID()});';
   writeFileSync(join(moduleRoot, "index.js"), moduleSource);
+  const childModuleRoot = join(root, "node_modules/@deepseek-ai/dsh-subagent");
+  mkdirSync(childModuleRoot, { recursive: true });
+  writeFileSync(join(childModuleRoot, "package.json"), '{"type":"module","main":"index.js"}');
+  const childModuleSource = "export {};";
+  writeFileSync(join(childModuleRoot, "index.js"), childModuleSource);
   const manifestPath = join(root, "desktop-runtime.json");
   const manifest = {
     release: { version: SUPPORTED_HOST },
@@ -36,6 +41,10 @@ function fixture(t) {
       {
         path: "node_modules/@deepseek-ai/dsh-llm/index.js",
         sha256: createHash("sha256").update(moduleSource).digest("hex"),
+      },
+      {
+        path: "node_modules/@deepseek-ai/dsh-subagent/index.js",
+        sha256: createHash("sha256").update(childModuleSource).digest("hex"),
       },
     ],
   };
@@ -51,7 +60,27 @@ function fixture(t) {
   const emit = (name, ...args) => {
     for (const callback of [...(listeners.get(name) ?? [])]) callback(...args);
   };
+  const deliveries = [];
+  let holdDeliveries = false;
   const ctx = {
+    subagents: {
+      [Symbol.for("dsh.subagent.deliverPrompt")](parent, id, content, source, signal, mode) {
+        const child = agents.get(id);
+        const delivery = { parent, id, content, source, signal, mode, status: child.status };
+        deliveries.push(delivery);
+        const accept = () => {
+          if (signal.aborted) return { accepted: false };
+          const message = { id: randomUUID(), role: "user", source, content };
+          child.inbox.splice("next-turn", child.inbox.nextTurn.length, 0, [message]);
+          delivery.message = message;
+          return { accepted: true, messageId: message.id };
+        };
+        if (!holdDeliveries) return Promise.resolve(accept());
+        return new Promise((resolve) => {
+          delivery.release = () => resolve(accept());
+        });
+      },
+    },
     agents: { get: (id) => agents.get(id), list: () => [...agents.values()] },
     on(name, callback) {
       const entries = listeners.get(name) ?? new Set();
@@ -70,6 +99,7 @@ function fixture(t) {
     const session = {
       id,
       header,
+      inheritedEventCount: 0,
       snapshotEvents: () => [...events],
       append(type, data) {
         const event = { seq: events.length, type, data };
@@ -112,6 +142,7 @@ function fixture(t) {
       finish(reason = { kind: "max-tokens" }) {
         const event = session.append("turn/end", { turn: 1, reason });
         agent.status = "idle";
+        emit("agent/status", { agent, status: "idle" });
         return event;
       },
       consume() {
@@ -130,7 +161,25 @@ function fixture(t) {
     continuation.revert();
     rmSync(root, { recursive: true, force: true });
   });
-  return { continuation, value, ctx, listeners, agents, emit, createAgent, manifestPath, manifest };
+  return {
+    continuation,
+    value,
+    ctx,
+    listeners,
+    agents,
+    emit,
+    createAgent,
+    manifestPath,
+    manifest,
+    deliveries,
+    holdDeliveries() {
+      holdDeliveries = true;
+    },
+    startChild(child, { local = true, runId = randomUUID() } = {}) {
+      child.status = "running";
+      emit("subagent/start", { id: child.session.id, runId, local });
+    },
+  };
 }
 
 test("manual continuation is explicit, truncated-only and plugin-attributed rather than a forged human input", async (t) => {
@@ -259,7 +308,7 @@ test("zero limit, unsupported child sessions and missing capabilities are explic
   assert.equal(agent.followups.length, 0);
   assert.equal(child.followups.length, 0);
   assert.throws(() => f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
-  assert.match(f.continuation.status({ sessionId: "child" }).unsupportedReason, /workflow/);
+  assert.match(f.continuation.status({ sessionId: "child" }).unsupportedReason, /手动/);
   f.continuation.continue({ sessionId: "root" });
   assert.equal(agent.followups.length, 1, "manual action is not an automatic quota");
   const noHost = new Continuation({}, { dispatch: () => ({ value: f.value }) }, {});
@@ -327,4 +376,360 @@ test("invalid inventory leaves no hooks and a repaired inventory can be applied"
   assert.ok(f.continuation.capabilities().every((item) => item.state === "available"));
   await f.continuation.apply();
   assert.notEqual(agent.cancel, before.value);
+});
+
+async function managedChild(t) {
+  const f = fixture(t);
+  f.value.autoContinue = true;
+  const parent = f.createAgent();
+  const child = f.createAgent("child", { parentSession: "root", origin: "subagent" });
+  await f.continuation.apply();
+  f.startChild(child);
+  return { ...f, parent, child };
+}
+
+test("managed child max-tokens synchronously queues official automatic delivery at the idle event", async (t) => {
+  const f = await managedChild(t);
+  f.value.continueText = "Current child continuation";
+  const end = f.child.finish();
+  assert.equal(
+    f.deliveries.length,
+    1,
+    "delivery starts during agent/status idle, before an immediate callback",
+  );
+  const delivery = f.deliveries[0];
+  assert.equal(delivery.status, "idle");
+  assert.equal(delivery.parent, f.parent);
+  assert.equal(delivery.id, "child");
+  assert.equal(delivery.mode, "queue");
+  assert.ok(delivery.signal instanceof AbortSignal);
+  assert.deepEqual(delivery.content, [{ type: "text", text: "Current child continuation" }]);
+  assert.deepEqual(delivery.source, {
+    kind: "dsh-unlimit/continuation",
+    mode: "automatic",
+    triggerSeq: end.seq,
+  });
+  assert.equal(f.child.followups.length, 0, "child input never uses root followup");
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 1);
+  assert.equal(f.continuation.status({ sessionId: "child" }).manualAvailable, false);
+  assert.throws(() => f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
+  f.emit("session/event", f.child.session, end);
+  await tick();
+  assert.equal(f.deliveries.length, 1, "same max-tokens trigger is submitted once");
+});
+
+test("managed child automatically continues only max-tokens and obeys current enable, source and limit", async (t) => {
+  const f = await managedChild(t);
+  for (const reason of [
+    { kind: "completed" },
+    { kind: "error", error: { code: "RATE_LIMIT" } },
+    { kind: "aborted", reason: { kind: "user" } },
+  ]) {
+    f.child.finish(reason);
+    assert.equal(f.deliveries.length, 0);
+  }
+  f.value.continueLimit = 0;
+  f.child.finish();
+  assert.equal(f.deliveries.length, 0);
+  f.value.continueLimit = 2;
+  f.value.autoContinue = false;
+  f.child.finish();
+  assert.equal(f.deliveries.length, 0);
+  f.value.autoContinue = true;
+  f.value.enabled = false;
+  f.child.finish();
+  assert.equal(f.deliveries.length, 0);
+  f.value.enabled = true;
+  f.child.finish();
+  f.child.consume();
+  f.child.finish();
+  f.child.consume();
+  f.child.finish();
+  assert.equal(f.deliveries.length, 2);
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 2);
+  await tick();
+  assert.equal(f.deliveries.length, 2);
+});
+
+test("new parent input and a child source input reset a managed child's automatic chain", async (t) => {
+  const f = await managedChild(t);
+  f.value.continueLimit = 1;
+  f.child.finish();
+  f.child.consume();
+  f.child.finish();
+  assert.equal(f.deliveries.length, 1);
+  f.parent.followup(user("Parent asks for status without delegating a new task"));
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 1);
+  f.child.followup({
+    ...user("A fresh task delegated by the parent"),
+    source: { kind: "agent-message", senderSessionId: "root", form: "relay" },
+  });
+  f.child.consume();
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 0);
+  f.child.status = "running";
+  f.child.finish();
+  assert.equal(f.deliveries.length, 2);
+  f.child.consume();
+  f.child.session.append("user/message", {
+    ...user("Context only"),
+    source: { kind: "runtime-context" },
+  });
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 1);
+  f.child.session.append("user/message", {
+    ...user("A fresh delegated task"),
+    source: { kind: "agent-message", senderSessionId: "root", form: "relay" },
+  });
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 0);
+  f.child.finish();
+  assert.equal(f.deliveries.length, 3);
+});
+
+test("pending child delivery is aborted by stop, native cancel, disable, new input and revert", async (t) => {
+  for (const action of [
+    "stop",
+    "cancel",
+    "parent-cancel",
+    "disable",
+    "auto-off",
+    "child-input",
+    "parent-input",
+    "completed",
+    "revert",
+  ]) {
+    await t.test(action, async (t) => {
+      const f = await managedChild(t);
+      f.holdDeliveries();
+      const end = f.child.finish();
+      f.emit("session/event", f.child.session, end);
+      assert.equal(f.deliveries.length, 1, "a pending trigger cannot submit twice");
+      const delivery = f.deliveries[0];
+      assert.equal(delivery.signal.aborted, false);
+      if (action === "stop") {
+        assert.equal(f.continuation.stop({ sessionId: "child" }).pendingCancelled, true);
+      } else if (action === "cancel") f.child.cancel({ kind: "user" });
+      else if (action === "parent-cancel") f.parent.cancel({ kind: "user" });
+      else if (action === "disable") {
+        f.value.enabled = false;
+        f.continuation.changed();
+      } else if (action === "auto-off") {
+        f.value.autoContinue = false;
+        f.continuation.changed();
+      } else if (action === "child-input") f.child.followup(user("Replace pending task"));
+      else if (action === "parent-input")
+        f.child.followup({
+          ...user("Replace pending child task from parent"),
+          source: { kind: "agent-message", senderSessionId: "root", form: "relay" },
+        });
+      else if (action === "completed") f.child.finish({ kind: "completed" });
+      else f.continuation.revert();
+      assert.equal(delivery.signal.aborted, true);
+      delivery.release();
+      await tick();
+      assert.equal(
+        f.child.inbox.nextTurn.length,
+        ["child-input", "parent-input"].includes(action) ? 1 : 0,
+        "cancelled delivery cannot arrive later or replace an unrelated new input",
+      );
+      assert.equal(delivery.message, undefined);
+      assert.equal(f.deliveries.length, 1);
+    });
+  }
+});
+
+test("accepted child automatic input uses ordinary ownership removal and running-turn cancellation", async (t) => {
+  const f = await managedChild(t);
+  f.child.finish();
+  await tick();
+  const acceptedSignal = f.deliveries[0].signal;
+  const stop = f.continuation.stop({ sessionId: "child" });
+  assert.equal(stop.ownedQueuedRemoved, 1);
+  assert.equal(f.child.inbox.nextTurn.length, 0);
+  assert.equal(acceptedSignal.aborted, false, "accepted delivery is no longer pending");
+  f.child.followup(user("Restart child"));
+  f.child.consume();
+  f.child.finish();
+  f.child.consume();
+  assert.equal(f.continuation.stop({ sessionId: "child" }).ownedRunCancelled, true);
+  assert.equal(f.child.cancelled, 1);
+});
+
+test("child automatic delivery requires an observed local start and exact live managed parent and child", async (t) => {
+  for (const scenario of [
+    "unobserved",
+    "pre-apply-start",
+    "remote",
+    "missing-parent",
+    "replaced-parent",
+    "replaced-child",
+  ]) {
+    await t.test(scenario, async (t) => {
+      const f = fixture(t);
+      f.value.autoContinue = true;
+      const parent = f.createAgent();
+      const child = f.createAgent("child", { parentSession: "root", origin: "subagent" });
+      if (scenario === "pre-apply-start") f.startChild(child);
+      await f.continuation.apply();
+      if (scenario !== "unobserved" && scenario !== "pre-apply-start")
+        f.startChild(child, { local: scenario !== "remote" });
+      if (scenario === "missing-parent") f.agents.delete("root");
+      if (scenario === "replaced-parent") f.agents.set("root", { ...parent });
+      if (scenario === "replaced-child") f.agents.set("child", { ...child });
+      child.status = "running";
+      child.finish();
+      await tick();
+      assert.equal(f.deliveries.length, 0);
+      assert.throws(() => f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
+      // Restore the directory for ordinary fixture teardown after the residency probe.
+      f.agents.set("root", parent);
+      f.agents.set("child", child);
+    });
+  }
+});
+
+test("child history excludes inherited root inputs and automatic quota, retaining its own accepted history", async (t) => {
+  const f = fixture(t);
+  f.value.autoContinue = true;
+  f.value.continueLimit = 1;
+  f.createAgent();
+  const child = f.createAgent("child", { parentSession: "root", origin: "subagent" });
+  child.session.append("user/message", {
+    ...user("Inherited root continuation"),
+    source: { kind: "dsh-unlimit/continuation", mode: "automatic", triggerSeq: 100 },
+  });
+  child.session.inheritedEventCount = 1;
+  await f.continuation.apply();
+  f.startChild(child);
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 0);
+  child.finish();
+  assert.equal(f.deliveries.length, 1);
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 1);
+  f.continuation.revert();
+  await f.continuation.apply();
+  f.startChild(child);
+  assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 1);
+  child.status = "running";
+  child.finish();
+  assert.equal(f.deliveries.length, 1, "own accepted automatic history still enforces quota");
+});
+
+test("parent cancellation retracts only accepted child automatic input before it starts", async (t) => {
+  const f = await managedChild(t);
+  f.child.finish();
+  assert.equal(f.deliveries.length, 1);
+  const owned = f.child.inbox.nextTurn[0];
+  const unrelated = {
+    ...user("Unrelated task from the parent"),
+    source: { kind: "agent-message", senderSessionId: "root", form: "relay" },
+  };
+  const human = user("Unrelated manual child input");
+  f.child.followup(unrelated);
+  f.child.followup(human);
+  assert.equal(f.child.inbox.nextTurn.length, 3);
+  assert.equal(f.parent.cancel({ kind: "user" }), "original-cancel");
+  assert.deepEqual(f.child.inbox.nextTurn, [unrelated, human]);
+  assert.equal(f.child.cancelled, 0, "no child turn is running yet");
+  assert.equal(f.parent.cancelled, 1);
+  assert.equal(
+    f.deliveries[0].signal.aborted,
+    false,
+    "the accepted delivery is removed through inbox ownership",
+  );
+  assert.equal(owned.source.mode, "automatic");
+  await tick();
+  assert.equal(f.deliveries.length, 1);
+});
+
+test("parent cancellation cancels an owned child automatic running turn but preserves ordinary child work", async (t) => {
+  await t.test("owned automatic turn", async (t) => {
+    const f = await managedChild(t);
+    f.child.finish();
+    f.child.consume();
+    assert.equal(f.child.status, "running");
+    f.parent.cancel({ kind: "user" });
+    assert.equal(f.parent.cancelled, 1);
+    assert.equal(f.child.cancelled, 1);
+    assert.deepEqual(f.child.cancelArgs, [{ kind: "user" }]);
+    await tick();
+    assert.equal(f.deliveries.length, 1);
+  });
+  await t.test("ordinary delegated turn", async (t) => {
+    const f = await managedChild(t);
+    f.child.followup({
+      ...user("Ordinary parent task"),
+      source: { kind: "agent-message", senderSessionId: "root", form: "relay" },
+    });
+    f.child.consume();
+    f.parent.cancel({ kind: "user" });
+    assert.equal(f.parent.cancelled, 1);
+    assert.equal(f.child.cancelled, 0);
+    assert.equal(f.child.status, "running");
+    assert.equal(f.deliveries.length, 0);
+  });
+});
+
+test("child automatic quota is preserved for context, instructions, settled notices and descendant messages", async (t) => {
+  for (const source of [
+    { kind: "runtime-context" },
+    { kind: "agent-instructions" },
+    { kind: "subagent-settled" },
+    { kind: "agent-message", senderSessionId: "grandchild", form: "relay" },
+  ]) {
+    await t.test(
+      source.kind + (source.senderSessionId ? ` from ${source.senderSessionId}` : ""),
+      async (t) => {
+        const f = await managedChild(t);
+        f.value.continueLimit = 1;
+        f.child.finish();
+        f.child.consume();
+        f.child.session.append("user/message", { ...user("Non-task source input"), source });
+        assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 1);
+        f.child.finish();
+        assert.equal(f.deliveries.length, 1, "non-parent source cannot reopen the automatic quota");
+      },
+    );
+  }
+});
+
+test("child cancel ownership conflict cannot suppress native parent cancellation or stopping another child", async (t) => {
+  const f = await managedChild(t);
+  f.child.finish();
+  f.child.consume();
+  const sibling = f.createAgent("sibling", { parentSession: "root", origin: "subagent" });
+  f.startChild(sibling);
+  sibling.finish();
+  assert.equal(sibling.inbox.nextTurn.length, 1);
+  const installedCancel = f.child.cancel;
+  let laterOwnerCalls = 0;
+  const laterOwnerCancel = () => {
+    laterOwnerCalls++;
+  };
+  f.child.cancel = laterOwnerCancel;
+  try {
+    let conflict;
+    try {
+      f.parent.cancel({ kind: "user" });
+    } catch (error) {
+      conflict = error;
+    }
+    const hasConflict = (error) =>
+      error?.code === "CONFLICT" ||
+      (error instanceof AggregateError && error.errors.some(hasConflict));
+    assert.ok(
+      hasConflict(conflict),
+      "child cancellation ownership conflict is reported explicitly",
+    );
+    assert.equal(f.parent.cancelled, 1, "the native parent cancellation must always execute");
+    assert.equal(f.child.cancel, laterOwnerCancel, "a later cancel owner is preserved");
+    assert.equal(laterOwnerCalls, 0, "the plugin must not invoke the later owner's cancel");
+    assert.equal(
+      sibling.inbox.nextTurn.length,
+      0,
+      "one child conflict cannot block another child's owned continuation removal",
+    );
+    await tick();
+    assert.equal(sibling.inbox.nextTurn.length, 0);
+  } finally {
+    // Restore our deliberately replaced method so fixture teardown can release its own hook.
+    f.child.cancel = installedCancel;
+  }
 });
