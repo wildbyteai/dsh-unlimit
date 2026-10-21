@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "behaviorId": "CORE-MODES",
-  "generatedAt": "2026-10-21T05:31:47.551Z",
+  "generatedAt": "2026-10-21T05:53:37.389Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2715,6 +2715,7 @@
     "rootsRemoved": true,
     "filesystemReadsReal": true,
     "filesystemBoundaryGuards": true,
+    "guardsHeldThroughOfficialLifecycle": true,
     "syntheticModelAdapter": true
   },
   "scenarios": [
@@ -2833,7 +2834,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "adbd80bf460a592c908cd799758336951bce16f3586e7478b14a20b55a54aed3"
+      "sha256": "48d476c23e9b939dc0b6bee817be5b057ac761fe3825909661fff3ef3fbae19e"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

@@ -77,6 +77,8 @@ async function fixture(t) {
     fiber,
     moduleNamespace: namespace,
   };
+  fiber.entry = entry;
+  fiber.runtime.fibers = [fiber];
   let entries = [entry];
   const services = { loader: { entries: () => entries } };
   const ctx = {
@@ -114,6 +116,9 @@ async function fixture(t) {
     },
     entries: (value) => {
       entries = value;
+    },
+    registry: (runtimes) => {
+      ctx.registry = new Map(runtimes.map((runtime) => [runtime.callback, runtime]));
     },
   };
 }
@@ -164,12 +169,94 @@ test("zero/default means host and invalid budgets reject before any update", asy
   assert.equal(f.updates.length, 0);
 });
 
+test("retained preset entry is discovered through the real Cordis registry shape", async (t) => {
+  const f = await fixture(t);
+  f.entries([]);
+  f.registry([f.fiber.runtime]);
+  assert.equal(f.adapter.capabilities()[0].state, "available");
+  assert.equal((await f.adapter.apply())[0].effective, 80);
+  assert.equal(f.fiber.config.readMaxBytes, 80);
+  assert.equal(f.entry.options.config, f.raw);
+  assert.deepEqual(f.raw, f.original);
+  await f.adapter.revert();
+  assert.deepEqual(f.fiber.config, f.original);
+  assert.ok(f.updates.every((row) => row.noSave === true));
+});
+
+test("Loader and registry catalogs deduplicate the same Entry by identity", async (t) => {
+  const f = await fixture(t);
+  f.entries([f.entry, f.entry]);
+  f.registry([f.fiber.runtime]);
+  assert.equal((await f.adapter.apply())[0].state, "active");
+  assert.equal(f.updates.length, 1);
+  await f.adapter.revert();
+  assert.deepEqual(f.fiber.config, f.original);
+});
+
+test("distinct root and preset entries remain an unsupported ambiguous target", async (t) => {
+  const f = await fixture(t);
+  const presetFiber = { ...f.fiber };
+  const presetEntry = { ...f.entry, fiber: presetFiber };
+  presetFiber.entry = presetEntry;
+  presetFiber.runtime = { callback: f.entry.moduleNamespace.apply, fibers: [presetFiber] };
+  f.registry([presetFiber.runtime]);
+  const capability = f.adapter.capabilities()[0];
+  assert.equal(capability.state, "unsupported");
+  assert.match(capability.detail, /未唯一活动/);
+  assert.equal(capability.effectiveCaps, null);
+  await assert.rejects(f.adapter.apply(), { code: "UNSUPPORTED_CAPABILITY" });
+  assert.equal(f.updates.length, 0);
+});
+
+test("stale or mismatched registry fibers cannot identify an active preset entry", async (t) => {
+  for (const change of [
+    (f) => {
+      f.fiber.state = 0;
+    },
+    (f) => {
+      f.entry.fiber = { ...f.fiber };
+    },
+    (f) => {
+      f.registry([{ callback: f.fiber.runtime.callback, fibers: [f.fiber] }]);
+    },
+    (f) => {
+      f.entry.moduleNamespace = { apply() {} };
+    },
+  ]) {
+    const f = await fixture(t);
+    f.entries([]);
+    f.registry([f.fiber.runtime]);
+    change(f);
+    assert.equal(f.adapter.capabilities()[0].state, "unsupported");
+    await assert.rejects(f.adapter.apply(), { code: "UNSUPPORTED_CAPABILITY" });
+    assert.equal(f.updates.length, 0);
+  }
+});
+
+test("revert locates the owned inactive preset fiber but does not invent a removed entry", async (t) => {
+  const f = await fixture(t);
+  f.entries([]);
+  f.registry([f.fiber.runtime]);
+  await f.adapter.apply();
+  f.fiber.state = 0;
+  assert.equal(f.adapter.capabilities()[0].state, "unsupported");
+  await f.adapter.revert();
+  assert.equal(f.fiber.state, 2);
+  assert.deepEqual(f.fiber.config, f.original);
+  await f.adapter.apply();
+  f.registry([]);
+  const count = f.updates.length;
+  await assert.rejects(f.adapter.revert(), { code: "CONFLICT" });
+  assert.equal(f.updates.length, count);
+  assert.equal(f.adapter.capabilities()[0].owned, true);
+});
+
 test("unsupported versions, modified modules, duplicate/inactive/disabled targets reject before writes", async (t) => {
   for (const change of [
     (f) => {
       f.host.version = "future";
     },
-    (f) => f.entries([f.entry, f.entry]),
+    (f) => f.entries([f.entry, { ...f.entry }]),
     (f) => {
       f.fiber.state = 0;
     },

@@ -22,7 +22,7 @@ const within = (base, path) => {
 };
 
 /** A real complete standard declaration; only model responses and human answers are synthetic. */
-export async function presetFixture(t, selectedRoot, cache) {
+export async function presetFixture(t, selectedRoot, cache, { permissionPresets = false } = {}) {
   const installedRoot = fs.realpathSync(selectedRoot);
   const inventoryBytes = fs.readFileSync(join(installedRoot, "desktop-runtime.json"));
   const inventory = new Map(JSON.parse(inventoryBytes).files.map((row) => [row.path, row.sha256]));
@@ -94,8 +94,10 @@ export async function presetFixture(t, selectedRoot, cache) {
     errors = [],
     requests = [],
     scripts = new Map(),
+    permissionEntries = [],
     revisionBindings = [];
   let disposed = false;
+  let officialLifecycleDisposed = false;
   const dispose = async () => {
     if (disposed) return;
     disposed = true;
@@ -106,9 +108,10 @@ export async function presetFixture(t, selectedRoot, cache) {
       for (const handle of handles.reverse()) await handle.dispose();
       for (const fiber of fibers.reverse()) if (fiber.uid !== null) await fiber.dispose();
       await ctx?.fiber.dispose();
+      officialLifecycleDisposed = true;
       for (const row of installed)
         assert.equal(digest(fs.readFileSync(join(installedRoot, row.path))), row.sha256);
-      assert.deepEqual(forbidden, [], "No network, subprocess or out-of-fixture file access");
+      assert.deepEqual(forbidden, [], "No forbidden network, subprocess or filesystem access");
     } finally {
       t.mock.restoreAll();
       syncBuiltinESMExports();
@@ -127,10 +130,41 @@ export async function presetFixture(t, selectedRoot, cache) {
     "Shared Loader must record every actual official import",
   );
 
+  // The official filesystem fence compares ancestor identities when an
+  // outside-workspace path is rejected. Permit only that exact directory
+  // metadata, never ancestor contents, enumeration or mutation.
+  const ancestorMetadata = new Set();
+  const platformMetadata = new Set();
+  const metadataReads = [];
+  if (permissionPresets) {
+    for (let ancestor = dirname(directory); ; ancestor = dirname(ancestor)) {
+      ancestorMetadata.add(ancestor);
+      if (dirname(ancestor) === ancestor) break;
+    }
+    for (const path of ["/tmp", os.tmpdir()]) {
+      platformMetadata.add(path);
+      platformMetadata.add(fs.realpathSync(path));
+    }
+  }
+
   // Keep real filesystem implementations. The guard rejects access instead of synthesizing data.
   const checkPath = (path, writing, operation) => {
     if (typeof path === "number") return;
     const filename = resolve(path instanceof URL ? fileURLToPath(path) : String(path));
+    if (
+      !writing &&
+      ((/^stat(?:Sync)?$/.test(operation) && ancestorMetadata.has(filename)) ||
+        (/^(?:realpath(?:Sync)?(?:\.native)?|stat(?:Sync)?)$/.test(operation) &&
+          platformMetadata.has(filename)))
+    ) {
+      metadataReads.push({
+        operation,
+        scope: platformMetadata.has(filename)
+          ? "platform-temporary-root"
+          : "synthetic-root-ancestor",
+      });
+      return;
+    }
     if (
       within(directory, filename) ||
       (!writing && (within(installedRoot, filename) || within(runtime.root, filename)))
@@ -138,7 +172,7 @@ export async function presetFixture(t, selectedRoot, cache) {
       return;
     forbidden.push(`filesystem.${operation}`);
     throw new Error(
-      `Standard preset fixture forbids filesystem.${operation} outside synthetic roots`,
+      `Standard preset fixture forbids filesystem.${operation} outside synthetic roots: ${filename}`,
     );
   };
   const writingFlags = (flags) =>
@@ -151,11 +185,11 @@ export async function presetFixture(t, selectedRoot, cache) {
             fs.constants.O_APPEND)) !==
         0
       : typeof flags === "string" && /[wa+]/.test(flags);
-  const guard = (api, key, writing) => {
+  const guard = (api, key, writing, operation = key) => {
     const original = api[key];
     if (typeof original !== "function") return;
     t.mock.method(api, key, function (path, ...args) {
-      checkPath(path, writing === "open" ? writingFlags(args[0]) : writing, key);
+      checkPath(path, writing === "open" ? writingFlags(args[0]) : writing, operation);
       if (/^(rename|copyFile)/.test(key)) checkPath(args[0], true, key);
       return Reflect.apply(original, this, [path, ...args]);
     });
@@ -172,6 +206,7 @@ export async function presetFixture(t, selectedRoot, cache) {
     "opendir",
   ])
     for (const target of [key, `${key}Sync`]) guard(fs, target, false);
+  for (const key of ["realpath", "realpathSync"]) guard(fs[key], "native", false, `${key}.native`);
   for (const key of [
     "writeFile",
     "appendFile",
@@ -228,6 +263,7 @@ export async function presetFixture(t, selectedRoot, cache) {
     typert: "dsh-typert-registry",
     sandboxPolicy: "dsh-sandbox-policy",
     approval: "dsh-user-approval",
+    ...(permissionPresets ? { permission: "dsh-permission-presets" } : {}),
     fs: "dsh-fs-sandbox",
     observation: "dsh-fs-observation-policy",
     directory: "dsh-working-directory",
@@ -290,17 +326,18 @@ export async function presetFixture(t, selectedRoot, cache) {
         tools: structuredClone(request.tools),
         plan: structuredClone(ctx.agentPresets.serviceFor(agent, "planMode").get(agent)),
       });
+      const requestOrdinal = requests.length;
       // A held response pauses only this synthetic model transport. The real
       // AgentLoop, activation admission and teardown remain unchanged.
       if (action?.kind === "hold") await action.wait(request);
-      if (action === "finish" || action?.kind === "hold")
+      if (action === "finish" || (action?.kind === "hold" && action.calls === undefined))
         yield { type: "text-delta", index: 0, text: "SYNTHETIC_STANDARD_COMPLETE" };
       else
-        for (const [index, call] of action.entries())
+        for (const [index, call] of (action?.kind === "hold" ? action.calls : action).entries())
           yield {
             type: "tool-call-delta",
             index,
-            id: `${agent.id}-${agent.phase.step}-${index}`,
+            id: `${agent.id}-${requestOrdinal}-${index}`,
             name: call.name,
             argumentsDelta: JSON.stringify(call.arguments),
           };
@@ -323,6 +360,14 @@ export async function presetFixture(t, selectedRoot, cache) {
       new api.llm.LlmRuntime(scope);
       scope.llm.registerAdapter(["synthetic-standard-offline"], new OfflineAdapter());
       scope.on("agent/error", ({ error }) => errors.push(error));
+      if (permissionPresets) {
+        // An in-memory configuration directory points to the actual official
+        // permission fiber. It provides no profile read/write implementation.
+        const editor = new api.cordis.Service(scope, "configEditor");
+        editor.entries = () => permissionEntries;
+        editor.configuration = deny("profile.configuration");
+        editor.edit = deny("profile.edit");
+      }
     },
   });
   await mount(api.tools);
@@ -348,6 +393,13 @@ export async function presetFixture(t, selectedRoot, cache) {
   await mount(api.sandbox);
   await mount(api.shell, { timeoutMs: 1000 });
   await mount(api.shellEnv, { dshHome: homes.DSH_HOME });
+  if (permissionPresets) {
+    const permissionFiber = await mount(api.permission, { defaultPreset: "workspace-write" });
+    permissionEntries.push({
+      options: { name: "@deepseek-ai/dsh-permission-presets" },
+      fiber: permissionFiber,
+    });
+  }
   await mount(api.ptc);
   await mount(api.subagents);
   await mount(api.spawn, { providerName: "spawn" });
@@ -578,6 +630,22 @@ export async function presetFixture(t, selectedRoot, cache) {
         rootsRemoved: !fs.existsSync(directory) && !fs.existsSync(runtime.root),
         filesystemReadsReal: true,
         filesystemBoundaryGuards: true,
+        guardsHeldThroughOfficialLifecycle: officialLifecycleDisposed,
+        ...(permissionPresets
+          ? {
+              metadataOnlyReads: {
+                purpose:
+                  "Official filesystem containment identity checks and canonical temporary roots",
+                scope: "Exact synthetic-root ancestors and platform temporary-root paths only",
+                operations: metadataReads.reduce((counts, row) => {
+                  const key = `${row.scope}:${row.operation}`;
+                  counts[key] = (counts[key] ?? 0) + 1;
+                  return counts;
+                }, {}),
+                ancestorEnumerationContentReadsOrWritesAllowed: false,
+              },
+            }
+          : {}),
         syntheticModelAdapter: true,
       },
     }),

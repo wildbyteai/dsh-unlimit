@@ -70,7 +70,22 @@ export class ReadLimits {
       const loader = this.service("loader");
       if (typeof loader?.entries !== "function" || typeof this.ctx.on !== "function")
         return { reason: "缺少官方运行时条目目录或配置生命周期观察接口" };
-      const entries = [...loader.entries()].filter(
+      const candidates = new Set(loader.entries());
+      // Retained preset trees are deliberately detached from the Host Loader.
+      // Cordis still catalogs their real fibers and Loader-owned Entry links.
+      if (typeof this.ctx.registry?.values === "function")
+        for (const runtime of this.ctx.registry.values())
+          for (const fiber of runtime.fibers) {
+            const entry = fiber.entry;
+            if (
+              entry?.options?.name === PACKAGE &&
+              entry.fiber === fiber &&
+              fiber.runtime === runtime &&
+              runtime.callback === entry.moduleNamespace?.apply
+            )
+              candidates.add(entry);
+          }
+      const entries = [...candidates].filter(
         (entry) =>
           entry.options?.name === PACKAGE &&
           (entry.fiber?.state === 2 || (!active && entry === this.#owned?.entry)),
