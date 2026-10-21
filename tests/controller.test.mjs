@@ -62,6 +62,75 @@ function controlFixture() {
   return { controller, store, runtime, repeat, calls, save };
 }
 
+test("HTTP scope activation failure rolls back controls before enabled is persisted", async () => {
+  const f = controlFixture();
+  const gate = Promise.withResolvers();
+  f.controller.webScope = {
+    capabilities: () => [{ id: "webScope", state: "available", owned: false }],
+    apply: () => gate.promise,
+    async revert() {
+      f.calls.push("http.reverted");
+    },
+  };
+  const applying = f.controller.dispatch("control.apply");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(f.store.dispatch("settings.get").value.enabled, false);
+  gate.reject(new Error("Synthetic HTTP ownership changed"));
+  await assert.rejects(applying, /ownership changed/);
+  assert.equal(f.store.dispatch("settings.get").value.enabled, false);
+  assert.equal(f.runtime.enabled, false);
+  assert.ok(f.calls.indexOf("http.reverted") < f.calls.indexOf("runtime.revert"));
+  f.controller.webScope.capabilities = () => [{ id: "webScope", state: "unsupported" }];
+  f.controller.webScope.apply = () => assert.fail("unsupported HTTP must stay unapplied");
+  const status = await f.controller.dispatch("control.apply");
+  assert.equal(status.enabled, true);
+  assert.equal(status.capabilities.find((item) => item.id === "webScope").state, "unsupported");
+});
+
+test("saving a changed exception list attempts HTTP cancellation despite independent cleanup failure", async () => {
+  const f = controlFixture();
+  let httpStops = 0;
+  f.controller.webScope = { stopAll: async () => httpStops++ };
+  f.controller.networkScope = {
+    changed: async () => {
+      throw new Error("Synthetic snapshot cleanup failure");
+    },
+  };
+  f.controller.connectionChecks = {
+    stopAll: async () => {
+      throw new Error("Synthetic check cleanup failure");
+    },
+  };
+  await assert.rejects(f.save({ ownServers: ["owned.example.invalid"] }), (error) => {
+    assert.equal(error.code, "SETTINGS_APPLIED_PARTIAL");
+    assert.equal(error.partial.savedRevision, 1);
+    return true;
+  });
+  assert.equal(httpStops, 1);
+  assert.deepEqual(f.store.dispatch("settings.get").value.ownServers, ["owned.example.invalid"]);
+  await f.save({ readLimit: 10 });
+  assert.equal(httpStops, 1, "unrelated setting does not cancel requests");
+});
+
+test("scope replacement cancels both transports even if the operation reports a partial failure", async () => {
+  const f = controlFixture();
+  let revision = "before";
+  const calls = [];
+  f.controller.networkScope = {
+    status: () => ({ revision }),
+    async dispatch() {
+      revision = "after";
+      throw Object.assign(new Error("Synthetic operation failed after persistence"), {
+        code: "PARTIAL",
+      });
+    },
+  };
+  f.controller.connectionChecks = { stopAll: async () => calls.push("checks") };
+  f.controller.webScope = { stopAll: async () => calls.push("http") };
+  await assert.rejects(f.controller.dispatch("networkScope.import", {}), { code: "PARTIAL" });
+  assert.deepEqual(calls.sort(), ["checks", "http"]);
+});
+
 test("permission selection validates before persistence and inactive saves do not apply host controls", async () => {
   const f = controlFixture();
   await assert.rejects(f.save({ permissionDefault: "auto" }), {

@@ -32,6 +32,7 @@ export class Controller {
     maintenance,
     connectionChecks,
     networkScope,
+    webScope,
     onSkillsChanged,
   }) {
     Object.assign(this, {
@@ -57,12 +58,14 @@ export class Controller {
       maintenance,
       connectionChecks,
       networkScope,
+      webScope,
       onSkillsChanged,
     });
   }
   async revertControls() {
     const errors = [];
     for (const service of [
+      this.webScope,
       this.continuation,
       this.repeat,
       this.readLimits,
@@ -152,6 +155,7 @@ export class Controller {
         ...runtimeCapabilities,
         ...(this.repeat?.capabilities() ?? []),
         ...(this.readLimits?.capabilities() ?? []),
+        ...(this.webScope?.capabilities() ?? []),
         ...(this.continuation?.capabilities() ?? []),
         ...(this.retry?.capabilities() ?? []).map((item) =>
           this.host.supported
@@ -227,6 +231,7 @@ export class Controller {
     };
     if (this.connectionChecks) await step("checks", () => this.connectionChecks.stopAll());
     if (this.networkScope) await step("scope", () => this.networkScope.stopAll());
+    if (this.webScope) await step("http", () => this.webScope.stopAll());
     // Cancel owned connections before draining accepted actions. No new action
     // enters while maintenance is active; awaited apply/save still finish.
     await Promise.allSettled([...this.#pending]);
@@ -342,6 +347,10 @@ export class Controller {
           this.extensions?.apply();
           await this.repeat?.apply();
           await this.updateReadLimits("apply");
+          if (
+            this.webScope?.capabilities().some((item) => item.state !== "unsupported" || item.owned)
+          )
+            await this.webScope.apply();
           this.store.dispatch("settings.save", {
             revision: current.revision,
             value: { ...current.value, enabled: true },
@@ -393,7 +402,11 @@ export class Controller {
         const errors = [];
         for (const change of [
           ...(JSON.stringify(current.value.ownServers) !== JSON.stringify(result.value.ownServers)
-            ? [() => this.networkScope?.changed(), () => this.connectionChecks?.stopAll()]
+            ? [
+                () => this.networkScope?.changed(),
+                () => this.connectionChecks?.stopAll(),
+                () => this.webScope?.stopAll(),
+              ]
             : []),
           () => this.continuation?.changed(),
           ...(this.runtime.enabled
@@ -474,10 +487,12 @@ export class Controller {
           if (!this.networkScope) return unavailable("范围管理服务未加载");
           const changesScope = ["networkScope.resolve", "networkScope.import"].includes(action);
           const before = changesScope ? this.networkScope.status().revision : null;
-          const result = await this.networkScope.dispatch(action, payload);
-          if (changesScope && this.networkScope.status().revision !== before)
-            await this.connectionChecks?.stopAll();
-          return result;
+          try {
+            return await this.networkScope.dispatch(action, payload);
+          } finally {
+            if (changesScope && this.networkScope.status().revision !== before)
+              await Promise.all([this.connectionChecks?.stopAll(), this.webScope?.stopAll()]);
+          }
         }
         if (action.startsWith("connectionChecks.")) {
           if (!this.connectionChecks) return unavailable("连接检查服务未加载");

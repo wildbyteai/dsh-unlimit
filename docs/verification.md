@@ -54,7 +54,9 @@ V-SCOPE 浏览器预览为1280×720，临时合成CSV和SQLite、假DNS/假传�
 | V-PLAN        | [workflow-plan.test.mjs](../tests/workflow-plan.test.mjs) | 16项合成收据检查：单槽排队、目录及环境依赖、原始结果只传直接依赖、上下文超限阻断、失败及清理保槽、父/项目隔离、停止/撤销/启动竞态 | 真实Store/Flow/DesktopWorkflow，activation结果为合成；官方计划执行另见 V-WORKFLOW，无自动拆解或跨重启恢复 |
 | V-CLIENT      | [client-bridge.test.mjs](../tests/client-bridge.test.mjs) | 13项桥验证：同源/指定iframe、文字/图片/文件草稿、字节与元信息、已有输入保护、部分失败、取消/关闭/过期、晚写拒绝、批次释放         | DOM为最小合成模型；官方客户端路径另见下节                                                                 |
 
-2026-10-21，在 `a7d4ab9` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，完整运行 `node --expose-internals --test tests/*.test.mjs`，退出码0，结果为 **482通过、0失败、0跳过**。JavaScript 语法检查 **115/115通过**。范围措辞调整与判定期间数据库替换的竞态回归均包含在最终完整运行中。这些是合成、官方模块隔离和入口集成测试，不是482项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。117项行为的目标及最低验收场景保持不变，局部新增证据不将整项范围执行标为完成。
+2026-10-21，在 `8c700fb` 后包含本文的工作树，主代理使用 bundled Node **24.21.0** 并提供 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`，完整运行 `node --expose-internals --test tests/*.test.mjs`，退出码0，结果为 **526通过、0失败、0跳过**。JavaScript 语法检查 **121/121通过**。此次包含官方 HTTP 工具、实际临时国家数据库、代理路由与描述符所有权修正的最终回归。这些是合成、官方模块隔离和入口集成测试，不是526项桌面验收。构建与离线打包独立核对，包不安装到当前桌面。117项行为的目标及最低验收场景保持不变，局部新增证据不将整项范围执行标为完成。
+
+新增 **V-WEB-SCOPE**：[请求组合测试](../tests/scoped-http.test.mjs)16项、[版本与摘要门](../tests/web-scope.test.mjs)2项、[官方工具链测试](../tests/web-scope-host.test.mjs)23项，以及Controller新增3项，共44项新增结果。官方 ToolRuntime/web_fetch/AgentRegistry/WebRuntime/HTTP provider 与临时真实 SQLite 范围库验证主/子会话、并发精确身份、CN/HK/MO/未知拒绝、精确与保存派生IP、别名拒绝、原生 private/mixed-DNS 拒绝、guard/pre-policy/取消、范围变化和还原冲突。真实官方代理安装后，目标DNS、dispatch和外部socket均为零；卸载路由恢复原dispatcher。独立回环fixture验证单一固定地址、原Host、同源逐跳判定、跨源拒绝和响应取消后关闭。生产适配门拒绝fixture resolver；不把回环测试当作放宽公有地址限制的依据。没有真实AgentLoop运行、真实profile、桌面安装、外部目标或生产TLS验收；通用出口及无例外IPv6地区判定仍缺。[合同](web-scope-contract.md) / [结构化证据](evidence/web-scope-acceptance.json)。
 
 新增凭据与环境预检：
 

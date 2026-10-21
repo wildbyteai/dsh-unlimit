@@ -27,6 +27,7 @@ import { DesktopMaintenance } from "./maintenance.js";
 import { ConnectionChecks } from "../core/connection-checks.js";
 import { NetworkScope } from "../core/network-scope.js";
 import { CountryDatabase } from "../core/country-database.js";
+import { WebScope } from "./web-scope.js";
 
 export const name = "dsh-unlimit";
 export const inject = ["webServer", "connection"];
@@ -50,6 +51,7 @@ export function mount(ctx, host) {
   const admission = new DrillAdmission(store, host.dataRoot);
   const countryDatabase = new CountryDatabase(realpathSync(host.dataRoot));
   const networkScope = new NetworkScope(store, { database: countryDatabase, admission });
+  const webScope = new WebScope(ctx, store, host, { scope: networkScope });
   const connectionChecks = new ConnectionChecks(store, { admission, scope: networkScope });
   const workflow = new DesktopWorkflow(ctx, store, flow, { admission });
   const environment = new LocalEnvironment(realpathSync(host.dataRoot));
@@ -77,6 +79,7 @@ export function mount(ctx, host) {
     admission,
     connectionChecks,
     networkScope,
+    webScope,
     plans,
     environment,
     host,
@@ -86,6 +89,7 @@ export function mount(ctx, host) {
   ctx.effect(() => async () => {
     const errors = [];
     for (const cleanup of [
+      () => webScope.revert(),
       () => connectionChecks.close(),
       () => networkScope.close(),
       () => countryDatabase.close(),
@@ -177,6 +181,7 @@ export function mount(ctx, host) {
     runtime.ctx = scope;
     repeat.ctx = scope;
     readLimits.ctx = scope;
+    webScope.ctx = scope;
     scope.effect(() => () => controller.revertControls());
     const settings = store.dispatch("settings.get").value;
     if (settings.enabled && settings.autoReapply && host.supported) {

@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-21",
+  "target": {
+    "desktop": "0.2.1-rc.2",
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "24.21.0"
+  },
+  "source": {
+    "baseCommit": "8c700fb3a68e4117d733c895820e3fb602a07970",
+    "revision": "the commit containing this evidence",
+    "sha256": {
+      "src/host/web-scope.js": "a0b162dbc18359797708db1152840cb31e0e9881503f94326bf278ec01732123",
+      "src/host/scoped-http.js": "eb26d1bbda28007d3e207519147b4915a88bf13be06b58e8299ca8be1a7bd929",
+      "src/host/plugin.js": "77c6aa55199cbf9bfc3f2fcf48878585d02aeb33e319aa7dd98e9e911f00ed9a",
+      "src/server/controller.js": "223d5dfdc699664698aff729af791c52182451b794307d7a965a99ad97d8fabf",
+      "src/core/network-scope.js": "eceac062793ba123a9d880beae85add4de2ee46e9c4ff850f947512ba2603448",
+      "src/core/country-database.js": "1a14d499b40241f3bda8953739173b6fc08423a5945bc0d675979d59b599405d",
+      "tests/web-scope.test.mjs": "7897c461ae41bd6748a7ec83993a6d2d23a42a2498587fc34a6d2b7f7f4de4e8",
+      "tests/scoped-http.test.mjs": "244f849f3f4da37cedf543f1cf6167eb8518bc4f18bebfe264e391d47334cd95",
+      "tests/web-scope-host.test.mjs": "b7f5a87bb9a019a60b40672b34ffc21f06328e171b84c4c4081c38737bba6fd9",
+      "tests/helpers/web-runtime.mjs": "d032b0414bf83e2c067a5613f1a6bf849384605ef2add74ff321199de2b98c73",
+      "tests/controller.test.mjs": "54d5fdbfd03804ec1a0e4ed6f8bfebad2aaafdbbc02cd8e8bea0f6e63ef7c087"
+    }
+  },
+  "status": "partial-functional-parity",
+  "verification": {
+    "fullSuite": {
+      "command": "DSH_UNLIMIT_RUNTIME=<official-runtime> DSH_UNLIMIT_OFFICIAL_PACKAGES=<pinned-archive-cache> <bundled-node> --expose-internals --test tests/*.test.mjs",
+      "passed": 526,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "syntax": {
+      "passed": 121,
+      "total": 121
+    },
+    "newResults": {
+      "scopedHttp": 16,
+      "versionAndDigestGate": 2,
+      "officialHostAndLoopback": 23,
+      "controller": 3,
+      "total": 44
+    },
+    "behaviorRequirements": {
+      "rows": 117,
+      "firstFiveColumnsUnchanged": true
+    }
+  },
+  "observed": [
+    {
+      "id": "HTTP-IDENTITY",
+      "path": "official ToolRuntime -> web_fetch -> WebRuntime -> HttpFetchProvider",
+      "result": "main, child and concurrent callers keep exact live Agent identity; no synthetic replacement tool"
+    },
+    {
+      "id": "HTTP-POLICY",
+      "path": "official tools with temporary WorkspaceStore, CountryDatabase and NetworkScope",
+      "result": "CN/HK/MO and unknown rejected; mixed answers accepted only with eligible address; exact hostname and saved literal IP exception accepted, alias rejected"
+    },
+    {
+      "id": "HTTP-NATIVE",
+      "result": "native private literal/mixed private answer, tool guard/pre-denial/cancel and caller pre-abort remain effective; native resolver is unchanged"
+    },
+    {
+      "id": "HTTP-PROXY",
+      "path": "official installProxyFromEnvironment and proxyRouteFor",
+      "syntheticProxy": "http://127.0.0.1:9",
+      "targetDnsDelta": 0,
+      "dispatchDelta": 0,
+      "externalSocketDelta": 0,
+      "result": "WEB_SCOPE_PROXY_UNSUPPORTED; official disposer restores previous dispatcher and route"
+    },
+    {
+      "id": "HTTP-REMOTE",
+      "remoteProviderFetchCalls": 0,
+      "result": "unsupported remote fetch and configured-missing provider fail before target work"
+    },
+    {
+      "id": "HTTP-CHANGES",
+      "result": "DNS-wait scope revision change and stopAll prevent dispatch; method and descriptor-only ownership changes are refused and external modifications preserved during revert"
+    },
+    {
+      "id": "HTTP-PIN",
+      "path": "independent official HttpFetchProvider composition with explicit fixture-only resolver",
+      "allowedConnectionAddress": "127.0.0.1",
+      "realSystemDnsCalls": 0,
+      "result": "single address passed to fixed lookup; original Host; same-origin two hops re-evaluated; cross-origin and denied second hop never contacted; active response abort observed closed"
+    },
+    {
+      "id": "HTTP-PRODUCTION-GATE",
+      "result": "fixture-only resolver cannot enter production adapter; unknown version and mismatched entry digest refused without module execution"
+    }
+  ],
+  "notVerified": [
+    "actual desktop installation or embedded UI",
+    "real AgentLoop driving these HTTP calls",
+    "real country dataset accuracy",
+    "external target or production TLS behavior",
+    "unregistered IPv6 country attribution through NAT64",
+    "MCP, terminal, search, Chromium and other egress",
+    "system firewall or hostile in-process plugin isolation"
+  ],
+  "externalActions": {
+    "installedPlugin": false,
+    "modifiedRealProfile": false,
+    "restartedDesktop": false,
+    "realTargetRequests": 0,
+    "realDnsQueries": 0,
+    "loopbackFixtureOnly": true
+  },
+  "publicCI": "does not contain official runtime; official host tests explicitly skip there"
+}

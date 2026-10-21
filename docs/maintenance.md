@@ -8,23 +8,25 @@
 
 ## 按接口变化定位
 
-| 边界           | 本项目位置                                  | 需要确认的宿主合同                                                                                                                                                                                                                                                                                                                                       |
-| -------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 进程与数据目录 | `src/host/desktop.js`                       | desktop-host 参数、profile 类型、版本清单、Node 版本                                                                                                                                                                                                                                                                                                     |
-| 页面入口       | `src/client-entry.js`、`src/server/http.js` | 客户端插件注册、`dsh-app://app/` 同源路由、宿主认证                                                                                                                                                                                                                                                                                                      |
-| 提示词         | `src/host/runtime.js`                       | `systemPrompt.assemble` 返回结构、工具段、上下文、插值语义                                                                                                                                                                                                                                                                                               |
-| 重试正文       | `src/host/prompt-refresh.js`                | `agent/request` 顺序、每代理 卸载适配位于 `src/host/maintenance.js`：升级时核对官方 `listBundles/removeBundle`、当前entryId/来源所有权、稳定ownerContext、结构化结果、self-dispose期间在途响应及移除后的读回。运行 `maintenance-host.test.mjs` 只能证明官方模块隔离路径；pnpm、真实HMR和桌面重启仍须分别验收。详见 [卸载合同](maintenance-contract.md)。 |
+| 边界           | 本项目位置                                   | 需要确认的宿主合同                                                                                                        |
+| -------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 进程与数据目录 | `src/host/desktop.js`                        | desktop-host 参数、profile 类型、版本清单、Node 版本                                                                      |
+| 页面入口       | `src/client-entry.js`、`src/server/http.js`  | 客户端插件注册、`dsh-app://app/` 同源路由、宿主认证                                                                       |
+| 提示词         | `src/host/runtime.js`                        | `systemPrompt.assemble` 返回结构、工具段、上下文、插值语义                                                                |
+| 重试正文       | `src/host/prompt-refresh.js`                 | `agent/request` 顺序、每代理 `systemPrompt.project`，请求与持久日志一致                                                   |
+| 原生工作区指令 | `src/host/native-instructions.js`            | pre-step 接纳/拒绝、真实 step/start 后的 request 时点、内建空 developer 派生、JSONL 重建、代理 scope 在持久句柄关闭前清理 |
+| 重试策略       | `src/host/retry-policy.js`                   | `llm.prepareCall` 的冻结返回、原生重试投影注册与可取消退避                                                                |
+| 截断继续       | `src/host/continuation.js`                   | max-tokens 结束原因、消息来源、人工输入计数、原生取消和当前系统正文                                                       |
+| 权限与子代理   | `src/host/runtime.js`                        | 用户明确覆盖优先、审批审计、沙箱解析、冻结动态配置引用                                                                    |
+| 日志上传       | `src/host/extensions.js`                     | 活动配置条目的所有者与动态引用，不覆盖其他插件的替换                                                                      |
+| 技能与工具     | `src/host/skills.js`、`src/host/tools.js`    | provider 目录刷新、真实工具 schema、会话绑定传递                                                                          |
+| 会话能力目录   | `src/host/catalog.js`                        | snapshot/get 的会话可见性、覆盖顺序、工作目录读取、MCP 公开 schema                                                        |
+| 会话回退       | `src/host/sessions.js`、客户端桥             | 事件切点、fork/create/archive、停止确认、草稿初始化结果                                                                   |
+| 演练执行       | `src/host/workflow.js`、`workflow-preset.js` | 官方 activation/spawn 收据、首轮前绑定、dispose 确认、原创预设精确所有权                                                  |
 
-`systemPrompt.project`，请求与持久日志一致 |
-| 原生工作区指令 | `src/host/native-instructions.js` | pre-step 接纳/拒绝、真实 step/start 后的 request 时点、内建空 developer 派生、JSONL 重建、代理 scope 在持久句柄关闭前清理 |
-| 重试策略 | `src/host/retry-policy.js` | `llm.prepareCall` 的冻结返回、原生重试投影注册与可取消退避 |
-| 截断继续 | `src/host/continuation.js` | max-tokens 结束原因、消息来源、人工输入计数、原生取消和当前系统正文 |
-| 权限与子代理 | `src/host/runtime.js` | 用户明确覆盖优先、审批审计、沙箱解析、冻结动态配置引用 |
-| 日志上传 | `src/host/extensions.js` | 活动配置条目的所有者与动态引用，不覆盖其他插件的替换 |
-| 技能与工具 | `src/host/skills.js`、`src/host/tools.js` | provider 目录刷新、真实工具 schema、会话绑定传递 |
-| 会话能力目录 | `src/host/catalog.js` | snapshot/get 的会话可见性、覆盖顺序、工作目录读取、MCP 公开 schema |
-| 会话回退 | `src/host/sessions.js`、客户端桥 | 事件切点、fork/create/archive、停止确认、草稿初始化结果 |
-| 演练执行 | `src/host/workflow.js`、`workflow-preset.js` | 官方 activation/spawn 收据、首轮前绑定、dispose 确认、原创预设精确所有权 |
+卸载适配位于 `src/host/maintenance.js`：升级时核对官方 `listBundles/removeBundle`、当前entryId/来源所有权、稳定ownerContext、结构化结果、self-dispose期间在途响应及移除后的读回。运行 `maintenance-host.test.mjs` 只能证明官方模块隔离路径；pnpm、真实HMR和桌面重启仍须分别验收。详见 [卸载合同](maintenance-contract.md)。
+
+网络适配位于 `src/host/web-scope.js` 与 `scoped-http.js`。升级时重新核对官方 `web_fetch`、provider 选择、HTTP 实例/解析器、Agent 归属、逐跳代理和固定 lookup；运行 `web-scope-host.test.mjs` 检查主/子会话、共享数据库判定、原生拒绝、官方代理拒绝、范围变化、回环传输与撤销。不能只调整版本号或以自有检查通过替代宿主工具链证据，详见 [HTTP 范围合同](web-scope-contract.md)。
 
 `systemPrompt.project` 是当前版本的内部实例接口，升级时尤其需要复验。发生部分失败时不伪造完成，不直接编辑会话日志补救。
 

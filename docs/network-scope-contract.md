@@ -1,6 +1,6 @@
 # 本地范围判定
 
-对应 SCOPE-EXACT、SCOPE-REGION 的独立实现，当前执行入口为本插件 WebShell / TCP 连接检查。SCOPE-ENFORCE 的主会话、子代理、其他工具和全部网络出口仍未完成。登记、入场确认或国家分类不构成目标所有权证明；每次检查仍需明确确认。
+对应 SCOPE-EXACT、SCOPE-REGION 的独立实现，当前执行入口为本插件 WebShell / TCP 连接检查，以及启用运行控制后的主／子代理本地 HTTP 工具路径。SCOPE-ENFORCE 的其他工具和全部网络出口仍未完成。登记、入场确认或国家分类不构成目标所有权证明；每次本地连接检查仍需明确确认。宿主 HTTP 的原生限制与 IPv6/代理边界见 [HTTP 合同](web-scope-contract.md)。
 
 ## 地区数据
 
@@ -52,10 +52,10 @@ CSV 最大 48 MiB；gzip 最大 16 MiB，展开最大 64 MiB；最多 150 万行
 
 `hosts` 每项有 `hostname,type,snapshot`；snapshot 包含 `addresses,resolvedAt`。解析回执包含 `hostname,state,reason,persisted` 及实际观察到的地址和时间。检查回执另有 `scope:{allowed,reason,country,address,matchedHost?,databaseRevision?}`；精确例外的 `country:null` 表示未查询，不冒充地区定位。
 
-撤销入场、清单变化、卸载准备和 dispose 均取消解析。数据库/快照改变时取消在途连接检查并使旧确认失效。卸载先取消自有任务再等待已接纳动作；数据库最后关闭，资料不删除。
+撤销入场、清单变化、卸载准备和 dispose 均取消解析。数据库/快照改变时取消在途连接检查及本项目适配的 HTTP 请求，并使旧确认失效。卸载先取消自有任务再等待已接纳动作；数据库最后关闭，资料不删除。
 
 ## 已验与未验
 
 合成 CSV、假 DNS、临时 SQLite 和官方挂载入口有自动测试；浏览器实际操作覆盖本地文件选择与导入、取消确认、解析停止、混合地址选择、别名拒绝、保存与刷新读回，见 [验收证据](evidence/network-scope-acceptance.json)。预览所有目标 DNS 和传输均为合成回调，只有页面服务监听回环。它不证明真实国家数据准确、外部目标可达或桌面嵌入已通过。
 
-官方 0.2.1-rc.2 边界调查确认 `web_fetch → HttpFetchProvider` 有每跳解析接口，但其代理分支会绕过该接口；原生 public-only、IPv6 NAT64 检查、远端 Fetch、MCP、shell 和 Chromium 各有不同执行路径。本轮没有接管它们，也没有用工具名称或命令关键词冒充逐请求出口控制。
+官方 0.2.1-rc.2 的 `web_fetch → HttpFetchProvider` 已有独立的每跳适配，并在解析前及解析后检查代理路由，保留原生 public-only。其代理分支、远端 Fetch 和无例外 IPv6 暂拒绝；MCP、shell、搜索和 Chromium 仍未纳入。详见 [HTTP 合同与证据](web-scope-contract.md)，不能把局部适配当作系统防火墙。
