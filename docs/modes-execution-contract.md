@@ -106,11 +106,38 @@ Host 依赖也使用官方服务，包括调度、存储、会话控制器、子
 
 本切片没有执行 bash、PTY 或 PTC，也没有触发压力压缩。`CORE-MODES` 要求四模式完成同一合成文本任务，此项仍未完成；图片读取不替代该验收。历史 PTC 失败也未重试，不能据此断言在正式批准的另一执行环境中必然失败或成功。
 
+## 官方 Node PTC 后端单次执行（2026-10-21）
+
+[固定探针](../scripts/probe-ptc-backend.mjs) 使用官方 Node **v24.21.0**，经正式 `require_escalated` 执行入口调用一次 `ToolRuntime.run_code → NodePtcRuntime → LocalSubprocessRuntime → Seatbelt → tools.read`。实际读回原创临时文本，PTC start/dispatch 事件各一条，关联同一 subCallId 和文件。实际加载的 310 个官方文件均与固定发行库存一致；tool-fs 来自固定公开归档，官方 PTC 包按库存字节复制到临时根，未覆盖安装目录。
+
+完整 argv、官方只读 profile、bootstrap 摘要、cwd、fd 7 和有效环境均在启动前精确核对。子进程有效环境只有固定 PATH 和官方控制管道标记；执行合成程序前官方清空可见环境，程序返回空环境与空网络/再启动尝试列表。首次预检因 macOS 在 `env -i` 后注入 `__CF_USER_TEXT_ENCODING` 而失败，尚未加载官方模块或启动后端；最终版本只移除这一 locale hint，不记录其用户相关值，再保持其他键的严格检查。
+
+成功后官方按 per-call 生命周期以 SIGTERM 关闭本次进程，实际观察到 child close 和控制管道 close；subprocess、控制通道、PTC live 集合及两类跟踪描述符均为 0，两处临时根已删除。生命周期和临时根清理全程保留守卫，禁止尝试与清理错误均为空。脱敏后的 argv、事件、工具结果、源码摘要与清理记录见 [ptc-backend-acceptance.json](evidence/ptc-backend-acceptance.json)；本机完整回执留在忽略目录，没有将本机路径或官方代码纳入公开证据。
+
+这说明当前官方 Node 的实际受限后端能够执行，旧 Node 26 的 `sandbox_apply` 失败不能继续作为当前环境必然失败的证据。探针没有加载完整 PTC 预设、运行 AgentLoop、挂载本插件的 replace/revert、写入 JSONL 或进行桌面交互；这些仍需后续验收。官方只读 profile 原样保留，本次未另测写入拒绝；其 `allow default` 也不是内核读取/网络白名单。macOS 普通子进程按 PGID 清理，不能保证追踪逃离进程组的后代；固定合成程序不启动后代。未改用普通 eval、假后端或关闭沙箱。
+
+该探针独立于 `npm test`，只适用于上述固定 macOS arm64 安装与库存；运行前需有官方归档缓存。完整命令为：
+
+```sh
+/usr/bin/env -i PATH=/usr/bin:/bin \
+  DSH_UNLIMIT_RUNTIME='/Applications/DeepSeek Harness.app/Contents/Resources/app/dsh' \
+  '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node' \
+  --expose-internals scripts/probe-ptc-backend.mjs
+```
+
+## 极简文本后端的环境与进程边界（2026-10-21）
+
+后续只读核对了 13 个官方声明、实现与 native/backend 文件，字节数和 SHA-256 均匹配发行库存；未导入官方模块或启动终端。记录见 [minimal-terminal-contract.json](evidence/minimal-terminal-contract.json)。完整极简文本任务应由真实 AgentLoop 调用原生 `bash`，在官方 `sandbox.confine` 返回的命令下，经真实 `spawnTerminal` 与 node-pty 执行。可用 bash 内建 `read/printf` 读取临时文本，另一次调用核对同一终端的合成变量，以验证持久状态；不能添加普通 read 工具替代。
+
+官方终端默认 `/bin/bash --noprofile --norc -i`，没有配置 HOME 或历史路径的公开字段。subprocess 会合并经筛选的父环境与终端 overlay，HOME、历史变量和代理等普通键仍可能继承；现有 JavaScript `os.homedir` 替换不隔离原生子进程。后续执行应放在白名单环境启动的专用测试 Node 进程中，仅为该进程及其子进程设置临时 HOME/TMPDIR、`HISTFILE=/dev/null` 与零历史容量，不继承 BASH_ENV/ENV、Node 选项、导出函数及代理变量；不修改本机环境或真实 shell 配置。实际 native helper 选择也须核对，不能继承未核验的 `DSH_NODE_PTY_SPAWN_HELPER`。
+
+node-pty 的 native `pty.fork` 不经过 `child_process.spawn`，验收不能只解除后者守卫就声称已限制所有进程。官方 macOS 终端检查还会调用确切的 `/bin/ps -o tpgid= -p <owned pid>`，以及 `/bin/ps -axo pid=,ppid=,lstart=` 后再筛选所属树。后一项读取全系统 PID、父 PID 和启动时间元数据，不请求 argv；后续实际验收需要明确纳入该官方路径，不能回传假进程表或保留无关行。本次没有执行这两个命令，也没有据此增加用户的永久权限限制。官方 read-only Seatbelt 仅限制写入，不提供读取或网络白名单；PTC 普通子进程的执行结果不能替代这个持久 PTY 路径。
+
 ## 保留差距
 
 - 完整 standard 声明、读取与计划切换以及完整 minimal 的图片路径已有隔离证据。极简文本任务、PTC 完整预设执行和真实用户默认预设选择仍未验，不能把工具注册视为工具执行验收。
 - ToolRuntime 的呈现值是 native/ptc；极简是另一份工具组合，其原生配置关闭文本 `read`，依赖持久 shell 读取文本。本次没有启动 shell 或 PTY。
-- PTC 需要实际后端。此前隔离探针被平台 `sandbox-unavailable` 阻断；本回归未重试 PTC、未运行子进程，也未用描述性 runtime 或宿主 eval 代替执行。
+- PTC 官方 Node 的一次真实受限后端读取已由独立探针验证；完整 PTC 预设、AgentLoop、提示词替换与撤销、持久日志和桌面仍未验证，不再将旧 Node 26 的失败外推为当前环境阻碍。
 - 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复、极简文本执行、PTC 完整预设及桌面计划 UI 仍未验证。
 - 合成人答没有执行真实 UI/Gateway 路由或 UI 所拥有的提问审计事件；本证据只声称已读回的 `plan/mode` Session 事件。
 - 本回归没有增加网页抓取或浏览器路径覆盖；`CORE-WEBTOOLS` 的本地页面检索和完整四模式工具能力仍需独立验收。

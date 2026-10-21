@@ -1,0 +1,142 @@
+{
+  "kind": "read-only-static-contract",
+  "target": {
+    "version": "0.2.1-rc.2",
+    "platform": "darwin",
+    "arch": "arm64",
+    "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0"
+  },
+  "verifiedFiles": [
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web-app/presets/minimal.patch.yml",
+      "bytes": 3724,
+      "sha256": "a2a9ba1c9c392a45466708f18bc0aefbf300577f9b544dc06049f73a8a5b3267",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/lib/index.js",
+      "bytes": 16069,
+      "sha256": "e5da0d699ca999f7372cc67ae913b1b881362b3232f5b01b003709e76390bc82",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-terminal-bash/lib/index.js",
+      "bytes": 37846,
+      "sha256": "388ce251b94a919edcfb9c13f6ffc49bcd1f4caf9ee493c65b46b454786c8c8b",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subprocess/lib/index.js",
+      "bytes": 5354,
+      "sha256": "0ea9e95a73639f9e69b48aa48f373f34881adffa2ee2ac2acd4702728da9592b",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subprocess-local/lib/index.js",
+      "bytes": 62333,
+      "sha256": "2964d94d6aa735f79e5cd5f54035a9d73b371e8060dda7e3bf666593428c04f4",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-subprocess-local/lib/runner-launch-B2zsQ1Dz.js",
+      "bytes": 57475,
+      "sha256": "6df08adc4a27f278878a5f4cde8b551b51e647b922ac7d6591fd62d272ced153",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-sandbox-local/lib/index.js",
+      "bytes": 22673,
+      "sha256": "be6e1107871cf8d94c040090b13c405bc833822e2f51ed5280e93eececf762be",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/node-pty/lib/unixTerminal.js",
+      "bytes": 14327,
+      "sha256": "23d8ae86eaf44c44c8cc30aaaacd335c9388dfeb9de1d8370dfa851077e83305",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/darwin-arm64/pty.node",
+      "bytes": 104832,
+      "sha256": "06906d34d3c2f5f868b1ce513183e33b90c9f6de4c0bf4dc31b0931d9c605a40",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper",
+      "bytes": 68624,
+      "sha256": "dca3af8fcb6056b843b09f29c703f78293725026282269f57135ac6bb902db3b",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/node-addon-system-darwin-arm64/bin/system.node",
+      "bytes": 70384,
+      "sha256": "e25056346e033991ed14a01f0804851f2b7a33b2c8c0b2d8de58eb3159bbb390",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-ptc-runtime-node/lib/index.js",
+      "bytes": 71157,
+      "sha256": "e2d31fe1292e11f79080f65f69af24d7d288dfe8fb11948a5194051189c29d8d",
+      "inventoryMatch": true
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-ptc-runtime-node/lib/process.js",
+      "bytes": 42917,
+      "sha256": "e25ce53b26bb3e96e62cb7433f74612395f3865b4627a695d3d4fd42c4706790",
+      "inventoryMatch": true
+    }
+  ],
+  "officialModulesImported": false,
+  "nativeBackendStarted": false,
+  "realProfileAccessed": false,
+  "realConfigurationChanged": false,
+  "contract": {
+    "textTool": "bash",
+    "toolSchemaRetained": ["bash", "read_image"],
+    "defaultShellArgv": ["/bin/bash", "--noprofile", "--norc", "-i"],
+    "readOnlyWrapper": "Official sandbox.confine selects the macOS Seatbelt backend; the real PTY starts its returned argv.",
+    "builtinOnlySyntheticTask": "Read the task-owned evidence.txt with the bash read builtin and print its marker; a second call may verify one synthetic shell variable.",
+    "ambientEnvironment": "The official subprocess layer merges scrubbed parent environment with the terminal overlay. HOME and shell-history variables survive that scrub. A parent JavaScript os.homedir replacement does not isolate the native child.",
+    "dedicatedTestProcessEnvironment": {
+      "PATH": "/usr/bin:/bin",
+      "HOME": "task-owned temporary home",
+      "HISTFILE": "/dev/null",
+      "HISTSIZE": "0",
+      "HISTFILESIZE": "0",
+      "BASH_ENV": "absent or task-owned empty file",
+      "ENV": "absent or task-owned empty file",
+      "TMPDIR": "task-owned temporary directory"
+    },
+    "excludeAmbientInputs": [
+      "NODE_OPTIONS",
+      "BASH_FUNC_*",
+      "SHELLOPTS",
+      "BASHOPTS",
+      "proxy variables",
+      "DSH_NODE_PTY_SPAWN_HELPER override"
+    ],
+    "nativeSpawnBoundary": "node-pty uses native pty.fork, outside the child_process.spawn JavaScript hook.",
+    "processInspectionCommands": [
+      {
+        "executable": "/bin/ps",
+        "argv": ["-o", "tpgid=", "-p", "<owned shell pid>"],
+        "scope": "owned shell"
+      },
+      {
+        "executable": "/bin/ps",
+        "argv": ["-axo", "pid=,ppid=,lstart="],
+        "scope": "system process metadata; the official inspector filters its owned tree afterwards; no argv requested"
+      }
+    ],
+    "processInspectionBoundary": "A later real PTY test must account for the unmodified official metadata command and avoid retaining unrelated rows. This read-only investigation did not run either command and does not establish a permanent user prohibition.",
+    "seatbeltBoundary": "The official read-only profile limits file writes. It is not an allowlist for reads and does not deny network access.",
+    "ptcDifference": "PTC per-call uses an ordinary Node subprocess and inherited control pipe, not a persistent PTY; successful PTC execution cannot prove minimal terminal behavior."
+  },
+  "acceptanceRemaining": [
+    "Full unmodified minimal preset AgentLoop execution of the synthetic text task",
+    "Actual selected native helper and argv/environment observation",
+    "Persistent terminal state across two tool calls",
+    "Canonical tool messages and physical JSONL readback",
+    "Owned PTY process and handle disposal with guards held through cleanup"
+  ]
+}
