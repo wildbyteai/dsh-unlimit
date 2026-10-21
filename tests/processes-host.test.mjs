@@ -1,20 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
-import {
-  eventually,
-  processHostFixture,
-  processHostNode,
-} from "./helpers/process-host-fixture.mjs";
+import { eventually, processHostFixture } from "./helpers/process-host-fixture.mjs";
 
 const selectedRoot = process.env.DSH_UNLIMIT_RUNTIME;
 const skip = !selectedRoot
   ? "Set DSH_UNLIMIT_RUNTIME for official local subprocess acceptance; no profile is loaded"
   : process.platform !== "darwin" || process.arch !== "arm64"
     ? "Native acceptance is pinned to the supported macOS arm64 runtime"
-    : !existsSync(selectedRoot) || !existsSync(processHostNode)
-      ? "The explicitly selected official runtime or bundled Node is unavailable"
-      : false;
+    : false;
 
 test(
   "official owned processes use real subprocess lifecycle in isolated temporary directories",

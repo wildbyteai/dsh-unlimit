@@ -67,5 +67,5 @@ node --expose-internals --test tests/file-permissions-host.test.mjs
 
 - 真实桌面安装与嵌入操作、侧边栏预览渲染、Gateway 认证授权和真实会话权限选择未验收。
 - 没有运行 PTY、shell 命令或操作系统进程沙箱；文件与终端跨执行族的内核权限一致性仍未验收。
-- 没有执行 `read_image`、文件搜索、`present`、文件 watch 或扩大权限后的重试；这些接口不能由本证据推定通过。
+- 本文件权限场景没有执行 `read_image`、文件搜索、`present`、文件 watch 或扩大权限后的重试；这些接口不能由本证据推定通过。后续 `present` 与权限扩大已有独立限定场景，分别见 [交付合同](deliverables-contract.md) 和 [扩大权限合同](escalation-contract.md)，不倒推本场景覆盖了它们。
 - 文件后端的官方 trusted-code fence 不等于内核安全边界。当前安装 tool-fs 摘要不符仍是实际部署限制，临时干净副本不会修复安装或授予额外权限。

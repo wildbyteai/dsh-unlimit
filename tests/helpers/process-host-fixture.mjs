@@ -13,6 +13,7 @@ import { isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { DesktopProcesses } from "../../src/host/processes.js";
+import { installTools } from "../../src/host/tools.js";
 
 export const processHostNode =
   "/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node";
@@ -40,7 +41,8 @@ export async function eventually(action, message, timeoutMs = 6000) {
 }
 
 /** In-memory official sessions/registry/policy; synthetic admission, toolkit and call context. */
-export async function processHostFixture(t, selectedRoot) {
+export async function processHostFixture(t, selectedRoot, { preview = false } = {}) {
+  assert.equal(typeof preview, "boolean");
   assert.equal(process.execPath, processHostNode, "Use the explicitly selected bundled Node only");
   assert.equal(process.version, "v24.21.0");
   assert.equal(process.platform, "darwin");
@@ -101,7 +103,36 @@ export async function processHostFixture(t, selectedRoot) {
     TMPDIR: environment.TMPDIR,
   };
   const script = join(workspace, "harmless-process.mjs");
-  const source = `
+  const previewBody =
+    "<!doctype html><title>Synthetic preview</title><p>SYNTHETIC_PREVIEW_READY</p>\n";
+  const source = preview
+    ? `
+import { createServer } from "node:http";
+const [label, behavior, ...args] = process.argv.slice(2);
+if (behavior !== "preview" || args.length !== 0) throw new Error("Unexpected preview arguments");
+const body = ${JSON.stringify(previewBody)};
+const server = createServer((request, response) => {
+  if (request.method !== "GET" || request.url !== "/") {
+    response.writeHead(404, { "Content-Length": "0", "Connection": "close" });
+    response.end();
+    return;
+  }
+  response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Content-Length": Buffer.byteLength(body), "Connection": "close" });
+  response.end(body);
+});
+server.listen(0, "127.0.0.1", () => {
+  process.stdout.write(JSON.stringify({ type: "ready", label, args, cwd: process.cwd(), environment: process.env, address: server.address() }) + "\\n");
+  process.stderr.write("stderr:" + label + "\\n");
+});
+process.on("SIGTERM", () => {
+  process.stdout.write("signal:" + label + ":SIGTERM\\n");
+  server.close(() => {
+    process.stdout.write("preview:closed\\n");
+    process.exitCode = 0;
+  });
+});
+`
+    : `
 const [label, behavior, ...args] = process.argv.slice(2);
 process.stdout.write(JSON.stringify({ type: "ready", label, args, cwd: process.cwd(), environment: process.env }) + "\\n");
 process.stderr.write("stderr:" + label + "\\n");
@@ -134,6 +165,12 @@ if (behavior === "exit") {
   const originalChildSpawn = childProcess.ChildProcess.prototype.spawn;
   const originalChildKill = childProcess.ChildProcess.prototype.kill;
   const originalKill = process.kill;
+  const originalConnect = net.Socket.prototype.connect;
+  const connections = [];
+  let previewPort,
+    permittedSocket,
+    toolDisposer,
+    directToolRuntimeCalls = 0;
   let spawnOpen = false;
 
   const dispose = async () => {
@@ -149,6 +186,7 @@ if (behavior === "exit") {
     };
     try {
       await cleanup("plugin close", () => adapter?.close());
+      await cleanup("plugin tools", () => toolDisposer?.());
       // These are captured handles only, including the intentionally unrelated process.
       for (const handle of handles)
         await cleanup("fixture child", async () => {
@@ -182,7 +220,13 @@ if (behavior === "exit") {
   t.after(dispose);
 
   t.mock.method(os, "homedir", () => environment.HOME);
-  t.mock.method(net.Socket.prototype, "connect", deny("socket.connect"));
+  t.mock.method(net.Socket.prototype, "connect", function (...args) {
+    if (!preview || this !== permittedSocket) return deny("socket.connect")();
+    assert.ok(Number.isInteger(previewPort) && previewPort > 0 && previewPort <= 65535);
+    assert.deepEqual(args, [previewPort, "127.0.0.1"]);
+    permittedSocket = undefined;
+    return Reflect.apply(originalConnect, this, args);
+  });
   t.mock.method(net.Server.prototype, "listen", deny("socket.listen"));
   for (const name of ["bind", "send", "connect"])
     t.mock.method(dgram.Socket.prototype, name, deny(`dgram.${name}`));
@@ -204,7 +248,8 @@ if (behavior === "exit") {
   });
   t.mock.method(childProcess, "spawn", function (command, args, options) {
     const expected = expectedLaunches.shift();
-    if (!expected || launches.length >= 6) return deny("child_process.spawn.extra")();
+    if (!expected || launches.length >= (preview ? 1 : 6))
+      return deny("child_process.spawn.extra")();
     assert.equal(command, processHostNode);
     assert.deepEqual(args, [script, expected.label, expected.behavior, ...expected.args]);
     assert.equal(fs.readFileSync(script, "utf8"), source);
@@ -284,6 +329,9 @@ if (behavior === "exit") {
     policy: "@deepseek-ai/dsh-sandbox-policy",
     sandbox: "@deepseek-ai/dsh-sandbox-local",
     subprocess: "@deepseek-ai/dsh-subprocess-local",
+    ...(preview
+      ? { prompt: "@deepseek-ai/dsh-system-prompt", tools: "@deepseek-ai/dsh-tools" }
+      : {}),
   }))
     api[key] = await load(name);
   ctx = new api.cordis.Context();
@@ -297,6 +345,15 @@ if (behavior === "exit") {
   await mount({
     name: "synthetic-owned-process-services",
     apply(scope) {
+      if (preview) {
+        new api.prompt.SystemPrompt(scope, {
+          includeHarnessIdentity: false,
+          includeRuntimeContext: false,
+          personaPrefix: "",
+          personaSuffix: "",
+        });
+        new api.tools.ToolRuntime(scope);
+      }
       new api.projections.SessionProjectionRegistry(scope);
       new api.sessions.SessionStore(scope);
       new api.agents.AgentRegistry(scope);
@@ -370,31 +427,66 @@ if (behavior === "exit") {
     toolName: "unlimit_processes",
     signal: new AbortController().signal,
   });
-  const start = async (label, { behavior = "wait", args = [], ...payload } = {}) => {
-    expectedLaunches.push({ label, behavior, args });
-    const result = await adapter.dispatch(
-      "processes.start",
+  if (preview)
+    toolDisposer = await installTools(
+      ctx,
       {
-        tool: "nmap",
-        args: [script, label, behavior, ...args],
-        ...payload,
+        dispatch(action, payload, call) {
+          assert.ok(action.startsWith("processes."));
+          return adapter.dispatch(action, payload, call);
+        },
       },
-      execution(),
+      { runtimeRoot: installed },
     );
+  const toolExecute = async (action, payload, actor = agent) => {
+    const call = execution(actor);
+    directToolRuntimeCalls++;
+    const result = await ctx.tools.execute({
+      name: "unlimit_process",
+      arguments: { action, payload },
+      agent: call.agent,
+      callId: call.callId,
+      signal: call.signal,
+    });
+    const text = result.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n");
+    assert.equal(result.isError, false, text);
+    return JSON.parse(text);
+  };
+  const start = async (label, { behavior = "wait", args = [], ...payload } = {}) => {
+    if (preview) {
+      assert.equal(label, "preview");
+      assert.equal(behavior, "preview");
+      assert.deepEqual(args, []);
+      assert.deepEqual(payload, {});
+    }
+    expectedLaunches.push({ label, behavior, args });
+    const input = {
+      tool: "nmap",
+      args: [script, label, behavior, ...args],
+      ...payload,
+    };
+    const result = preview
+      ? await toolExecute("start", input)
+      : await adapter.dispatch("processes.start", input, execution());
     const run = adapter.runs.get(result.item.id);
     assert.ok(run.handle);
     handles.push(run.handle);
     return result.item;
   };
   const output = (item, extra = {}, actor = agent) =>
-    adapter.dispatch(
-      "processes.output",
-      {
-        id: item.id,
-        ...extra,
-      },
-      execution(actor),
-    );
+    preview
+      ? toolExecute("output", { id: item.id, ...extra }, actor)
+      : adapter.dispatch(
+          "processes.output",
+          {
+            id: item.id,
+            ...extra,
+          },
+          execution(actor),
+        );
   const ready = (item, label) =>
     eventually(async () => {
       const result = await output(item);
@@ -410,6 +502,17 @@ if (behavior === "exit") {
       const { __CF_USER_TEXT_ENCODING: encoding, ...inherited } = data.environment;
       assert.match(encoding, /^0x[\da-f]+:0x[\da-f]+:0x[\da-f]+$/i);
       assert.deepEqual(inherited, childEnvironment);
+      if (preview) {
+        assert.deepEqual(Object.keys(data.address).sort(), ["address", "family", "port"]);
+        assert.equal(data.address.address, "127.0.0.1");
+        assert.equal(data.address.family, "IPv4");
+        assert.ok(
+          Number.isInteger(data.address.port) &&
+            data.address.port > 0 &&
+            data.address.port <= 65535,
+        );
+        previewPort = data.address.port;
+      }
       return result;
     }, `Actual stdout/stderr from ${label} were not observed`);
   let unrelated;
@@ -453,6 +556,65 @@ if (behavior === "exit") {
     output,
     ready,
     execution,
+    ...(preview
+      ? {
+          previewBody,
+          stop: (item) => toolExecute("stop", { id: item.id }),
+          async requestPreview({ refused = false } = {}) {
+            assert.ok(Number.isInteger(previewPort));
+            assert.equal(
+              connections.length,
+              refused ? 1 : 0,
+              "One real response and one post-stop refusal only",
+            );
+            const observation = { host: "127.0.0.1", port: previewPort, path: "/", refused };
+            connections.push(observation);
+            return new Promise((resolve, reject) => {
+              const socket = new net.Socket();
+              const chunks = [];
+              socket.setTimeout(3000, () =>
+                socket.destroy(new Error("Fixed preview request timed out")),
+              );
+              socket.once("connect", () => {
+                observation.connected = true;
+                socket.write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+              });
+              socket.on("data", (chunk) => chunks.push(chunk));
+              socket.once("error", (error) => {
+                observation.error = error.code ?? error.message;
+                if (!refused || error.code !== "ECONNREFUSED") reject(error);
+              });
+              socket.once("close", () => {
+                observation.closed = true;
+                try {
+                  if (refused) {
+                    assert.equal(observation.connected, undefined);
+                    assert.equal(observation.error, "ECONNREFUSED");
+                    resolve({ refused: true, code: observation.error });
+                  } else {
+                    assert.equal(observation.error, undefined);
+                    const raw = Buffer.concat(chunks).toString("utf8");
+                    const separator = raw.indexOf("\r\n\r\n");
+                    assert.ok(separator > 0);
+                    const headers = raw.slice(0, separator),
+                      body = raw.slice(separator + 4);
+                    assert.match(headers, /^HTTP\/1\.1 200 OK\r\n/);
+                    assert.match(headers, /content-type: text\/html; charset=utf-8/i);
+                    assert.equal(body, previewBody);
+                    observation.status = 200;
+                    observation.bodySha256 = hash(body);
+                    resolve({ status: 200, headers, body });
+                  }
+                } catch (error) {
+                  reject(error);
+                }
+              });
+              permittedSocket = socket;
+              socket.connect(previewPort, "127.0.0.1");
+            });
+          },
+        }
+      : {}),
     unrelatedStart,
     assertUnrelatedAlive,
     dispose,
@@ -478,6 +640,22 @@ if (behavior === "exit") {
         kernelSandboxVerified: false,
         subprocessServiceMocked: false,
         modelRequests: 0,
+        ...(preview
+          ? {
+              preview: {
+                scriptSha256: hash(source),
+                bodySha256: hash(previewBody),
+                directToolRuntimeCalls,
+                actualPluginToolRegistered: true,
+                agentLoopExecuted: false,
+                syntheticExecution: true,
+                syntheticAdmission: true,
+                syntheticToolkitNodeMapping: true,
+                connections,
+                childNetworkKernelRestricted: false,
+              },
+            }
+          : {}),
         networkAttempts: forbidden,
         admissions,
         calls,

@@ -666,3 +666,15 @@ node --test tests/parity-baseline.test.mjs tests/package-contents.test.mjs
 bundled Node **v24.21.0**、显式 **0.2.1-rc.2** 运行时与固定官方归档执行完整隔离回归 **1041 通过、0 失败、0 跳过**，日志 `artifacts/summary-full.log`；正常完成提示修复后重跑 UI 与包/基线检查 **11 项通过**，日志 `artifacts/summary-final-check.log`。语法 **185/185**，有限来源和分层检查通过。117 项前五列及来源、NOTICE、UNLICENSED、第三方归属保持，FLOW-DISPATCH 只更新已验证状态，仍未宣称完整通过。
 
 离线构建打包成功，**75 个文件、1,042,060 字节解包内容**逐项与工作树字节一致，SHA-256 `f2e74109045aa9e6f7091def5c2de731d4fe30488ff106fd391338af6e3dbde4`。本批没有安装、重载、真实 profile/config/session 修改或真实模型请求；自动任务拆解、工具匹配、PTC 待办恢复及真实桌面验收等缺口仍保留。
+
+## 本地预览进程的实际响应与停止（2026-10-21）
+
+从 `11ad070ecba27ee836e7fa66c534112830487aa9` 继续，本批不改变生产实现或页面，而是补齐 CORE-DELIVERABLE 中尚未执行的回环预览进程路径。新增 [显式探针](../scripts/probe-preview-process.mjs) 通过实际 `installTools → 官方 ToolRuntime → DesktopProcesses → 官方 LocalSubprocessRuntime` 启动固定原创 Node 服务，取得 HTTP 200 与完整合成 HTML，再经同一插件工具停止；实际 `spawn → exit(0) → close(0)`、关闭日志和同端口 `ECONNREFUSED` 均核对通过。只有一个子进程、两次指定回环连接，均确认结束，临时根已删除。
+
+探针 **1 项通过**，包含四组场景断言；182 个官方加载文件通过发行清单校验，五项本项目源码摘要与当前字节相同。[结构化证据](evidence/preview-process-acceptance.json)在所有断言和清理通过后生成。Agent 是注册到真实官方目录的合成对象，调用、绑定、入场确认及 full-access 模式也是合成边界；工具标识映射到 bundled Node 只用于固定程序。没有 AgentLoop、真实模型、人工审批、内核沙箱或桌面渲染证据，不把一次真实 HTTP 响应当作完整桌面预览验收。详见 [交付合同](deliverables-contract.md#受控回环预览进程)。
+
+同时修复进程验收的环境门：未提供宿主路径时仍明确跳过；在目标平台上显式提供无效路径改为失败。实际执行两种情况，前者 exit 0 / skipped 1，后者 exit 1 / failed 1 / skipped 0，日志分别为 `artifacts/process-gate-absent.log` 和 `artifacts/process-gate-invalid.log`。不再用跳过掩盖明确配置错误，原七项真实进程回归继续通过。
+
+bundled Node **v24.21.0**、指定 **0.2.1-rc.2** 运行时和固定归档的完整隔离回归 **1041 通过、0 失败、0 跳过**，日志 `artifacts/preview-process-full.log`；语法 **186/186**，有限来源与分层检查通过。117 项原验收前五列未变，仅更新交付路径的实际状态；来源说明、NOTICE、UNLICENSED 和第三方归属保持。没有读取旧插件、安装、重载或修改真实 DSH 配置。
+
+构建、离线打包和包/基线检查 **3 项通过**；本批没有发布文件变化，安装包仍为 **75 个文件、1,042,060 字节**，SHA-256 `f2e74109045aa9e6f7091def5c2de731d4fe30488ff106fd391338af6e3dbde4`，包内字节逐项与工作树一致。

@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-21T12:34:55.847Z",
+  "behaviorId": "CORE-DELIVERABLE",
+  "slice": "owned-loopback-preview-process",
+  "status": "passed",
+  "command": "env -i PATH=/usr/bin:/bin DSH_UNLIMIT_RUNTIME=<official-runtime> <bundled-node> --expose-internals scripts/probe-preview-process.mjs",
+  "hostVersion": "0.2.1-rc.2",
+  "node": "v24.21.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "manifestSha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
+  "verifiedOfficialFiles": 182,
+  "syntheticFullAccessPolicy": true,
+  "realHumanApprovalVerified": false,
+  "kernelSandboxVerified": false,
+  "subprocessServiceMocked": false,
+  "modelRequests": 0,
+  "preview": {
+    "scriptSha256": "30aa3c9d9bd1fc755fc6a38eddad55d7853bb10d96e72928551f298f0e7fdf1b",
+    "bodySha256": "f5d3fb9760340bf0103f8b873f090fd390572536b42d0c3844e00d3e751f3765",
+    "directToolRuntimeCalls": 6,
+    "actualPluginToolRegistered": true,
+    "agentLoopExecuted": false,
+    "syntheticExecution": true,
+    "syntheticAdmission": true,
+    "syntheticToolkitNodeMapping": true,
+    "connections": [
+      {
+        "host": "127.0.0.1",
+        "port": 54062,
+        "path": "/",
+        "refused": false,
+        "connected": true,
+        "closed": true,
+        "status": 200,
+        "bodySha256": "f5d3fb9760340bf0103f8b873f090fd390572536b42d0c3844e00d3e751f3765"
+      },
+      {
+        "host": "127.0.0.1",
+        "port": 54062,
+        "path": "/",
+        "refused": true,
+        "error": "ECONNREFUSED",
+        "closed": true
+      }
+    ],
+    "childNetworkKernelRestricted": false
+  },
+  "networkAttempts": [],
+  "admissions": 3,
+  "calls": 6,
+  "unrelatedSurvival": [],
+  "launches": [
+    {
+      "label": "preview",
+      "closed": true,
+      "events": [
+        {
+          "type": "spawn"
+        },
+        {
+          "type": "exit",
+          "code": 0,
+          "signal": null
+        },
+        {
+          "type": "close",
+          "code": 0,
+          "signal": null
+        }
+      ]
+    }
+  ],
+  "signalTargets": ["preview"],
+  "fixtureRootRemoved": true,
+  "sourceDigests": [
+    {
+      "path": "scripts/probe-preview-process.mjs",
+      "sha256": "c0d3aed54342cad924c8c8124cb791aa9b773c77c142fb9662bed0b443d3b7d6"
+    },
+    {
+      "path": "tests/helpers/process-host-fixture.mjs",
+      "sha256": "b297fecd87b71ac7246ea0273666e2334d0bf35d0a7ddf63751ca69a59d74152"
+    },
+    {
+      "path": "src/host/processes.js",
+      "sha256": "6536e835e4eb67ee263d648700c8c5a0400095faa7277f5cb247a721a42edfeb"
+    },
+    {
+      "path": "src/host/tools.js",
+      "sha256": "c65edf0e975be3ac8c5a5458cfb42f5a3831227ac90dca19c5c9734d72025f09"
+    },
+    {
+      "path": "src/host/official-package.js",
+      "sha256": "2cfecf298886428d377005386c9252a55db4367a3b0e574fb41416df761b7caa"
+    }
+  ],
+  "cases": [
+    {
+      "id": "PREVIEW-PLUGIN-TOOL-START",
+      "result": "passed"
+    },
+    {
+      "id": "PREVIEW-ACTUAL-HTTP-RESPONSE",
+      "result": "passed"
+    },
+    {
+      "id": "PREVIEW-STOP-EXIT-AND-CLOSE",
+      "result": "passed"
+    },
+    {
+      "id": "PREVIEW-POST-STOP-CONNECTION-REFUSED",
+      "result": "passed"
+    }
+  ],
+  "boundaries": {
+    "actualOfficialToolRuntime": true,
+    "actualPluginToolRegistration": true,
+    "actualOfficialSubprocessService": true,
+    "syntheticAgentRegistered": true,
+    "syntheticExecution": true,
+    "syntheticAdmission": true,
+    "syntheticFullAccessPolicy": true,
+    "fixtureToolIdNmapMappedToBundledNode": true,
+    "realToolIdentityVerified": false,
+    "agentLoopExecuted": false,
+    "modelRequests": 0,
+    "productionToolEventsFabricated": false,
+    "realHumanApprovalVerified": false,
+    "kernelSandboxVerified": false,
+    "fixedChildSourceUsesOnlyLoopback": true,
+    "childNetworkKernelRestricted": false,
+    "renderedBrowserPreviewVerified": false,
+    "desktopFileCardVerified": false,
+    "nativeApplicationOpened": false,
+    "realDesktopTouched": false,
+    "realProfileLoadedOrModified": false,
+    "transportAuthenticationVerified": false
+  }
+}

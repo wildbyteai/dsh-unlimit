@@ -1,6 +1,6 @@
 # 官方文件交付执行验收
 
-对应 `CORE-DELIVERABLE`，目标是 DSH desktop `0.2.1-rc.2`。本批验证官方工具写文件、`present` 声明、临时 JSONL 读回、官方打开处理器和预览后端；桌面文件卡、原生应用打开与本地预览进程仍未验收，不能将该行标为完整通过。
+对应 `CORE-DELIVERABLE`，目标是 DSH desktop `0.2.1-rc.2`。文件交付验收覆盖官方工具写文件、`present` 声明、临时 JSONL 读回、官方打开处理器和预览后端。下文另列受控回环预览进程的隔离场景；两组场景不合并声称完整桌面链路通过。桌面文件卡与原生应用打开仍未验收，不能将该行标为完整通过。
 
 ## 实际执行链
 
@@ -39,4 +39,23 @@ node --expose-internals --test tests/deliverables-host.test.mjs
 
 缺少任一环境门时明确跳过；明确配置但归档或摘要错误时失败。设置 `DSH_UNLIMIT_DELIVERABLES_EVIDENCE=1` 才更新固定证据文件。普通回归不改写证据；证据源码摘要只对应生成时的文件版本。
 
-后续仍需真实桌面文件卡与预览、官方原生打开，以及官方工具启动和关闭授权回环预览进程的验收。本批未安装或重载插件，不修改真实 DSH 配置。
+后续仍需真实桌面文件卡与预览、官方原生打开。文件交付场景没有启动回环服务；新增进程场景的独立边界见下节。本批未安装或重载插件，不修改真实 DSH 配置。
+
+## 受控回环预览进程
+
+显式运行的 [预览探针](../scripts/probe-preview-process.mjs) 复用 [进程夹具](../tests/helpers/process-host-fixture.mjs) 的 `preview:true` 分支，默认进程测试保持原路径。测试使用实际 `installTools` 注册的 `unlimit_process`，直接通过官方 ToolRuntime 调用 `start/output/stop`，进入本项目 `DesktopProcesses` 和官方 `LocalSubprocessRuntime`。没有手写生产 `tool/call`、结果或 AgentLoop 日志。
+
+固定原创 Node 程序仅在临时 cwd 中运行，以 `127.0.0.1:0` 监听，提供一段固定合成 HTML；不暴露文件目录。夹具核对精确可执行文件、脚本文本、参数、cwd 和最小环境，通过真实 stdout 取得端口。父测试只允许两次对该端口的连接：第一次核对 HTTP 200 与完整正文；经插件工具停止、等待实际 exit/close 后，第二次必须得到 `ECONNREFUSED`。其余网络和进程入口继续拒绝，结束时确认连接、子进程和临时根均清理。
+
+这是插件工具和实际本地进程的集成验证。Agent 是注册在官方 AgentRegistry 中的合成对象，Session 是官方内存对象；调用参数、项目绑定、入场确认与 full-access 模式均为合成设置。工具目录将测试标识映射到 bundled Node，不证明该标识对应的真实安全工具已运行。官方 AgentLoop、真实模型、人工审批、受限内核沙箱、桌面渲染及浏览器交互不在此场景内；没有安装、重载或修改真实 DSH 配置。
+
+2026-10-21 显式探针 **1 项通过**，包含启动、实际响应、停止退出和停止后连接拒绝四组断言；182 个实际加载的官方文件通过发行清单摘要校验。原有进程回归 **7 项通过**。结果及五个源码摘要见 [预览进程证据](evidence/preview-process-acceptance.json)。探针只有全部断言和清理成功后才更新该证据，不进入普通 `npm test`。
+
+```sh
+env -i PATH=/usr/bin:/bin \
+  DSH_UNLIMIT_RUNTIME='/Applications/DeepSeek Harness.app/Contents/Resources/app/dsh' \
+  '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node' \
+  --expose-internals scripts/probe-preview-process.mjs
+```
+
+常规进程测试没有选择运行时时明确跳过；在目标 macOS 平台上显式提供无效路径则失败，不把环境故障记录为跳过。上述显式探针也要求完整指定环境及固定 Node，任何不符直接失败。
