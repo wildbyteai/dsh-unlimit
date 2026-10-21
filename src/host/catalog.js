@@ -90,6 +90,9 @@ function summary(value, origin, id) {
     id,
     name: value.name,
     description: value.description,
+    ...(origin === "project" && value.resources !== undefined
+      ? { resources: value.resources.map(({ path, bytes }) => ({ path, bytes })) }
+      : {}),
     ...(value.provider !== undefined ? { provider: value.provider } : {}),
     ...(value.source !== undefined ? { source: value.source } : {}),
     ...(value.path !== undefined ? { path: value.path } : {}),

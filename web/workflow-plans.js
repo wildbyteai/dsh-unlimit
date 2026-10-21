@@ -66,7 +66,7 @@ export async function workflowPlans({
   const html = panel(
     "任务规划与执行",
     `<div id="workflow-plans-module">
-    <p class="info">可以直接填写明确任务，也可以描述目标，让规划者根据当前能力目录拆分草稿。可先检查草稿再提交，也可选择规划后直接执行。两种方式都会产生模型调用。</p>
+    <p class="info">可以直接填写明确任务，也可以描述目标，让规划者根据当前能力目录拆分草稿。可先检查草稿再提交，也可选择规划后直接执行。两种方式都会产生模型调用。规划者可从项目技能的附属文件目录选择文本，执行前重新检查；文件名可见不代表内容已读取。</p>
     <div id="workflow-plan-capability" class="${capability.available ? "note" : "error"}" role="status">${esc(capability.available ? "当前可提交显式计划；依赖预检不增加执行授权，执行者结果仍须核实。" : `不能提交计划：${unavailable()}`)}</div>
     ${!capability.available && capability.reasons?.length ? `<details><summary>查看接口诊断详情</summary><p class="info">${esc(capability.reasons.join("；"))}</p></details>` : ""}
     <form id="workflow-plan-create-form">

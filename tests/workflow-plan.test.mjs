@@ -1201,3 +1201,111 @@ test("explicit resource errors and combined context limit prevent executor start
       assert.equal(f.starts.length, 0);
     });
 });
+
+test("automatic resource selection is bound to its own observed skill and excludes extra metadata", async (t) => {
+  const catalog = planningCatalog();
+  const list = catalog.list;
+  catalog.list = async () => {
+    const value = await list();
+    value.skills.find((item) => item.origin === "project").resources = [
+      {
+        path: "references/own.md",
+        bytes: 3,
+        content: "NOT_FOR_RESOURCE_PLANNER",
+        contentBase64: "PRIVATE_BASE64",
+      },
+    ];
+    value.skills.push({
+      origin: "project",
+      id: "other-skill",
+      name: "other",
+      resources: [{ path: "references/foreign.md", bytes: 4 }],
+    });
+    return value;
+  };
+  const f = fixture(t, catalog);
+  const { item } = await f.plans.dispatch("workflow.plan.run", {
+    ...f.owner,
+    goal: "Use local-skill to inspect supplied material",
+  });
+  await until(() => f.starts.length === 1);
+  const prompt = f.starts[0].request.prompt[0].text;
+  assert.match(prompt, /references\/own.md/);
+  assert.match(prompt, /references\/foreign.md/);
+  assert.doesNotMatch(prompt, /NOT_FOR_RESOURCE_PLANNER|PRIVATE_BASE64/);
+  f.pending.get(f.starts[0].childId).resolve(
+    modelOutput({
+      tasks: [
+        task("read", {
+          skills: [{ origin: "project", id: "local-skill", resources: ["references/foreign.md"] }],
+        }),
+      ],
+    }),
+  );
+  const final = await until(async () => {
+    const state = await f.status(item.id);
+    return state.proposal.state === "invalid" && state;
+  });
+  assert.equal(final.proposal.error.code, "UNKNOWN_RESOURCE");
+  assert.equal(f.starts.length, 1);
+});
+
+test("a selected resource removed after planning observation blocks automatic execution", async (t) => {
+  const f = skillFixture(t);
+  const content =
+    "---\nname: same-name\ndescription: Synthetic resource skill\ndsh-unlimit-requirements: []\n---\nUse the selected reference.";
+  const document = { path: "SKILL.md", contentBase64: Buffer.from(content).toString("base64") };
+  f.library.dispatch("skills.import", {
+    id: f.ref.id,
+    files: [
+      document,
+      {
+        path: "references/count.md",
+        contentBase64: Buffer.from("SYNTHETIC_COUNT_BODY").toString("base64"),
+      },
+    ],
+  });
+  const { item } = await f.plans.dispatch("workflow.plan.run", {
+    ...f.owner,
+    goal: "Use the supplied skill reference",
+  });
+  await until(() => f.starts.length === 1);
+  assert.match(f.starts[0].request.prompt[0].text, /references\/count.md/);
+  assert.doesNotMatch(f.starts[0].request.prompt[0].text, /SYNTHETIC_COUNT_BODY/);
+  f.library.dispatch("skills.import", { id: f.ref.id, files: [document] });
+  f.pending.get(f.starts[0].childId).resolve(
+    modelOutput({
+      tasks: [task("read", { skills: [{ ...f.ref, resources: ["references/count.md"] }] })],
+    }),
+  );
+  const final = await until(async () => {
+    const state = await f.status(item.id);
+    return state.state === "finished-with-errors" && state;
+  });
+  assert.equal(final.proposal.state, "ready");
+  assert.equal(final.tasks[1].state, "blocked");
+  assert.equal(final.tasks[1].error.code, "DEPENDENCIES_UNAVAILABLE");
+  assert.ok(
+    final.tasks[1].preflight.checks.some((check) => check.code === "SKILL_RESOURCE_MISSING"),
+  );
+  assert.equal(f.starts.length, 1);
+});
+
+test("oversized resource inventory is rejected without truncation or starting a planner", async (t) => {
+  const catalog = planningCatalog();
+  const list = catalog.list;
+  catalog.list = async () => {
+    const value = await list();
+    value.skills[1].resources = Array.from({ length: 200 }, (_, i) => ({
+      path: `references/${i}-${"x".repeat(180)}.md`,
+      bytes: 1,
+    }));
+    return value;
+  };
+  const f = fixture(t, catalog);
+  await assert.rejects(
+    f.plans.dispatch("workflow.plan.run", { ...f.owner, goal: "Use listed skills" }),
+    { code: "PLANNING_CONTEXT_LIMIT" },
+  );
+  assert.equal(f.starts.length, 0);
+});

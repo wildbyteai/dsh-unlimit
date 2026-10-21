@@ -149,7 +149,7 @@ test("goal planning displays a checked draft, fills JSON only on request and nev
     ...task,
     dependsOn: [],
     task: "整理合成材料 <script>never-run</script>",
-    skills: [{ origin: "project", id: "evidence-review" }],
+    skills: [{ origin: "project", id: "evidence-review", resources: ["references/count.md"] }],
   };
   const ui = await setup({
     respond(action, payload) {

@@ -619,6 +619,15 @@ test("explicit project resources use the same skill snapshot and expose only sel
       ],
     });
   install(reference);
+  const inventory = await f.catalog.list({ sessionId: "first" });
+  assert.deepEqual(
+    inventory.skills
+      .find((item) => item.origin === "project")
+      .resources.map((item) => item.path)
+      .sort(),
+    ["references/check.md", "scripts/example.js"],
+  );
+  assert.doesNotMatch(JSON.stringify(inventory), /SYNTHETIC_REFERENCE|UNSELECTED_SCRIPT/);
   const ref = { origin: "project", id: "local-one", resources: ["references/check.md"] };
   const listing = await f.catalog.read({ origin: ref.origin, id: ref.id });
   assert.deepEqual(listing.item.resources.map(({ path }) => path).sort(), [

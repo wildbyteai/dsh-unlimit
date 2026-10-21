@@ -12,7 +12,11 @@ test(
   "one automatic goal run uses real official planning, selected skill execution, dependency handoff and source summary",
   optionalHost,
   async (t) => {
-    const selected = { origin: "project", id: "automatic-review" };
+    const selected = {
+      origin: "project",
+      id: "automatic-review",
+      resources: ["references/count.md"],
+    };
     const generated = [
       {
         id: "inventory",
@@ -43,6 +47,23 @@ test(
       id: selected.id,
       content:
         "---\nname: automatic-review\ndescription: Synthetic inventory procedure\ndsh-unlimit-requirements: []\n---\nAUTO_SKILL_BODY: Count only supplied records and cite their source.",
+    });
+    const stored = library.dispatch("skills.read", { id: selected.id }).item;
+    library.dispatch("skills.import", {
+      id: selected.id,
+      files: [
+        ...stored.files,
+        {
+          path: "references/count.md",
+          contentBase64: Buffer.from(
+            "AUTO_RESOURCE_BODY: A and B are exactly two synthetic records.\r\n",
+          ).toString("base64"),
+        },
+        {
+          path: "references/unused.md",
+          contentBase64: Buffer.from("UNSELECTED_AUTO_RESOURCE").toString("base64"),
+        },
+      ],
     });
     const catalog = new HostCatalog(
       {
@@ -87,16 +108,24 @@ test(
         const serialized = JSON.stringify(f.requests[index].messages);
         assert.ok(serialized.includes(goal));
         assert.equal(serialized.includes("AUTO_SKILL_BODY"), index === 1);
+        assert.equal(serialized.includes("AUTO_RESOURCE_BODY"), index === 1);
+        assert.equal(serialized.includes("UNSELECTED_AUTO_RESOURCE"), false);
+        if (index === 0) assert.ok(serialized.includes("references/count.md"));
         if (index === 2) assert.ok(serialized.includes(outputs[1]));
       }
       await f.ctx.sessionPersistence.flush();
       for (const task of done.tasks) {
         const reader = await f.ctx.sessionPersistence.open(task.receipt.sessionId, "read");
         try {
+          const events = (await reader.read()).events;
           assert.ok(
-            (await reader.read()).events.some(
+            events.some(
               (event) => event.type === "turn/end" && event.data.reason.kind === "completed",
             ),
+          );
+          assert.equal(
+            JSON.stringify(events).includes("AUTO_RESOURCE_BODY"),
+            task.id === "inventory",
           );
         } finally {
           await reader.close();

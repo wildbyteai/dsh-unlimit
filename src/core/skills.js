@@ -399,6 +399,9 @@ export class SkillLibrary {
       id: skillId,
       ...metadata(content),
       bytes: files.reduce((sum, file) => sum + file.content.length, 0),
+      resources: files
+        .filter((file) => file.path !== "SKILL.md")
+        .map((file) => ({ path: file.path, bytes: file.content.length })),
     };
     if (includeFiles)
       Object.assign(result, {
