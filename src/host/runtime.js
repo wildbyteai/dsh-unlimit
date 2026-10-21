@@ -71,6 +71,57 @@ export class DesktopRuntime {
   get enabled() {
     return this.#undo.length > 0;
   }
+  terminalStatus() {
+    const agents = this.service("agents");
+    const presets = this.service("agentPresets");
+    if (
+      !this.host.supported ||
+      typeof agents?.list !== "function" ||
+      typeof presets?.serviceFor !== "function"
+    )
+      return { available: false, detail: "当前没有经过适配的活动会话与终端目录，未执行检查。" };
+    try {
+      const owners = agents.list();
+      if (!Array.isArray(owners)) throw new Error("活动会话目录返回值无效");
+      const terminals = [],
+        pendingOwners = [];
+      for (const owner of owners) {
+        if (typeof owner?.id !== "string") throw new Error("活动会话缺少身份");
+        const registry = presets.serviceFor(owner, "terminals");
+        if (registry === undefined) continue;
+        if (typeof registry.list !== "function" || typeof registry.hasOwnerActivity !== "function")
+          throw new Error("终端目录缺少只读清单或活动状态接口");
+        const snapshots = registry.list(owner);
+        if (!Array.isArray(snapshots)) throw new Error("终端目录返回值无效");
+        for (const snapshot of snapshots) {
+          if (
+            typeof snapshot.sessionId !== "string" ||
+            !["running", "exited"].includes(snapshot.status?.kind)
+          )
+            throw new Error("终端快照缺少会话身份或运行状态");
+          terminals.push({
+            agentId: owner.id,
+            terminalId: snapshot.sessionId,
+            state: snapshot.status.kind,
+            startupMode: "unknown",
+            elevatedByPlugin: "unknown",
+          });
+        }
+        if (snapshots.length === 0 && registry.hasOwnerActivity(owner))
+          pendingOwners.push(owner.id);
+      }
+      return {
+        available: true,
+        scannedAgents: owners.length,
+        terminals,
+        pendingOwners,
+        detail:
+          "仅检查当前活动会话的终端注册，不读取输出或历史。宿主未记录启动权限及本插件升权来源，未知不等于已收回；本检查不会关闭终端。",
+      };
+    } catch (error) {
+      return { available: false, detail: `终端检查失败：${error.message}` };
+    }
+  }
   capabilities() {
     this.permissionDefaults.ctx = this.ctx;
     const candidates = [

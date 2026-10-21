@@ -809,3 +809,14 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 - 全量官方隔离回归 1102 通过、0 失败、0 跳过；194 项语法及 55 模块分层检查通过。构建和离线包通过，77 文件，SHA-256 `2986564b5a7be682f9b11534b709ded912d03af2de7205402ab777f0e3d43d74`。本地日志为 `artifacts/terminal-permissions.log`、`artifacts/terminal-permissions-original.log`、`artifacts/terminal-permissions-full.log`。
 
 本批修复的是错误的完整还原预期；自动收回旧 PTY 权限尚未实现。已询问用户是否在撤销时关闭由插件扩大权限创建的终端（会丢失 shell 状态），或保留并要求手工关闭；该选择未答复前不加入自动终止逻辑。保持 117 项原目标、真实来源、NOTICE、UNLICENSED 和第三方归属，不改真实 DSH 配置/profile/会话。
+
+## 终端只读清单与未知权限来源（2026-10-21）
+
+基于 `d707c33ebcdb97bb181576e0255c8a2d9c702b17`，新增 `DesktopRuntime.terminalStatus()` 与 `status.terminalPermissions`，在诊断页展示当前活动会话的终端归属。检查不调用关闭、发送输入、权限更改或持久化接口；启动权限和插件升权归属明确未知，不能用当前 fullAccess 或只读解析结果倒推。字段及边界见 [权限合同](file-permissions-contract.md#活动终端只读清单2026-10-21)。
+
+- Runtime 与页面定向 37 通过。实际 owner 对象逐项核对，不合并跨会话同名终端；只保留安全元数据，名称/MOTD/PID 不外传；未发布活动、无接口、失败和空清单分别检查。另增加状态 API 回归，验证控制未启用时仍可读取，且没有配置写入或控制操作。
+- 真实 minimal/PTY 缺陷探针在撤销后原终端仍可写的时刻，调用新增产品读取方法，核对两个真实终端、精确 Agent/PTY 身份、running 与 unknown 字段，完整 Session 事件没有变化。探针 3 项通过，4 个真实 PTY 清理确认；最终仍标 `gap-confirmed`，因为自动权限收回没有实现。证据 [terminal-permissions-acceptance.json](evidence/terminal-permissions-acceptance.json) 绑定当前源摘要。
+- 1280×720 真实组件预览分别展示活动终端/未发布活动、空清单、检查失败，布局和关键文案可见，无 console error。截图 `artifacts/terminal-inventory-preview.png`，数据是原创合成清单，服务器退出 0。另用完整项目合成预览打开诊断页并点击运行诊断，新增检查区刷新、不可用不误报为空，无 console error；Ctrl+C 结束时 npm 返回 1，随后确认该预览端口已关闭，不将 npm 退出码记为 0。预览页均关闭。
+- 全量官方隔离回归 1106 通过、0 失败、0 跳过；194 项语法、55 模块分层检查通过。构建与离线包通过，77 文件，SHA-256 `fe39a98e6cfb58f5c64b7923259b7f96b2c2a2731809e8e919da4ba09b9852eb`。日志为 `artifacts/terminal-inventory-targeted.log`、`artifacts/terminal-inventory-host.log`、`artifacts/terminal-inventory-full.log`。
+
+自动关闭方案仍待用户选择，此批没有增加终止行为；现存终端的未知升权归属不能据当前状态补造。117 项原验收目标、来源与许可说明保留，未安装、重载或修改真实 DSH 配置/profile/会话。

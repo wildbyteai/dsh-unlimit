@@ -8,7 +8,12 @@ import { processMonitor } from "./processes.js";
 import { workflowPlans } from "./workflow-plans.js";
 import { openWorkspaceRules } from "./workspace-rules.js";
 import { openPromptPreview } from "./prompt-preview.js";
-import { uninstallSection, uninstallFlow, renderReceipt } from "./maintenance.js";
+import {
+  uninstallSection,
+  uninstallFlow,
+  renderReceipt,
+  terminalStatusSection,
+} from "./maintenance.js";
 import {
   connectionCheckFlow,
   connectionCheckPanel,
@@ -4225,6 +4230,10 @@ async function diagnosticsPage() {
     html:
       heading('<button class="primary" id="run-diagnostics">运行诊断</button>') +
       panel(
+        "持久终端 · 只读检查",
+        `<div id="terminal-status">${terminalStatusSection(state.status?.terminalPermissions)}</div>`,
+      ) +
+      panel(
         "演练入口确认",
         `<p class="info">${admission.accepted ? `当前安装已确认 · ${esc(admission.acceptedAt)}` : "当前安装尚未确认演练区使用说明。"}撤销会阻止新的演练任务，并尝试停止本项目管理的执行者；普通聊天和运行控制继续可用。若停止未确认，可再次执行撤销以重试清理。</p><button id="revoke-admission" class="danger">撤销确认 / 重试清理</button><button id="enter-admission">查看演练入口</button>`,
       ) +
@@ -4282,6 +4291,10 @@ async function diagnosticsPage() {
       $("#run-diagnostics").onclick = (e) =>
         run(e.target, async () => {
           const result = await api("diagnostics.run");
+          await refreshStatus();
+          $("#terminal-status").innerHTML = terminalStatusSection(
+            state.status?.terminalPermissions,
+          );
           const checks = result.checks || [];
           $("#diagnostic-result").innerHTML = panel(
             "诊断结果",

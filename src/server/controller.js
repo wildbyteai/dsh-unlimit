@@ -188,6 +188,10 @@ export class Controller {
         supported: this.host.supported,
       },
       enabled: this.runtime.enabled,
+      terminalPermissions: this.runtime.terminalStatus?.() ?? {
+        available: false,
+        detail: "当前运行控制未提供终端检查接口。",
+      },
       capabilities: [
         ...runtimeCapabilities,
         ...(this.repeat?.capabilities() ?? []),

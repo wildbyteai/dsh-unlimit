@@ -201,3 +201,42 @@ test("removal receipt separates package removal from unrestored prompt history",
   assert.match(legacy, /历史会话提示词<\/span><span>未返回恢复证据/);
   assert.doesNotMatch(legacy, /历史会话提示词<\/span><span>已/);
 });
+
+test("terminal inventory displays unknown permissions, pending activity and unavailable evidence without mutation controls", async () => {
+  const { terminalStatusSection } = await import("../web/maintenance.js");
+  const html = terminalStatusSection({
+    available: true,
+    scannedAgents: 2,
+    detail: "Read-only",
+    terminals: [
+      {
+        agentId: "<img src=x>",
+        terminalId: "pty-1",
+        state: "running",
+        startupMode: "unknown",
+        elevatedByPlugin: "unknown",
+      },
+    ],
+    pendingOwners: ["pending<&>"],
+  });
+  assert.match(html, /&lt;img src=x&gt;/);
+  assert.match(html, /未知/);
+  assert.match(html, /未确认/);
+  assert.match(html, /pending&lt;&amp;&gt;/);
+  assert.match(html, /不能视为已清理/);
+  assert.doesNotMatch(html, /<button|<img|已收回|全部清理完成/);
+  assert.doesNotMatch(
+    terminalStatusSection({ available: false, detail: "Unavailable" }),
+    /没有发现/,
+  );
+  assert.match(
+    terminalStatusSection({
+      available: true,
+      scannedAgents: 0,
+      terminals: [],
+      pendingOwners: [],
+      detail: "Read-only",
+    }),
+    /此次检查没有发现已发布的终端注册/,
+  );
+});

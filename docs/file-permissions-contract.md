@@ -112,3 +112,13 @@ node --expose-internals --test tests/file-permissions-host.test.mjs
 当前产品修正了能力说明、还原确认及卸载页面/回执中的提示，明确旧终端可能保留全访问；**这只是消除错误承诺，不是权限撤销修复**。自动关闭由插件扩大权限创建的终端将丢失 shell 变量/当前目录并可能中止工作；该处理方式已向用户提出选择，尚未获答复时不引入自动终止行为。不会通过关闭所有终端代替判断所有权。
 
 复验命令与前节一致，脚本改为 `scripts/probe-terminal-permissions.mjs`。它不安装或重载插件，不访问真实 profile。未来的撤销修复需要把缺陷断言替换为真正的权限收回断言，并保留本次历史证据。
+
+## 活动终端只读清单（2026-10-21）
+
+诊断页通过 `status.terminalPermissions` 读取当前内存 Agent 目录，再按精确 Agent 对象向其保留预设的 `terminals` 服务调用 `list(owner)`。返回所属会话 ID、终端 ID 和 running/exited 状态；相同 `pty-1` 在不同会话下分别保留。没有读取终端输出、名称、MOTD、历史日志或 profile，也不返回 PID。运行控制撤销后仍可只读检查，检查过程不启用、撤销或关闭任何终端。
+
+官方快照只有身份、类型、PID 与状态，没有启动时沙箱模式及插件升权来源；当前 `startupMode`、`elevatedByPlugin` 明确为 `unknown`。不能用当前 resolve 结果、fullAccess 开关、终端 ID 或 PID 推断历史归属，不能据清单批量关闭未知来源终端。未来回收需有创建时可追溯的权限归属证据，现存未记录终端不能倒推为插件所有。
+
+`available:true` 时返回 `scannedAgents`、`terminals` 和 `pendingOwners`。后者仅标记 `list(owner)` 为空但 `hasOwnerActivity(owner)` 为真的会话，不表示全部 pending spawn 的数量；有已发布终端的会话同样不能视为已清理。没有宿主接口或检查失败返回 `available:false` 和原因，不返回伪造的空清单。“运行诊断”和全局刷新都会重新读取。
+
+真实 PTY 探针在旧全访问终端撤销后仍可写的时刻检查此清单，两个活动终端均保持真实归属与未知权限，全部 Session 事件不变；随后原有缺陷仍如实复现。API 及页面验证见 [验证记录](verification.md#终端只读清单与未知权限来源2026-10-21)。此功能不收回旧权限，不替代待确认的终端关闭方案。

@@ -616,3 +616,27 @@ test("unknown versions cannot start workflow or continuation mutations", async (
   assert.equal((await controller.dispatch("workflow.plan.capabilities")).available, false);
   assert.equal(calls, 0);
 });
+
+test("status exposes terminal inspection independently of control activation and performs no writes", async () => {
+  const f = controlFixture();
+  assert.equal((await f.controller.dispatch("status")).terminalPermissions.available, false);
+  const inventory = {
+    available: true,
+    scannedAgents: 1,
+    terminals: [
+      {
+        agentId: "synthetic",
+        terminalId: "pty-1",
+        state: "running",
+        startupMode: "unknown",
+        elevatedByPlugin: "unknown",
+      },
+    ],
+    pendingOwners: [],
+  };
+  f.runtime.terminalStatus = () => structuredClone(inventory);
+  const result = await f.controller.dispatch("status");
+  assert.equal(result.enabled, false);
+  assert.deepEqual(result.terminalPermissions, inventory);
+  assert.deepEqual(f.calls, []);
+});

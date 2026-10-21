@@ -155,6 +155,18 @@ test(
           const after = join(outside, "default-after-revert.txt");
           expectWrite((await run(agent, [bash(command(after))], []))[0], after, true);
           assert.equal(f.minimalTerminal.evidence().launches.at(-1).pid, launch.pid);
+          const beforeInspection = agent.session.snapshotEvents();
+          const inventory = f.adapter.terminalStatus();
+          assert.equal(inventory.available, true);
+          assert.equal(inventory.scannedAgents, 2);
+          assert.equal(inventory.terminals.length, 2);
+          assert.deepEqual(inventory.pendingOwners, []);
+          const observed = inventory.terminals.find((row) => row.agentId === agent.id);
+          assert.equal(observed.terminalId, launch.sessionId);
+          assert.equal(observed.state, "running");
+          assert.equal(observed.startupMode, "unknown");
+          assert.equal(observed.elevatedByPlugin, "unknown");
+          assert.deepEqual(agent.session.snapshotEvents(), beforeInspection);
           await run(agent, [bash("exit")], []);
           const next = join(outside, "default-after-close.txt");
           expectWrite((await run(agent, [bash(command(next))], ["read-only"]))[0], next, false);
@@ -166,6 +178,7 @@ test(
             samePtyRetained: true,
             afterClosingNewPtyOutsideWrite: false,
             officialPersistenceReadbackEqual: true,
+            terminalInventory: inventory,
           });
         },
       );
@@ -177,7 +190,7 @@ test(
     const evidence = {
       schemaVersion: 1,
       behaviorIds: ["CORE-FILES", "CORE-PERMISSION", "DESK-REVERT"],
-      developmentBasis: "8bdbeb8dd7ef2ae4362165a23b22cacb0aa1d8d7",
+      developmentBasis: "d707c33ebcdb97bb181576e0255c8a2d9c702b17",
       generatedAt: new Date().toISOString(),
       node: process.version,
       platform: { os: process.platform, arch: process.arch },

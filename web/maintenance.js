@@ -10,6 +10,18 @@ const promptHistoryNotice =
 const terminalPermissionNotice =
   "卸载前请关闭已有持久终端。还原权限接口不会收回这些终端的启动权限，它们仍可能保留全访问；在终端执行 exit 或通过宿主关闭后，新终端才使用恢复后的权限。";
 
+export function terminalStatusSection(status) {
+  if (status?.available !== true)
+    return `<p class="info" role="status">${esc(status?.detail || "未返回终端检查结果，不能确认是否仍有终端运行。")}</p>`;
+  const rows = status.terminals
+    .map(
+      (row) =>
+        `<tr><td>${esc(row.agentId)}</td><td>${esc(row.terminalId)}</td><td>${row.state === "running" ? "运行中" : "进程已退出，注册待清理"}</td><td>未知</td><td>未确认</td></tr>`,
+    )
+    .join("");
+  return `<p class="info">已检查 ${esc(status.scannedAgents)} 个活动会话。${esc(status.detail)}</p>${rows ? `<div class="tablewrap"><table><thead><tr><th>所属会话</th><th>终端</th><th>运行状态</th><th>启动权限</th><th>由本插件升权</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="info">此次检查没有发现已发布的终端注册。</p>'}${status.pendingOwners.length ? `<div class="note">以下会话仍有未发布的终端活动，不能视为已清理：${status.pendingOwners.map(esc).join("、")}</div>` : ""}`;
+}
+
 export const uninstallConfirmation =
   "确认卸载 dsh-unlimit？将先撤销本插件的运行控制与演练确认，停止所属任务和探测，再由宿主官方插件管理器卸载本插件。规则、技能、材料、数据库及无关文件保留。当前面板未保存的草稿会丢失。不会自动重启宿主；如需重启，由你稍后操作。" +
   promptHistoryNotice +

@@ -596,3 +596,83 @@ test("failed activation invalidates permission wrappers retained during setup", 
   });
   await expectNativeControls(saved, f);
 });
+
+test("terminal inspection keeps exact owner identities and never infers startup policy or plugin ownership", (t) => {
+  const f = fixture(t);
+  const owners = [{ id: "one" }, { id: "two" }, { id: "pending" }, { id: "no-terminal-preset" }];
+  f.ctx.agents = { list: () => owners };
+  const seen = [];
+  const registry = {
+    list(owner) {
+      seen.push(owner);
+      return owner === owners[2]
+        ? []
+        : [
+            {
+              sessionId: "pty-1",
+              status: { kind: "running" },
+              pid: 123,
+              motd: "SECRET_OUTPUT",
+              name: "PRIVATE_NAME",
+              startupMode: "danger-full-access",
+            },
+          ];
+    },
+    hasOwnerActivity(owner) {
+      assert.equal(owner, owners[2]);
+      return true;
+    },
+    kill() {
+      assert.fail("Read-only inspection must never close a terminal");
+    },
+  };
+  f.ctx.agentPresets = {
+    serviceFor(owner, name) {
+      assert.equal(name, "terminals");
+      return owner === owners[3] ? undefined : registry;
+    },
+  };
+  f.runtime.apply();
+  f.settings.enabled = true;
+  assert.equal(f.ctx.sandboxPolicy.resolve().mode, "danger-full-access");
+  const result = f.runtime.terminalStatus();
+  assert.equal(result.available, true);
+  assert.equal(result.scannedAgents, 4);
+  assert.deepEqual(seen, owners.slice(0, 3));
+  assert.deepEqual(result.pendingOwners, ["pending"]);
+  assert.deepEqual(
+    result.terminals,
+    owners.slice(0, 2).map((owner) => ({
+      agentId: owner.id,
+      terminalId: "pty-1",
+      state: "running",
+      startupMode: "unknown",
+      elevatedByPlugin: "unknown",
+    })),
+  );
+  assert.doesNotMatch(JSON.stringify(result), /SECRET_OUTPUT|PRIVATE_NAME|123|danger-full-access/);
+});
+
+test("terminal inspection distinguishes unavailable, failed and verified empty inventories", (t) => {
+  const f = fixture(t);
+  assert.equal(f.runtime.terminalStatus().available, false);
+  f.ctx.agents = { list: () => [] };
+  f.ctx.agentPresets = { serviceFor: () => undefined };
+  const empty = f.runtime.terminalStatus();
+  assert.equal(empty.available, true);
+  assert.deepEqual(empty.terminals, []);
+  assert.equal(empty.scannedAgents, 0);
+  f.ctx.agents.list = () => [{ id: "synthetic" }];
+  f.ctx.agentPresets.serviceFor = () => ({
+    list() {
+      throw new Error("Synthetic inventory failure");
+    },
+    hasOwnerActivity() {
+      return true;
+    },
+  });
+  const failed = f.runtime.terminalStatus();
+  assert.equal(failed.available, false);
+  assert.match(failed.detail, /Synthetic inventory failure/);
+  assert.equal(failed.terminals, undefined);
+});

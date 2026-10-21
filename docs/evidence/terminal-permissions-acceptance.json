@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "behaviorIds": ["CORE-FILES", "CORE-PERMISSION", "DESK-REVERT"],
-  "developmentBasis": "8bdbeb8dd7ef2ae4362165a23b22cacb0aa1d8d7",
-  "generatedAt": "2026-10-21T14:32:26.172Z",
+  "developmentBasis": "d707c33ebcdb97bb181576e0255c8a2d9c702b17",
+  "generatedAt": "2026-10-21T14:41:53.849Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2125,9 +2125,9 @@
           "sessionId": "pty-1",
           "exited": true,
           "fdClosed": true,
-          "pid": 50525,
+          "pid": 54087,
           "fd": 12,
-          "started": "Wed Oct 21 22:32:17 2026",
+          "started": "Wed Oct 21 22:41:45 2026",
           "exitArguments": [0, 0]
         },
         {
@@ -2174,9 +2174,9 @@
           "sessionId": "pty-2",
           "exited": true,
           "fdClosed": true,
-          "pid": 50562,
+          "pid": 54124,
           "fd": 12,
-          "started": "Wed Oct 21 22:32:17 2026",
+          "started": "Wed Oct 21 22:41:45 2026",
           "exitArguments": [0, 9]
         },
         {
@@ -2215,9 +2215,9 @@
           "sessionId": "pty-3",
           "exited": true,
           "fdClosed": true,
-          "pid": 50581,
+          "pid": 54143,
           "fd": 16,
-          "started": "Wed Oct 21 22:32:18 2026",
+          "started": "Wed Oct 21 22:41:46 2026",
           "exitArguments": [0, 0]
         },
         {
@@ -2264,9 +2264,9 @@
           "sessionId": "pty-4",
           "exited": true,
           "fdClosed": true,
-          "pid": 50654,
+          "pid": 54170,
           "fd": 16,
-          "started": "Wed Oct 21 22:32:19 2026",
+          "started": "Wed Oct 21 22:41:47 2026",
           "exitArguments": [0, 9]
         }
       ],
@@ -2280,9 +2280,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -2295,20 +2295,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2319,20 +2319,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2343,20 +2343,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2367,20 +2367,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2391,20 +2391,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2415,20 +2415,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2439,20 +2439,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2463,20 +2463,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2487,20 +2487,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50525,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54087,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50525"],
+          "argv": ["-o", "tpgid=", "-p", "54087"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50525
+          "ownedForegroundPgid": 54087
         },
         {
           "executable": "/bin/ps",
@@ -2565,9 +2565,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -2580,20 +2580,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50562"],
+          "argv": ["-o", "tpgid=", "-p", "54124"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50562
+          "ownedForegroundPgid": 54124
         },
         {
           "executable": "/bin/ps",
@@ -2604,20 +2604,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50562"],
+          "argv": ["-o", "tpgid=", "-p", "54124"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50562
+          "ownedForegroundPgid": 54124
         },
         {
           "executable": "/bin/ps",
@@ -2628,20 +2628,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50562"],
+          "argv": ["-o", "tpgid=", "-p", "54124"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50562
+          "ownedForegroundPgid": 54124
         },
         {
           "executable": "/bin/ps",
@@ -2652,20 +2652,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50562"],
+          "argv": ["-o", "tpgid=", "-p", "54124"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50562
+          "ownedForegroundPgid": 54124
         },
         {
           "executable": "/bin/ps",
@@ -2676,20 +2676,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50562"],
+          "argv": ["-o", "tpgid=", "-p", "54124"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50562
+          "ownedForegroundPgid": 54124
         },
         {
           "executable": "/bin/ps",
@@ -2700,20 +2700,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50562"],
+          "argv": ["-o", "tpgid=", "-p", "54124"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50562
+          "ownedForegroundPgid": 54124
         },
         {
           "executable": "/bin/ps",
@@ -2724,20 +2724,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50562"],
+          "argv": ["-o", "tpgid=", "-p", "54124"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50562
+          "ownedForegroundPgid": 54124
         },
         {
           "executable": "/bin/ps",
@@ -2748,20 +2748,20 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50562"],
+          "argv": ["-o", "tpgid=", "-p", "54124"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50562
+          "ownedForegroundPgid": 54124
         },
         {
           "executable": "/bin/ps",
@@ -2772,14 +2772,14 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
@@ -2792,25 +2792,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -2821,25 +2821,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -2850,25 +2850,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -2879,25 +2879,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -2908,25 +2908,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -2937,25 +2937,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -2966,25 +2966,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -2995,25 +2995,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -3024,25 +3024,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50581,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:18 2026"
+              "pid": 54143,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:46 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50581"],
+          "argv": ["-o", "tpgid=", "-p", "54143"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50581
+          "ownedForegroundPgid": 54143
         },
         {
           "executable": "/bin/ps",
@@ -3053,24 +3053,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
-            }
-          ]
-        },
-        {
-          "executable": "/bin/ps",
-          "argv": ["-axo", "pid=,ppid=,lstart="],
-          "options": {
-            "encoding": "utf8"
-          },
-          "success": true,
-          "ownedTree": [
-            {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3083,9 +3068,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3098,9 +3083,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3113,9 +3098,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3128,9 +3113,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3143,14 +3128,29 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
+            }
+          ]
+        },
+        {
+          "executable": "/bin/ps",
+          "argv": ["-axo", "pid=,ppid=,lstart="],
+          "options": {
+            "encoding": "utf8"
+          },
+          "success": true,
+          "ownedTree": [
+            {
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
@@ -3163,25 +3163,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50654"],
+          "argv": ["-o", "tpgid=", "-p", "54170"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50654
+          "ownedForegroundPgid": 54170
         },
         {
           "executable": "/bin/ps",
@@ -3192,25 +3192,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50654"],
+          "argv": ["-o", "tpgid=", "-p", "54170"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50654
+          "ownedForegroundPgid": 54170
         },
         {
           "executable": "/bin/ps",
@@ -3221,25 +3221,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50654"],
+          "argv": ["-o", "tpgid=", "-p", "54170"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50654
+          "ownedForegroundPgid": 54170
         },
         {
           "executable": "/bin/ps",
@@ -3250,25 +3250,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50654"],
+          "argv": ["-o", "tpgid=", "-p", "54170"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50654
+          "ownedForegroundPgid": 54170
         },
         {
           "executable": "/bin/ps",
@@ -3279,25 +3279,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50654"],
+          "argv": ["-o", "tpgid=", "-p", "54170"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50654
+          "ownedForegroundPgid": 54170
         },
         {
           "executable": "/bin/ps",
@@ -3308,25 +3308,25 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
         {
           "executable": "/bin/ps",
-          "argv": ["-o", "tpgid=", "-p", "50654"],
+          "argv": ["-o", "tpgid=", "-p", "54170"],
           "options": {
             "encoding": "utf8"
           },
           "success": true,
-          "ownedForegroundPgid": 50654
+          "ownedForegroundPgid": 54170
         },
         {
           "executable": "/bin/ps",
@@ -3337,14 +3337,14 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
@@ -3357,14 +3357,14 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
@@ -3377,14 +3377,14 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             },
             {
-              "pid": 50654,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:19 2026"
+              "pid": 54170,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:47 2026"
             }
           ]
         },
@@ -3397,9 +3397,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3412,9 +3412,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3427,9 +3427,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3442,9 +3442,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3457,9 +3457,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3472,9 +3472,9 @@
           "success": true,
           "ownedTree": [
             {
-              "pid": 50562,
-              "parentPid": 50502,
-              "started": "Wed Oct 21 22:32:17 2026"
+              "pid": 54124,
+              "parentPid": 54058,
+              "started": "Wed Oct 21 22:41:45 2026"
             }
           ]
         },
@@ -3509,25 +3509,25 @@
       "processSignals": [
         {
           "launch": 4,
-          "pid": 50654,
+          "pid": 54170,
           "target": "owned-process",
           "signal": "SIGTERM"
         },
         {
           "launch": 4,
-          "pid": 50654,
+          "pid": 54170,
           "target": "owned-process",
           "signal": "SIGKILL"
         },
         {
           "launch": 2,
-          "pid": 50562,
+          "pid": 54124,
           "target": "owned-process",
           "signal": "SIGTERM"
         },
         {
           "launch": 2,
-          "pid": 50562,
+          "pid": 54124,
           "target": "owned-process",
           "signal": "SIGKILL"
         }
@@ -3613,13 +3613,35 @@
       "actualOldPtyOutsideWrite": true,
       "samePtyRetained": true,
       "afterClosingNewPtyOutsideWrite": false,
-      "officialPersistenceReadbackEqual": true
+      "officialPersistenceReadbackEqual": true,
+      "terminalInventory": {
+        "available": true,
+        "scannedAgents": 2,
+        "terminals": [
+          {
+            "agentId": "synthetic-minimal-permission-canonical",
+            "terminalId": "pty-2",
+            "state": "running",
+            "startupMode": "unknown",
+            "elevatedByPlugin": "unknown"
+          },
+          {
+            "agentId": "synthetic-minimal-permission-full-default",
+            "terminalId": "pty-3",
+            "state": "running",
+            "startupMode": "unknown",
+            "elevatedByPlugin": "unknown"
+          }
+        ],
+        "pendingOwners": [],
+        "detail": "仅检查当前活动会话的终端注册，不读取输出或历史。宿主未记录启动权限及本插件升权来源，未知不等于已收回；本检查不会关闭终端。"
+      }
     }
   ],
   "sourceDigests": [
     {
       "path": "scripts/probe-terminal-permissions.mjs",
-      "sha256": "226db2787f50d936c567da586033ad91bea80c16ace6cadc915a63997f147450"
+      "sha256": "d8efa70810a89278a042ba543bc49912cf87766cb0be7daf30109324f4777506"
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
@@ -3639,7 +3661,7 @@
     },
     {
       "path": "src/host/runtime.js",
-      "sha256": "9bc5728c85c1b70884951c32b47c72a4065812f276781ca0befdd6e5d6212309"
+      "sha256": "22b21e1c29c5d1530daaf3c3e005aa4b81c834e1c4387a3d32e827a9befa0f6d"
     },
     {
       "path": "src/host/native-instructions.js",
