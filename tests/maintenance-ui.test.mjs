@@ -241,6 +241,20 @@ test("terminal inventory displays unknown permissions, pending activity and unav
   );
 });
 
+test("unsupported Hook and memory policies show reasons and inert legacy values without fake controls", async () => {
+  const { unsupportedPolicies } = await import("../web/maintenance.js");
+  const html = unsupportedPolicies(
+    [{ id: "hooks", state: "unsupported", detail: "Provider <unknown>" }],
+    { hooksDeny: true },
+  );
+  assert.match(html, /Hook 策略 · 未适配/);
+  assert.match(html, /第三方记忆策略 · 未适配/);
+  assert.match(html, /Provider &lt;unknown&gt;/);
+  assert.match(html, /旧配置保存了启用值，但当前未生效/);
+  assert.doesNotMatch(html, /<input|<button|<unknown>/);
+  assert.doesNotMatch(unsupportedPolicies([], { hooksDeny: false }), /旧配置保存/);
+});
+
 test("confirmed terminal attribution and close-on-revert consequences are visible", async () => {
   const { terminalStatusSection } = await import("../web/maintenance.js");
   assert.match(

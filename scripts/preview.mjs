@@ -16,6 +16,7 @@ import { ReadLimits } from "../src/host/read-limits.js";
 import { HostCatalog } from "../src/host/catalog.js";
 import { DesktopWorkflow } from "../src/host/workflow.js";
 import { Continuation } from "../src/host/continuation.js";
+import { HostExtensions } from "../src/host/extensions.js";
 import { DrillAdmission } from "../src/core/admission.js";
 import { LocalEnvironment } from "../src/core/environment.js";
 import { DesktopWorkflowPlan } from "../src/host/workflow-plan.js";
@@ -162,6 +163,7 @@ try {
   const controller = new Controller({
     store,
     runtime,
+    extensions: new HostExtensions({}, store),
     skills,
     files: new WorkspaceFiles(join(temporary, "materials"), store),
     retry: new RetryPolicy({}, store),

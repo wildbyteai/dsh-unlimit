@@ -832,3 +832,14 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 - 1280×720 真实组件与完整合成工作台实际渲染，分别核对已确认/未知归属和还原确认，随后取消，无 console error。截图 `artifacts/terminal-revocation-preview.png`、`artifacts/terminal-revocation-confirmation.png`。组件预览退出 0；完整 npm 预览 Ctrl+C 返回 130，随后确认两端口均关闭。页面全部关闭。
 
 此修复只计入有创建证据的官方终端撤销，不能推定任意后台后代进程、未知旧终端、Windows 或真实桌面均通过。Hook/第三方记忆、完全卸载后的旧提示词恢复、PTC 待办立即恢复等原缺口保持。真实来源、NOTICE、UNLICENSED、DB-IP 归属及原验收基线不变。本批未安装、重载、发起真实模型请求或修改真实 DSH 配置/profile/会话。
+
+## Hook 与第三方记忆接口复核及无效启用修正（2026-10-21）
+
+基于 `f00da73`，优先复核 `CORE-HOOKS / PROMPT-MEMORY`。两项仍缺：当前已核验发行内容中没有定位对应 Hook 执行器/策略接口，也没有确定记忆提供者、来源及独立保留开关。历史 Hook 格式、通用步骤事件、MCP 连接关闭均不算对齐。原因、关键来源行号和继续适配条件见 [合同](hooks-memory-contract.md#本批结论与仍缺条件2026-10-21)。
+
+- 新增只读 `scripts/inspect-hook-memory.mjs`，显式指定运行时，摘要核对后检索发行清单所列入口/声明/patch；不导入宿主、不读 profile、不读备份或自装插件、不联网。结果 [hooks-memory-interface-scan.json](evidence/hooks-memory-interface-scan.json) 只含摘要、路径、匹配行号及调查边界。8 个摘要不符条目仅记录摘要、跳过内容，不据此推导不存在或执行其代码。负向检索不证明整个第三方生态不支持。
+- 修复 `settings.save` 仍可新开启无效 Hook 的行为：未适配时从 false 改 true 在持久化前以 `UNSUPPORTED` 拒绝，设置与 revision 不变。已有 true 值保持但不生效，仍能编辑其他设置或明确清除该值。没有引入 Hook 拦截器、记忆删除器或停用 MCP 的替代实现。
+- 破甲控制页新增两个未适配原因说明；旧启用值单独注明未生效，原禁用开关不误呈现为有效。完整合成预览在 1280×720 下可见，两项原因准确，Hook 控件禁用、无 console error。截图 `artifacts/hooks-memory-support.png`。关闭预览后 npm 返回 130，回环端口确认关闭；未在真实桌面操作。
+- 定向日志 `artifacts/hooks-memory-targeted.log` 为 44 通过、1 项因未设官方运行时门而明确跳过；随后带官方双环境门执行完整回归 `artifacts/hooks-memory-full.log`，1116 通过、0 失败、0 跳过。语法/来源/分层/格式、构建与离线包检查通过；原 117 项验收前五列未变。离线包 78 文件，SHA-256 `bf67b61a641a4d60a9ce3705403395d6f0c70d896a81b6de5365801b85f10637`。
+
+本批完成的是接口核查与无效配置行为修正，不把它记成 Hook/第三方记忆能力已实现。其余已实现破甲路径保持，完全卸载后提示词恢复、PTC 待办恢复等原缺口继续保留。未安装、重载、读写真实 DSH 配置或真实会话，也未改变来源、许可或第三方归属声明。

@@ -62,6 +62,37 @@ function controlFixture() {
   return { controller, store, runtime, repeat, calls, save };
 }
 
+test("unsupported Hook enablement is rejected before persistence, with an actionable reason", async () => {
+  const f = controlFixture();
+  f.controller.extensions = {
+    capabilities: () => [
+      { id: "hooks", state: "unsupported", detail: "No verified Hook provider" },
+    ],
+  };
+  await assert.rejects(f.save({ hooksDeny: true }), {
+    code: "UNSUPPORTED",
+    message: "No verified Hook provider",
+  });
+  assert.equal(f.store.dispatch("settings.get").revision, 0);
+  assert.deepEqual(f.calls, []);
+  f.controller.extensions = undefined;
+  await assert.rejects(f.save({ hooksDeny: true }), { code: "UNSUPPORTED" });
+  assert.equal(f.store.dispatch("settings.get").revision, 0);
+});
+
+test("legacy unsupported Hook value remains inert and does not block editing other settings or clearing it", async () => {
+  const f = controlFixture();
+  const initial = f.store.dispatch("settings.get");
+  f.store.dispatch("settings.save", {
+    revision: initial.revision,
+    value: { ...initial.value, hooksDeny: true },
+  });
+  const edited = await f.save({ prompt: "Synthetic new prompt" });
+  assert.equal(edited.value.hooksDeny, true);
+  assert.equal(edited.value.prompt, "Synthetic new prompt");
+  assert.equal((await f.save({ hooksDeny: false })).value.hooksDeny, false);
+});
+
 test("revoking admission stops owned processes and reports unconfirmed cleanup", async () => {
   const f = controlFixture();
   let stops = 0;

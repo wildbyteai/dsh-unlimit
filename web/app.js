@@ -13,6 +13,7 @@ import {
   uninstallFlow,
   renderReceipt,
   terminalStatusSection,
+  unsupportedPolicies,
 } from "./maintenance.js";
 import {
   connectionCheckFlow,
@@ -1757,6 +1758,7 @@ async function controlPage() {
       heading(
         `${capabilityButton("control.revert", "还原运行控制", 'id="revert-control" class="danger"')}${capabilityButton("control.apply", "应用运行控制", 'id="apply-control" class="primary"')}`,
       ) +
+      unsupportedPolicies(state.status.capabilities, v) +
       `<form id="settings-form"><div class="grid2"><div>${panel(
         "系统提示词",
         `<div class="toolbar">${renderField(

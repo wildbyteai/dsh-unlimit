@@ -10,6 +10,25 @@ const promptHistoryNotice =
 const terminalPermissionNotice =
   "还原时会关闭本次加载后由插件升权创建的持久终端，丢失其中的变量与当前目录状态，并等待关闭完成。用户显式授权或来源未知的终端不会自动关闭；旧版未记录来源的全访问终端仍需手工关闭。关闭后首次 bash 调用可能报告旧终端已失效，下一次调用新建终端；不会自动重放命令。";
 
+export function unsupportedPolicies(capabilities = [], settings = {}) {
+  return [
+    ["hooks", "Hook 策略"],
+    ["memory", "第三方记忆策略"],
+  ]
+    .flatMap(([id, label]) => {
+      const capability = capabilities.find((item) => item.id === id);
+      if (capability && capability.state !== "unsupported") return [];
+      const legacy =
+        id === "hooks" && settings.hooksDeny === true
+          ? "<p>旧配置保存了启用值，但当前未生效；保留该值不会禁用任何 Hook，也不阻止其他已支持功能运行。</p>"
+          : "";
+      return [
+        `<div class="note"><strong>${label} · 未适配</strong><p>${esc(capability?.detail ?? "当前没有可验证的提供者与定向策略接口，不能确认此能力可用。")}</p>${legacy}</div>`,
+      ];
+    })
+    .join("");
+}
+
 export function terminalStatusSection(status) {
   if (status?.available !== true)
     return `<p class="info" role="status">${esc(status?.detail || "未返回终端检查结果，不能确认是否仍有终端运行。")}</p>`;

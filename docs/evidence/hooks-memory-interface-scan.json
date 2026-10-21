@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "result": "static-inventory-inspection-only",
+  "target": {
+    "version": "0.2.1-rc.2",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
+  "verifiedPackageCount": 307,
+  "verifiedEntryCount": 298,
+  "verifiedDeclarationAndPatchCount": 20,
+  "verifiedPathsAndHashesSha256": "3ef0fd416a99d4dde3aceb796c275dc0b57a90be1564c154d73f0f7cf8f75e9c",
+  "providerNameMatches": [],
+  "searches": {
+    "historicalHookProducer": {
+      "pattern": "[\"']hooks-(?:codex|claude-code)[\"']",
+      "matchedFiles": 1
+    },
+    "hookAuditVocabulary": {
+      "pattern": "[\"']hook\\/(?:invoked|result)[\"']",
+      "matchedFiles": 4
+    },
+    "hookPolicyOrCallback": {
+      "pattern": "Hook(?:Service|Policy|Config)|PreToolUse|PostToolUse|UserPromptSubmit|hooksDeny",
+      "matchedFiles": 0
+    },
+    "memoryIntegration": {
+      "pattern": "mnemon|memoryPolicy|MemoryService|memory_settings",
+      "matchedFiles": 0
+    }
+  },
+  "matches": [
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v0-to-v1/lib/index.js",
+      "sha256": "1b3bff6aaf28ca62a864cf97b9aa9aa45ab76de5e459f7881ba4bc8de73490b1",
+      "kind": "hookAuditVocabulary",
+      "lines": [88, 94, 357, 364]
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v3-to-v4/lib/index.js",
+      "sha256": "a6b974d110572bd0b16aa7ab09a30d9061944e8dc9f811e8c4a35e4891f83f12",
+      "kind": "historicalHookProducer",
+      "lines": [81, 82]
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v3-to-v4/lib/index.js",
+      "sha256": "a6b974d110572bd0b16aa7ab09a30d9061944e8dc9f811e8c4a35e4891f83f12",
+      "kind": "hookAuditVocabulary",
+      "lines": [1255, 1256]
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session/lib/index.js",
+      "sha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+      "kind": "hookAuditVocabulary",
+      "lines": [99, 100]
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-skill/lib/index.js",
+      "sha256": "3d0aecda4e4b10ffc0404f0e1b99e31d0271018031f553c2d600e4c8e9db0ba2",
+      "kind": "hookAuditVocabulary",
+      "lines": [684, 685]
+    }
+  ],
+  "keyEntries": [
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js",
+      "sha256": "cf57e3ecd487ac5c2553455aaa5cef2c6fb41e6bd61be5aa455675d1d7193033"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-app-boot/lib/index.js",
+      "sha256": "5135179ac810e4f626f32ec3bdc3293dc7d2028e8aa92e5e0c006f1a33b78e76"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-mcp-client/lib/index.js",
+      "sha256": "758d8fc473b700b5d351158d06ce9f9e92c16e8b25497b08bb7bd2122a87f5dd"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-scope/lib/index.js",
+      "sha256": "2829df71d76e08941457d4dd173eac60783e55354921137c8b75e8b5c0d2ecca"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v0-to-v1/lib/index.js",
+      "sha256": "1b3bff6aaf28ca62a864cf97b9aa9aa45ab76de5e459f7881ba4bc8de73490b1"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-format-v3-to-v4/lib/index.js",
+      "sha256": "a6b974d110572bd0b16aa7ab09a30d9061944e8dc9f811e8c4a35e4891f83f12"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session/lib/index.js",
+      "sha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-system-prompt/lib/index.js",
+      "sha256": "7be9f7aafbf345d01ddcc12fd297b16e9a1d41283a6a04073b867becca0bf020"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tools/lib/index.js",
+      "sha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a"
+    }
+  ],
+  "mismatched": [
+    {
+      "path": "node_modules/@deepseek-ai/dsh-acp-app/cordis.patch.yml",
+      "expectedSha256": "b2191971be86e253c4a53b27aaa5951a36b31721abad4fbd2e06352f2898cfa0",
+      "actualSha256": "725b8533f1699724c664d7cfe49ecc2742ffcf5aaf27d01b5748a7f91a19d9bc",
+      "contentScanned": false
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-instructions/lib/index.js",
+      "expectedSha256": "4011f6e4c08228601bd4348ac78e322913142264f6e491ffdf9dcfda97393988",
+      "actualSha256": "3ac195f57618c21d94e461a69778aabc7c19f40502a57ed225749a4cd6e51a2d",
+      "contentScanned": false
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-headless/cordis.patch.yml",
+      "expectedSha256": "f4d5f53f070089a7fc5209bd47c9ae4e85b99d042cbe76be88ab1ed63dfb8fc8",
+      "actualSha256": "4cabf50f2ec5fbfa2443354a650b6dd44bc1c14635910992c93a91dbbea1173f",
+      "contentScanned": false
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-sdk-app/cordis.patch.yml",
+      "expectedSha256": "f3b82cf41f2184d7099e393ce1d92ce109a1b76e490e57f7499a1803e540d238",
+      "actualSha256": "0211e93d0868b2f55d9051aa8eaddfc546bb1c1ff0eaa4f9a1ed4d502660be65",
+      "contentScanned": false
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js",
+      "expectedSha256": "a1215d7bcaf82c0755be48321ef6bb45075f1cb33296d6263009e9d10fd596f6",
+      "actualSha256": "e64e11d4c542c8d85e70c2a810205d22ef20e8252d49fd6ea102108282178434",
+      "contentScanned": false
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-fs/lib/index.js",
+      "expectedSha256": "b11d3fa50b9042019a91cc38a6abe35d74ed651374278f95e60b42734e079df1",
+      "actualSha256": "a8866836428f7af011482dfe769b9eba15073759abad69b30bc4e74e7abdaf54",
+      "contentScanned": false
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-pwsh/lib/index.js",
+      "expectedSha256": "94c7f68c425e62c8006907b3f4fea771935321581fd2327b7ee1f0ba8d15eec1",
+      "actualSha256": "f74bef5d2c65b7d7ad5979be9c8d6a7505be372ac08707eb13b466e5209905bb",
+      "contentScanned": false
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web-app/cordis.patch.yml",
+      "expectedSha256": "3e1f923309612ed8551141127409d662e78758e2d0d125218a3f70514417e472",
+      "actualSha256": "b184edc231c1ce61ce03b70462060ae6cc957921c7438756c8bffb8dd2c7b097",
+      "contentScanned": false
+    }
+  ],
+  "boundaries": {
+    "hostCodeExecuted": false,
+    "realProfileRead": false,
+    "realProfileModified": false,
+    "realSessionsRead": false,
+    "thirdPartyInstallationsInspected": false,
+    "networkRequests": false,
+    "contentOfMismatchedFilesScanned": false,
+    "absenceOfMatchesProvesEcosystemAbsence": false
+  }
+}

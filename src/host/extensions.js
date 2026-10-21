@@ -59,15 +59,17 @@ export class HostExtensions {
         id: "hooks",
         label: "Hook处理策略",
         state: "unsupported",
+        reasonCode: "HOOK_PROVIDER_NOT_IDENTIFIED",
         detail:
-          "尚未验证Claude/Codex Hook策略配置器；宿主通用事件与拒绝结果保留，保存此开关不改变它们。",
+          "0.2.1-rc.2 官方发行中仅找到历史 Hook 事件/来源格式，未找到对应执行器与可撤销策略接口。通用事件不能替代 Hook 适配；未检查用户自装插件。",
       },
       {
         id: "memory",
         label: "第三方记忆段策略",
         state: "unsupported",
+        reasonCode: "MEMORY_PROVIDER_NOT_IDENTIFIED",
         detail:
-          "尚未验证第三方记忆策略配置器；具名MCP段不等于来源证明，不按名称猜删段落或人工消息。",
+          "当前未识别第三方记忆提供者、内容来源及独立保留开关。官方 MCP 只有连接与说明预算配置，停用连接会同时撤销工具/资源，不能代替记忆策略；未检查用户自装插件。",
       },
       {
         id: "sessionLogUpload",

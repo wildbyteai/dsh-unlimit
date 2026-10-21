@@ -485,6 +485,13 @@ export class Controller {
       }
       case "settings.save": {
         const current = this.store.dispatch("settings.get", {});
+        if (payload.value?.hooksDeny === true && current.value.hooksDeny !== true) {
+          const hook = this.extensions?.capabilities().find((item) => item.id === "hooks");
+          if (!hook || hook.state === "unsupported")
+            return unavailable(
+              hook?.detail ?? "当前没有经过适配的 Hook 策略接口，不能开启禁用钩子。",
+            );
+        }
         if (
           payload.value?.enabled !== undefined &&
           payload.value.enabled !== current.value.enabled

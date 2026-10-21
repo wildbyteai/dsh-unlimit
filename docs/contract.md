@@ -128,7 +128,7 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 结果包含 `revision / model / directory / enabled / mode / source / rule / workspace / text`；`source` 为 `rule / saved / workspace / default`，`rule` 仅在规则正文被采用时包含 ID、名称和限定模型。`workspace` 返回策略、本次读取的 `selectedPaths` 和正文是否包含工作区内容。返回的 `text` 与运行时使用同一个正文选择函数；停用时仍可预览候选正文，`enabled` 为 false。此结果不包含宿主工具说明、会话角色段或未保存的表单草稿，不能当作已经发送的完整系统消息。旧进程缓存回退仍未引入。
 
-`rules.workspace / rules.preview` 浏览明确目录的祖先链和完整正文；扫描不保存选择。`rules.select / rules.policy` 必须带 `revision`，冲突拒绝覆盖。路径、字节、UTF-8 和链接边界见 [工作区规则合同](workspace-rules-contract.md)。Hook 与第三方记忆专用策略尚无已验证目标接口，保存值不代表生效，详见 [接口调查](hooks-memory-contract.md)。
+`rules.workspace / rules.preview` 浏览明确目录的祖先链和完整正文；扫描不保存选择。`rules.select / rules.policy` 必须带 `revision`，冲突拒绝覆盖。路径、字节、UTF-8 和链接边界见 [工作区规则合同](workspace-rules-contract.md)。Hook 与第三方记忆专用策略尚无已验证目标接口。新开启 `hooksDeny` 在保存前返回 `UNSUPPORTED`，不更新配置或 revision；旧启用值保留但无效，不阻止其他配置编辑，也允许关闭。能力状态及破甲控制页明确列原因，详见 [接口调查](hooks-memory-contract.md)。
 
 服务器清单只接受 IP、完整主机名或 `username@host`。空行忽略，主机名转小写和 IDNA，IPv6 使用规范化方括号格式，按完整项去重。密码、密钥、URL、端口、网段、通配符和多目标表达式拒绝，错误不回显输入。清单仍是本地库存，不提供 DNS/地区判定或出口授权。
 
