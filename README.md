@@ -4,7 +4,7 @@
 
 当前版本 **0.1.0**，适配目标为 **DSH 0.2.1-rc.2 · macOS arm64**。已完成合成数据与官方模块的隔离测试，尚未安装到真实桌面验收，完整功能对齐仍在进行。[查看已验证范围与缺口](https://github.com/wildbyteai/dsh-unlimit/blob/main/docs/parity.md)。
 
-![dsh-unlimit 桌面工作台，图中为合成数据](docs/ui-preview.png)
+![dsh-unlimit 桌面工作台，图中为合成数据](docs/ui-preview.jpg)
 
 ## 功能
 

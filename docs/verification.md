@@ -177,19 +177,19 @@ V-PLUGIN 另验证新模块的真实 ToolRuntime schema/执行与受控HTTP入�
 | DATA-CREDENTIAL              | 保存原创合成秘密；重新编辑密码为空；未保存名称可恢复，密码和清空勾选不恢复；空输入保存保留原秘密状态，明确勾选后清空，替换后仅显示已保存 | 无真实账号或登录；资产关联为合成记录；截图不含秘密                                                            |
 | FLOW-PREFLIGHT / ENV-SECRETS | 声明合成变量与主机，缺失时blocked；保存配置后相应行ready；登记47字节自建普通文件，密钥ID元信息ready；清空变量后再次blocked               | 普通文件不是私钥；未读文件内容；官方技能/工具注册表缺失，因此全部环境项ready时整体仍为unknown；不伪装为可执行 |
 
-截图见 [credentials-preview.png](credentials-preview.png) 和 [preflight-preview.png](preflight-preview.png)。浏览器console warning/error为空；结束后关闭临时页、重置视口、停止预览并确认端口无监听，临时库自动清理，自建元信息样本确认内容未变化后删除。所有上传、模型和会话行为仍仅有上述官方模块隔离证据。
+截图见 [credentials-preview.jpg](credentials-preview.jpg) 和 [preflight-preview.jpg](preflight-preview.jpg)。浏览器console warning/error为空；结束后关闭临时页、重置视口、停止预览并确认端口无监听，临时库自动清理，自建元信息样本确认内容未变化后删除。所有上传、模型和会话行为仍仅有上述官方模块隔离证据。
 
-新截图见 [admission-preview.png](admission-preview.png) 与 [environment-preview.png](environment-preview.png)。预览结束已关闭两个临时页、重置尺寸、停止服务并核对无端口监听；临时库和元信息样本已核对为本次合成数据后清理。
+新截图见 [admission-preview.jpg](admission-preview.jpg) 与 [environment-preview.jpg](environment-preview.jpg)。预览结束已关闭两个临时页、重置尺寸、停止服务并核对无端口监听；临时库和元信息样本已核对为本次合成数据后清理。
 
-本轮浏览器控制台未观察到 warning/error。新目录截图见 [catalog-preview.png](catalog-preview.png)，材料恢复截图见 [materials-preview.png](materials-preview.png)。初始基线合成预览截图见 [ui-preview.png](ui-preview.png)。截图证明该视口的最终渲染；上述保存、筛选和下载结论来自实际操作与读回，不能仅由截图推断。
+本轮浏览器控制台未观察到 warning/error。新目录截图见 [catalog-preview.jpg](catalog-preview.jpg)，材料恢复截图见 [materials-preview.jpg](materials-preview.jpg)。初始基线合成预览截图见 [ui-preview.jpg](ui-preview.jpg)。截图证明该视口的最终渲染；上述保存、筛选和下载结论来自实际操作与读回，不能仅由截图推断。
 
 官方桌面嵌入、真实安装与卸载、重启/升级、真实会话草稿桥、多模式工具权限、真实模型联网全部仍待单独授权和验收。未保存内存状态已有限定证据；全部表单失败路径、真实桌面技能调用、外部代理并发仍未因此提升为通过。
 
 本轮工作区规则预览在1280×720完成：父子候选与超限禁选、全文与摘要、取消不保存、确认保存及清空、旧修订冲突保留弹窗，具体修订读回见 [工作区规则合同](workspace-rules-contract.md)。最终控制页也实际检查了read正文预算禁用、0沿用宿主及不生效说明。两次临时页console warning/error均为空；页面和临时服务已关闭，合成文件及临时库已清理。
 
-原生规则策略另做1280×720回环预览：三种策略名称可见，缺官方接口时明确提示只处理本插件所选规则；选择strict后保存revision 0→1，重新加载页面读回strict和revision 1。应用按钮仍禁用，console warning/error为空。截图 [native-rules-preview.png](native-rules-preview.png) 只含合成数据；尚未验证真实桌面的原生能力可用分支。临时标签及服务已关闭，端口无监听；本次合成库和空目录经核对后清理。
+原生规则策略另做1280×720回环预览：三种策略名称可见，缺官方接口时明确提示只处理本插件所选规则；选择strict后保存revision 0→1，重新加载页面读回strict和revision 1。应用按钮仍禁用，console warning/error为空。截图 [native-rules-preview.jpg](native-rules-preview.jpg) 只含合成数据；尚未验证真实桌面的原生能力可用分支。临时标签及服务已关闭，端口无监听；本次合成库和空目录经核对后清理。
 
-卸载新增1280×720合成回环预览：技能页显示最多200普通文件；打开卸载确认后取消，服务端移除调用0次且未收到卸载API。再次明确确认后，合成管理器调用1次，Controller清理全部返回完成，设置enabled与入场accepted均为false，原合成项目仍在。管理器关闭临时库和撤下路由后，页面显示只读回执、导航禁用，未再请求status或数据，后续请求计数0。console warning/error为空；截图 [uninstall-preview.png](uninstall-preview.png)。该预览的管理器是合成服务，与上述真实官方管理器测试分别记证。临时页、服务和数据库已清理；真实桌面未操作。
+卸载新增1280×720合成回环预览：技能页显示最多200普通文件；打开卸载确认后取消，服务端移除调用0次且未收到卸载API。再次明确确认后，合成管理器调用1次，Controller清理全部返回完成，设置enabled与入场accepted均为false，原合成项目仍在。管理器关闭临时库和撤下路由后，页面显示只读回执、导航禁用，未再请求status或数据，后续请求计数0。console warning/error为空；截图 [uninstall-preview.jpg](uninstall-preview.jpg)。该预览的管理器是合成服务，与上述真实官方管理器测试分别记证。临时页、服务和数据库已清理；真实桌面未操作。
 
 连接检查新增1280×720合成回环预览：取消单项预览与未登记目标预览均未发连接；3次明确确认共5次底层连接，系统DNS调用0次。实际观察HTTP 403响应、已关闭端口拒绝、6秒超时、主动停止取消、TCP监听连接和缺失监听端不支持；3条HTTP请求均为HEAD，含一次原样查询参数和两次slow样本，TCP未产生HTTP请求。编辑合成记录后旧结果标过期，刷新及页面重新加载仍读回持久状态且不新增连接。console warning/error为空；截图 [connection-checks-preview.jpg](connection-checks-preview.jpg) 和上述JSON汇总仅含合成数据。临时页面、进程和SQLite已清理；真实DSH仍未安装，地区与通用出口缺口保留。
 
@@ -252,7 +252,7 @@ JS
 
 新包只包含本项目源码、界面和文档，运行时不分发官方程序、Node.js、其他插件或真实profile。打包和导入验证不执行 mount；本轮未安装到桌面。
 
-本轮运行控制预览为1280×720，使用项目临时SQLite：缺官方服务时新会话默认和重复提醒下拉框禁用、原因可见，应用按钮禁用。提示词保存revision 0→1，随后重新载入逐字读回（含字面花括号）；保存后刷新状态。截图 [control-defaults-preview.png](control-defaults-preview.png) 仅含合成数据。临时服务、浏览器标签和数据已清理；不等于真实桌面可用目录选择或启用验收。
+本轮运行控制预览为1280×720，使用项目临时SQLite：缺官方服务时新会话默认和重复提醒下拉框禁用、原因可见，应用按钮禁用。提示词保存revision 0→1，随后重新载入逐字读回（含字面花括号）；保存后刷新状态。截图 [control-defaults-preview.jpg](control-defaults-preview.jpg) 仅含合成数据。临时服务、浏览器标签和数据已清理；不等于真实桌面可用目录选择或启用验收。
 
 ## 本轮回退与报告补齐
 
@@ -264,7 +264,7 @@ JS
 
 **V-REPORT**：[report.test.mjs](../tests/report.test.mjs) 的3项用例覆盖空库、完整现有字段与12类记录、17条证据记录、计分去重/阶段归属、关联与来源、凭据整条隐藏及嵌套脱敏、跨区拒绝。query_only 下报告前后所有 entries/metadata 逐行一致，重复构建结果一致。保留 stats 原字段并增加记录分类/评估/测试/关系/事件计数；未执行引用文件或网络。详见 [报告合同](report-contract.md)。
 
-1280×720 回环预览核对报告完整正文，合成3资产、2关系、1发现、15分读回一致，页面无控制台错误；导出点击出现下载提示，本轮未取得对应下载文件，因此不把提示当作文件验收。截图见 [报告预览](report-preview.png)。同尺寸独立组件预览使用实际 web/rewind.js 与 styles.css，核对创建来源与切点、队列清空、草稿未发送、导航未确认及部分失败提示，见 [回退结果预览](rewind-result-preview.png)；这不是实际宿主回退窗口的交互验收。两个回环进程均已停止，合成临时库按本轮工作区ID核验后清理。
+1280×720 回环预览核对报告完整正文，合成3资产、2关系、1发现、15分读回一致，页面无控制台错误；导出点击出现下载提示，本轮未取得对应下载文件，因此不把提示当作文件验收。截图见 [报告预览](report-preview.jpg)。同尺寸独立组件预览使用实际 web/rewind.js 与 styles.css，核对创建来源与切点、队列清空、草稿未发送、导航未确认及部分失败提示，见 [回退结果预览](rewind-result-preview.jpg)；这不是实际宿主回退窗口的交互验收。两个回环进程均已停止，合成临时库按本轮工作区ID核验后清理。
 
 ## 交接修复与后续执行证据（2026-10-21）
 
@@ -307,3 +307,11 @@ JS
 首次无监听权限的消费者回归有一项回环服务 `EPERM`，按正式工具审批执行完整回归。第一次完整回归为 637 通过、1 失败：原有卸载探测测试未在约 1 秒内看到合成子进程就绪文件，期间另有检查/构建并发运行。该用例单独执行通过；没有改动它的断言或等待时限。停止并发构建后，以原命令重新执行全套，结果为 **638 通过、0 失败、0 跳过**。第一次失败仍记录为测试调度时限的未解决不稳定性，不把复跑成功写成测试已修复。
 
 最终使用官方 Node `v24.21.0`、显式 `0.2.1-rc.2` 运行时及已核验归档；语法 140/140、格式、来源/分层、117 项验收基线、构建与离线打包均通过。新包含 67 个普通文件。历史 NAT64/网络证据保留其旧源码摘要；本批执行结果和当前源码摘要另存 [IP 解析验收](evidence/ip-bytes-acceptance.json)，没有直接刷新旧证据冒充复验。没有安装、重载或修改真实 DSH 配置，也没有真实网络目标、模型或数据库数据参与。
+
+## 素材核查与文件格式修正（2026-10-21）
+
+**V-MATERIAL-PROVENANCE**：实际逐张查看 17 张项目截图和 11 张参照位图，并核对 `src/`、`web/` 的静态资源表达。未观察到原作者品牌、宣传素材或已查看位图的裁剪改色复用；参照 SVG 未查看，历史截图生成会话未重演，视觉差异不构成法律独立证明。详细范围、摘要和首次提交见 [素材证据](evidence/material-provenance.json) 及 [来源记录](provenance.md#图片界面资源与随附文本核查2026-10-21)。
+
+13 张误用 `.png` 后缀的 JPEG 已更名为 `.jpg`，同步文档、发布白名单与既有发布回归中的路径。17 张截图与 `a0e9e6d` 的文件字节全部一致，没有修改页面、图片像素或运行逻辑。包内容/文档链接、117 项验收基线、来源检查的专项共 **9 项通过、0 失败、0 跳过**，使用官方 Node `v24.21.0`。本批未重跑上节 638 项全套，不把历史计数当作本批执行结果；也未重复 UI 预览或进行真实 DSH 安装与配置变更。
+
+语法 140/140、格式、有限来源与分层检查、构建及离线打包通过。实际包包含 67 个普通文件、解压总计 894,566 字节，SHA-256 为 `4a32c500762ecc6f8b36bd42562be7af2e3211ea2c506b82fb88f3df93760c7b`。逐文件字节与工作区一致，文档只含用户指南与 `ui-preview.jpg`；临时解压后四个入口导入成功，未调用 mount，解压目录已清理。

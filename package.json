@@ -25,7 +25,7 @@
     "README.md",
     "NOTICE.md",
     "docs/user-guide.md",
-    "docs/ui-preview.png"
+    "docs/ui-preview.jpg"
   ],
   "scripts": {
     "check": "node scripts/check.mjs && node scripts/provenance-check.mjs && node scripts/self-audit.mjs",

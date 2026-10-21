@@ -99,4 +99,4 @@ prompts.js 重导出新扫描函数。**扫描数组含诊断项，不能直接�
 
 测试只创建临时原创规则；专项对临时根外的 AGENTS / CLAUDE stat 作合成不存在处理，并禁止打开临时根外正文，未读取真实用户规则、profile、真实会话，没有模型请求。根集成检查见 `tests/rules-controller.test.mjs`：扫描与预览不持久化，明确选择及清空可读回，旧修订拒绝覆盖，跨区路径拒绝，组合阈值上下均有断言。
 
-1280×720 浏览器已实际验证三项父子候选、超限项禁选、全文及摘要、勾选后取消保持 revision 0、确认保存两项至 revision 1、再次打开读回勾选。通过本地 API 模拟另一个窗口保存到 revision 2 后，旧弹窗清空提交得到 CONFLICT，保留弹窗与未保存选择，后台原路径未变；刷新修订后确认清空到 revision 3。控制台 warning/error 为空。截图见 [workspace-rules-preview.png](workspace-rules-preview.png)。临时页面、服务和合成文件已清理；官方桌面嵌入与键盘完整流程仍未验。
+1280×720 浏览器已实际验证三项父子候选、超限项禁选、全文及摘要、勾选后取消保持 revision 0、确认保存两项至 revision 1、再次打开读回勾选。通过本地 API 模拟另一个窗口保存到 revision 2 后，旧弹窗清空提交得到 CONFLICT，保留弹窗与未保存选择，后台原路径未变；刷新修订后确认清空到 revision 3。控制台 warning/error 为空。截图见 [workspace-rules-preview.jpg](workspace-rules-preview.jpg)。临时页面、服务和合成文件已清理；官方桌面嵌入与键盘完整流程仍未验。

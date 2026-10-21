@@ -32,7 +32,7 @@ try {
   }
   const planned = pack(["--dry-run"]);
   const allowed =
-    /^(?:src\/|web\/|dist\/|docs\/(?:user-guide\.md|ui-preview\.png)$|package\.json$|cordis\.patch\.yml$|README\.md$|NOTICE\.md$|LICENSE(?:\.md)?$)/;
+    /^(?:src\/|web\/|dist\/|docs\/(?:user-guide\.md|ui-preview\.jpg)$|package\.json$|cordis\.patch\.yml$|README\.md$|NOTICE\.md$|LICENSE(?:\.md)?$)/;
   for (const item of planned.files) {
     if (
       !allowed.test(item.path) ||

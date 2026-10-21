@@ -54,11 +54,11 @@ test("真实离线 npm pack 只交付运行文件、用户文档和声明，且�
   }
   for (const directory of ["src", "web", "dist"]) checkRuntimeFiles(directory);
   assert.deepEqual([...paths].filter((path) => path.startsWith("docs/")).sort(), [
-    "docs/ui-preview.png",
+    "docs/ui-preview.jpg",
     "docs/user-guide.md",
   ]);
   const allowed =
-    /^(?:src\/|web\/|dist\/|docs\/(?:user-guide\.md|ui-preview\.png)$|package\.json$|cordis\.patch\.yml$|README\.md$|NOTICE\.md$|LICENSE(?:\.md)?$)/;
+    /^(?:src\/|web\/|dist\/|docs\/(?:user-guide\.md|ui-preview\.jpg)$|package\.json$|cordis\.patch\.yml$|README\.md$|NOTICE\.md$|LICENSE(?:\.md)?$)/;
   for (const path of paths) {
     assert.match(path, allowed, `非交付文件入包：${path}`);
     assert.doesNotMatch(

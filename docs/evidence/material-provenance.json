@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "reviewedRevision": "a0e9e6d7b45ccf8640c28911c0601d87f1272bc9",
+  "date": "2026-10-21",
+  "scope": {
+    "projectImagesViewed": 17,
+    "referenceBitmapsViewed": 11,
+    "referenceSvgViewed": false,
+    "sourceAndPromptReferenceComparison": false,
+    "originalCaptureSessionsReplayed": false,
+    "historicalDeletedAssetsReviewed": false,
+    "runtimeSourceChanged": false,
+    "imageBytesChanged": false,
+    "realDshInstalledOrConfigured": false
+  },
+  "observations": {
+    "referenceAuthorBrandObserved": false,
+    "referenceBitmapCropOrRecolorObserved": false,
+    "fixedExternalImageOrFontResourcesFound": false,
+    "bundledSkillBodyPackFound": false,
+    "workspaceRulesScreenshotContainsSyntheticTemporaryPath": true
+  },
+  "repositoryReadback": {
+    "nameWithOwner": "wildbyteai/dsh-unlimit",
+    "isFork": false,
+    "parent": null,
+    "visibility": "PUBLIC",
+    "licenseInfo": null
+  },
+  "images": [
+    {
+      "path": "docs/admission-preview.jpg",
+      "reviewedPath": "docs/admission-preview.png",
+      "sha256": "3aef4c955ec45a0104d7e6d562d7e4a40b7267231f88f814d6aeaae499ab48f3",
+      "bytes": 71084,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 820],
+      "gitFirstCommit": "30b3c619eeefeb756f262c80a6c8279fc0c17616",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/catalog-preview.jpg",
+      "reviewedPath": "docs/catalog-preview.png",
+      "sha256": "f1f8bc0c4efdca766ab8f36eab57dabc6d4a943a85be87429e0d685bc6444cf6",
+      "bytes": 65212,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 820],
+      "gitFirstCommit": "24b5df4d072703384a1f0e9a3fd615e72c932fcb",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/connection-checks-preview.jpg",
+      "reviewedPath": "docs/connection-checks-preview.jpg",
+      "sha256": "c8f5327af63811db7a83386e76ab412c507bb2c46fc9ba1a13ae5050436b600a",
+      "bytes": 73512,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 720],
+      "gitFirstCommit": "a7d4ab93fbea4425f8620d4d74c1156b1475a2f4",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/control-defaults-preview.jpg",
+      "reviewedPath": "docs/control-defaults-preview.png",
+      "sha256": "2a35d0d0d15b8ac7fccfc9292ec86f0b7a7f3f327dcd25899ccbedde05eb43c4",
+      "bytes": 60552,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 720],
+      "gitFirstCommit": "1f737eaf862fe078ea16b1d4c799365e22108722",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/credentials-preview.jpg",
+      "reviewedPath": "docs/credentials-preview.png",
+      "sha256": "40b639795be3550dee34f4af0aaf44fdc4b157efd8920088b8cb41a3c21bab23",
+      "bytes": 49309,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 820],
+      "gitFirstCommit": "1d37c0193c090975c1ba7c3a2c4c96ff5d3277f5",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/environment-preview.jpg",
+      "reviewedPath": "docs/environment-preview.png",
+      "sha256": "35d61a54d037688f7c7cf94aee9d482abb0b81638d19e9245e772fbbe67ef78c",
+      "bytes": 73615,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 820],
+      "gitFirstCommit": "30b3c619eeefeb756f262c80a6c8279fc0c17616",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/materials-preview.jpg",
+      "reviewedPath": "docs/materials-preview.png",
+      "sha256": "ed31e40e3352e155992f87653a81b0e32fd446b9ce89f0f4661889dcdb72f8cf",
+      "bytes": 69729,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 820],
+      "gitFirstCommit": "24b5df4d072703384a1f0e9a3fd615e72c932fcb",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/nat64-results-preview.jpg",
+      "reviewedPath": "docs/nat64-results-preview.jpg",
+      "sha256": "a6c5c899082e519cd036c45ab12fe68338c5cae33ee68307c097b22209d95b12",
+      "bytes": 130882,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 1193],
+      "gitFirstCommit": "0bc13d239890bfa89a241b5aa35236651af842b8",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/native-rules-preview.jpg",
+      "reviewedPath": "docs/native-rules-preview.png",
+      "sha256": "95f5c3defcba0fc5e678bf470e07a566528a123c352a4eb5627c162f6ecfba42",
+      "bytes": 65066,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 720],
+      "gitFirstCommit": "849e16bcc26aecbf312b2d2bd3a365549852c51e",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/network-scope-preview.jpg",
+      "reviewedPath": "docs/network-scope-preview.jpg",
+      "sha256": "13dcf1fe399590b9be44d066a86d26dbb4589a14662978fbc86cca94d581da7e",
+      "bytes": 50853,
+      "mediaType": "image/jpeg",
+      "dimensions": [1265, 712],
+      "gitFirstCommit": "8c700fb3a68e4117d733c895820e3fb602a07970",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/network-scope-results-preview.jpg",
+      "reviewedPath": "docs/network-scope-results-preview.jpg",
+      "sha256": "3a8723151467a5801921f4aa78567bc0a4076fabf2569eeb4e46e28a7cdfd645",
+      "bytes": 69569,
+      "mediaType": "image/jpeg",
+      "dimensions": [1265, 712],
+      "gitFirstCommit": "8c700fb3a68e4117d733c895820e3fb602a07970",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/preflight-preview.jpg",
+      "reviewedPath": "docs/preflight-preview.png",
+      "sha256": "0e699829c83659af14f5be502ea08da7e793dbe5a2a68b0bac2dc1448be4f420",
+      "bytes": 68102,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 820],
+      "gitFirstCommit": "1d37c0193c090975c1ba7c3a2c4c96ff5d3277f5",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/report-preview.jpg",
+      "reviewedPath": "docs/report-preview.png",
+      "sha256": "17524851d8dc2c4084fbde54b68d361b2c3904bbe981115989ce5579898d244b",
+      "bytes": 70106,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 720],
+      "gitFirstCommit": "3573d6f39002dbb902f474c2d332f90a5c9db2e2",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/rewind-result-preview.jpg",
+      "reviewedPath": "docs/rewind-result-preview.png",
+      "sha256": "04eccd02a49d99da3c790093e48bcbbe16ee7dd0f7e9476f4cd4db8142ebe275",
+      "bytes": 39324,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 720],
+      "gitFirstCommit": "3573d6f39002dbb902f474c2d332f90a5c9db2e2",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/ui-preview.jpg",
+      "reviewedPath": "docs/ui-preview.png",
+      "sha256": "a198ecd18540777698e6a805375636673bf46609d674f9484082e649416b5650",
+      "bytes": 64383,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 820],
+      "gitFirstCommit": "100f9b797c375c4f5ce5ed08730fd805dcfb7d2e",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/uninstall-preview.jpg",
+      "reviewedPath": "docs/uninstall-preview.png",
+      "sha256": "83ea9e427c6ecf9173ae5dd7c96db913c580018aedf16c6ae41cf30a233a062f",
+      "bytes": 36231,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 720],
+      "gitFirstCommit": "e540d7665b099df6c1255ae1100de0879dec2fb9",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    },
+    {
+      "path": "docs/workspace-rules-preview.jpg",
+      "reviewedPath": "docs/workspace-rules-preview.png",
+      "sha256": "78434f8e7db07eba5f0cf1a9791f9a2034a25283c6e29af933b9f18e691f4124",
+      "bytes": 67268,
+      "mediaType": "image/jpeg",
+      "dimensions": [1280, 720],
+      "gitFirstCommit": "2afb6976ddec92c4323928911d10c350064a8fd1",
+      "visuallyReviewed": true,
+      "byteIdenticalToReviewedRevision": true
+    }
+  ],
+  "sourceDigests": {
+    "src/core/prompts.js": "d75dad1e76f737b1239dc9fc2ea9c962c91597ba280259a68097307879585fea",
+    "src/host/workflow-preset.js": "44d0d8d242f7b39cfc488c769549223165896197e666d51186e8152047da9337",
+    "src/core/store.js": "b852c51b488fe7d4cf7d7806f5afc6b36803b5f519111becfa5df5fb3e9afd70",
+    "src/core/validation.js": "c8b1bffa030a3ec256bb1631f722c4d4c1af5a92ad42b1437716986371507eb4",
+    "src/core/skills.js": "516d76037da578730c74d1ead18bbe0061e4df2ba1016fbce3b70f232ea5bcad",
+    "src/core/templates.js": "bc3e6af7ee12b4ca32de9279781ea9c4dcfe258b08e3d5e07fa81d1926c15e3e",
+    "src/core/files.js": "d186b624907f43fde922cbd59813b7b77fcfbde543830905ded34e639b001253",
+    "web/app.js": "4479a00805738554a8fdf17cf3b509f304d1e4e354f1aa376654590d46b23883",
+    "web/styles.css": "7022e281345cf50a7541b2a657484d2ba0b2c1d76222af3167a119460f5f1995",
+    "web/network-scope.js": "64162998648b8b78d8e047c9596209ca54e65e3bd09217c9ab1aacf5189668ef",
+    "src/client-entry.js": "5afc2c801d8525851d8101fe996822f835e1e39d4b716cea2383d99559a21b8a"
+  },
+  "limitations": [
+    "Visual review only covers the 17 project screenshots and 11 reference bitmaps actually viewed.",
+    "Version history and associated verification records do not independently prove the capture process.",
+    "No legal independence or project-wide clean-room conclusion is drawn.",
+    "Earlier source exposure and applicable third-party attribution remain documented."
+  ]
+}
