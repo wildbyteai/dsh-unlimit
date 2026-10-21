@@ -1,6 +1,6 @@
 # 官方单次权限扩大验收
 
-本合同对应 `CORE-ESCALATION`，目标为 DSH desktop `0.2.1-rc.2`、macOS arm64。已验证真实官方文件执行链上的单次模式升权；**不能把它解释为“仅授权任意新增目录”的完整闭环**，也没有桌面或子进程权限验收。
+本合同对应 `CORE-ESCALATION`，目标为 DSH desktop `0.2.1-rc.2`、macOS arm64。已验证真实官方文件执行链，以及完整 standard 预设下 Bash/Seatbelt 的单次模式升权；**不能把它解释为“仅授权任意新增目录”的完整闭环**。桌面审批 UI 与持久 PTY 权限切换仍未验收。
 
 ## 官方公开合同
 
@@ -62,5 +62,23 @@ node --expose-internals --test tests/escalation-host.test.mjs
 
 - 原目标要求“仅授权任意选定临时目录，第三目录继续受限”，官方这些 API 没有额外授权目录列表或受范围约束的 Grant；不能修改前述要求来宣称通过。
 - `danger-full-access` 是本次调用不受文件沙箱约束的模式，不是指定目录授权；本回归没有执行它。
-- Bash/PowerShell/PTY 执行端、操作系统沙箱、真实审批 UI、跨进程会话恢复与桌面操作未验收。
+- Bash/Seatbelt 的限定单次升权已补验，见下节；PowerShell、持久 PTY 权限切换、真实审批 UI、跨进程会话恢复与桌面操作未验收。
 - 当前安装 tool-fs 不可信的部署限制仍保留；临时干净副本没有修复安装，也没有提供规避权限控制的路径。
+
+## 完整 standard Bash 单次审批与实际重试（2026-10-21）
+
+[probe-standard-shell.mjs](../scripts/probe-standard-shell.mjs) 在原有三模式文件/Bash 对照后，增加六个完整 AgentLoop 场景。每个场景先执行固定 printf 命令，由真实 Seatbelt 在只读模式下拒绝；下一次合成模型响应提交**同一命令**及 `workspace-write`、非空理由。审批仍经过官方 ApprovalService，只在需要人工答复时提供合成 answerer。没有自动伪造同意事件或直接调用 shell 后端。
+
+| 场景                         | 实际结果                                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 同意一次，原工作区           | 首次进程退出 1 且无文件；审批 allowed-once 后重试退出 0，逐字读回；紧接着普通调用退出 1，新文件不存在 |
+| 拒绝一次                     | 首次进程退出 1；重试返回 user rejected，不启动第二个进程，无文件                                      |
+| 同意一次，工作区外与第三目录 | 两个独立场景均获得 allowed-once，但重试仍由 workspace-write 内核沙箱拒绝，退出 1 且无文件             |
+| 插件自动审批，无显式会话策略 | 不调用 answerer，官方审计记录 allowed-once；仅重试命令写入成功，下一普通调用仍只读                    |
+| 插件自动审批，显式 never     | 不调用 answerer，官方审计记录 rejected；不启动重试进程，无文件                                        |
+
+新增部分为 6 个合成会话、14 次官方 Bash 工具调用、12 个真实子进程、20 次合成模型请求。六对 `approval/asked` / `approval/decided` 的 ID 与结果逐项核对；answerer 核对 Agent、工具名与 callId。所有会话的 `sandbox/mode` 事件没有新增，最终 mode 仍为 read-only、workspaceRoot 保持原值。每个结果进入下一次模型输入，官方 JSONL reader 与内存完整事件一致。
+
+原有五场景也一起复验：整份探针共 12 项通过、0 失败、0 跳过，22 个实际子进程全部关闭，subprocess/controlChannels 为空，临时根删除、安装入口不变。新摘要与实际 argv/profile 记录在 [standard-shell-acceptance.json](evidence/standard-shell-acceptance.json)，复验命令见 [文件与 shell 对照](file-permissions-contract.md#完整-standard-文件与-shell-权限对照2026-10-21)。
+
+此批没有修改产品权限实现，只补足当前实现的实际进程证据。合成模型预先选择重试，不证明真实模型会正确判断何时重试；合成 answerer 不是桌面确认框。仍不覆盖任意额外目录授权、PowerShell、持久 PTY 或真实桌面。

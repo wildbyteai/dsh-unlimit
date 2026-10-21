@@ -155,8 +155,11 @@ export function createStandardShellGuard(t, { installedRoot, workspace, director
     },
     async run(agent, mode, sources, action) {
       assert.equal(expected.length, 0);
+      const modes = Array.isArray(mode) ? mode : sources.map(() => mode);
+      assert.equal(modes.length, sources.length);
       const before = launches.length;
-      for (const source of sources) expected.push({ agent, mode, source });
+      for (const [index, source] of sources.entries())
+        expected.push({ agent, mode: modes[index], source });
       await action();
       assert.equal(
         expected.length,

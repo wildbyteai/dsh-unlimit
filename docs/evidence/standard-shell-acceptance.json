@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "behaviorIds": ["CORE-FILES", "CORE-PERMISSION", "CORE-MODES"],
-  "developmentBasis": "50607362d76d284eaced4bdcd482d4b9caf896f9",
-  "generatedAt": "2026-10-21T13:37:52.374Z",
+  "behaviorIds": ["CORE-FILES", "CORE-PERMISSION", "CORE-MODES", "CORE-ESCALATION"],
+  "developmentBasis": "cff1d197541e9b139ec42e5ae09598321231408b",
+  "generatedAt": "2026-10-21T14:18:21.114Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -529,6 +529,678 @@
     },
     {
       "sessionId": "synthetic-standard-shell-revert",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    },
+    {
+      "sessionId": "synthetic-standard-escalation-approved",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    },
+    {
+      "sessionId": "synthetic-standard-escalation-rejected",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    },
+    {
+      "sessionId": "synthetic-standard-escalation-outside",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    },
+    {
+      "sessionId": "synthetic-standard-escalation-third",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    },
+    {
+      "sessionId": "synthetic-standard-escalation-auto-approved",
+      "presetId": "standard",
+      "exactRetainedScopeIdentity": true,
+      "modules": [
+        {
+          "moduleName": "@deepseek-ai/dsh-persona",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-agent-instructions",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-time-context",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-bash",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-fs-search",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-jobs",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-schedule",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-skill-filesystem",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-skill",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-goal",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-ask-user",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-todo",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-web",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-present",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-plan-mode",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-basic",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-command-compact",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-compaction-tool-result-pruner",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-subagent",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-workflow-ptc",
+          "useHostBase": true
+        },
+        {
+          "moduleName": "@deepseek-ai/dsh-tool-workflow",
+          "useHostBase": true
+        }
+      ],
+      "leakedServices": []
+    },
+    {
+      "sessionId": "synthetic-standard-escalation-explicit-never",
       "presetId": "standard",
       "exactRetainedScopeIdentity": true,
       "modules": [
@@ -2993,6 +3665,210 @@
           "closed": true,
           "code": 1,
           "signal": null
+        },
+        {
+          "mode": "read-only",
+          "sessionId": "synthetic-standard-escalation-approved",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_approved' > '<synthetic-root>/workspace/escalation-approved.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "workspace-write",
+          "sessionId": "synthetic-standard-escalation-approved",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\")) (allow file-write* (subpath \"<synthetic-root>/workspace\") (subpath \"/private/tmp\") (subpath \"<synthetic-root>/tmp\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_approved' > '<synthetic-root>/workspace/escalation-approved.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\")) (allow file-write* (subpath \"<synthetic-root>/workspace\") (subpath \"/private/tmp\") (subpath \"<synthetic-root>/tmp\"))",
+          "closed": true,
+          "code": 0,
+          "signal": null
+        },
+        {
+          "mode": "read-only",
+          "sessionId": "synthetic-standard-escalation-approved",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_approved' > '<synthetic-root>/workspace/escalation-approved-next.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "read-only",
+          "sessionId": "synthetic-standard-escalation-rejected",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_rejected' > '<synthetic-root>/workspace/escalation-rejected.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "read-only",
+          "sessionId": "synthetic-standard-escalation-outside",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_outside' > '<synthetic-root>/outside/escalation-outside.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "workspace-write",
+          "sessionId": "synthetic-standard-escalation-outside",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\")) (allow file-write* (subpath \"<synthetic-root>/workspace\") (subpath \"/private/tmp\") (subpath \"<synthetic-root>/tmp\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_outside' > '<synthetic-root>/outside/escalation-outside.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\")) (allow file-write* (subpath \"<synthetic-root>/workspace\") (subpath \"/private/tmp\") (subpath \"<synthetic-root>/tmp\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "read-only",
+          "sessionId": "synthetic-standard-escalation-third",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_third' > '<synthetic-root>/third/escalation-third.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "workspace-write",
+          "sessionId": "synthetic-standard-escalation-third",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\")) (allow file-write* (subpath \"<synthetic-root>/workspace\") (subpath \"/private/tmp\") (subpath \"<synthetic-root>/tmp\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_third' > '<synthetic-root>/third/escalation-third.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\")) (allow file-write* (subpath \"<synthetic-root>/workspace\") (subpath \"/private/tmp\") (subpath \"<synthetic-root>/tmp\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "read-only",
+          "sessionId": "synthetic-standard-escalation-auto-approved",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_auto-approved' > '<synthetic-root>/workspace/escalation-auto-approved.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "workspace-write",
+          "sessionId": "synthetic-standard-escalation-auto-approved",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\")) (allow file-write* (subpath \"<synthetic-root>/workspace\") (subpath \"/private/tmp\") (subpath \"<synthetic-root>/tmp\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_auto-approved' > '<synthetic-root>/workspace/escalation-auto-approved.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\")) (allow file-write* (subpath \"<synthetic-root>/workspace\") (subpath \"/private/tmp\") (subpath \"<synthetic-root>/tmp\"))",
+          "closed": true,
+          "code": 0,
+          "signal": null
+        },
+        {
+          "mode": "read-only",
+          "sessionId": "synthetic-standard-escalation-auto-approved",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_auto-approved' > '<synthetic-root>/workspace/escalation-auto-approved-next.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
+        },
+        {
+          "mode": "read-only",
+          "sessionId": "synthetic-standard-escalation-explicit-never",
+          "command": "sandbox-exec",
+          "args": [
+            "-p",
+            "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+            "--",
+            "bash",
+            "-c",
+            "printf '%s' 'SYNTHETIC_ESCALATION_explicit-never' > '<synthetic-root>/workspace/escalation-explicit-never.txt'"
+          ],
+          "profile": "(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\"))",
+          "closed": true,
+          "code": 1,
+          "signal": null
         }
       ],
       "signals": [
@@ -3043,6 +3919,66 @@
         },
         {
           "sessionId": "synthetic-standard-shell-revert",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-approved",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-approved",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-approved",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-rejected",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-outside",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-outside",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-third",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-third",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-auto-approved",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-auto-approved",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-auto-approved",
+          "signal": 0,
+          "group": true
+        },
+        {
+          "sessionId": "synthetic-standard-escalation-explicit-never",
           "signal": 0,
           "group": true
         }
@@ -3212,6 +4148,38 @@
       {
         "operation": "realpathSync.native",
         "scope": "platform-temporary-root"
+      },
+      {
+        "operation": "realpathSync.native",
+        "scope": "platform-temporary-root"
+      },
+      {
+        "operation": "realpathSync.native",
+        "scope": "platform-temporary-root"
+      },
+      {
+        "operation": "realpathSync.native",
+        "scope": "platform-temporary-root"
+      },
+      {
+        "operation": "realpathSync.native",
+        "scope": "platform-temporary-root"
+      },
+      {
+        "operation": "realpathSync.native",
+        "scope": "platform-temporary-root"
+      },
+      {
+        "operation": "realpathSync.native",
+        "scope": "platform-temporary-root"
+      },
+      {
+        "operation": "realpathSync.native",
+        "scope": "platform-temporary-root"
+      },
+      {
+        "operation": "realpathSync.native",
+        "scope": "platform-temporary-root"
       }
     ]
   },
@@ -3250,7 +4218,7 @@
           "output": "[stderr]\nbash: <synthetic-root>/outside/readonly-bash.txt: Operation not permitted\n[sandbox: file access denied under read-only mode]\n[sandbox: escalation available — retry this exact command once with sandbox_permissions (the narrowest wider mode that suffices) + justification; the approval prompt asks the user]\n[exit code: 1]"
         }
       ],
-      "jsonlSha256": "20dc8295a95fc33f6aa6a99c585f584a28507398e5ace8b49008e2e4dc495a3b",
+      "jsonlSha256": "e9cec0ad522b752bb1c336ffe4dfa94f83a3d88522e7646cf71d29842597fcae",
       "physicalRows": 39,
       "officialAndPhysicalReadbackEqual": true
     },
@@ -3288,7 +4256,7 @@
           "output": "[stderr]\nbash: <synthetic-root>/outside/workspace-bash.txt: Operation not permitted\n[sandbox: file access denied under workspace-write mode]\n[sandbox: escalation available — retry this exact command once with sandbox_permissions (the narrowest wider mode that suffices) + justification; the approval prompt asks the user]\n[exit code: 1]"
         }
       ],
-      "jsonlSha256": "6d57db3c9eabf60e2574f37ba583a681a11a690b0537f8b66041090865c4a8bf",
+      "jsonlSha256": "ac7a4b82fd7ab04a172989a6486645863ac7e8a290abec6ae1e4bb08e0684b8a",
       "physicalRows": 41,
       "officialAndPhysicalReadbackEqual": true
     },
@@ -3325,7 +4293,7 @@
           "output": "(no output)"
         }
       ],
-      "jsonlSha256": "284ea68024e88149aa3c653aa7f79f658a8e2b38833bc9fb16755d1654a1c48e",
+      "jsonlSha256": "9c2f69326657d10df8cd44eb49687500db4a0fb40225afbd8fe890935979a578",
       "physicalRows": 42,
       "officialAndPhysicalReadbackEqual": true
     },
@@ -3363,7 +4331,7 @@
           "output": "[stderr]\nbash: <synthetic-root>/outside/explicit-restricted-bash.txt: Operation not permitted\n[sandbox: file access denied under read-only mode]\n[sandbox: escalation available — retry this exact command once with sandbox_permissions (the narrowest wider mode that suffices) + justification; the approval prompt asks the user]\n[exit code: 1]"
         }
       ],
-      "jsonlSha256": "aca72e4387474a2d6312c37cd1e2ad0de6a88c0f48bbda62c631675acb98d027",
+      "jsonlSha256": "96de323441be4a5a0fd4fd579aa8d6af1ee93c7f39ad4bb0cbd794f087c0c021",
       "physicalRows": 76,
       "officialAndPhysicalReadbackEqual": true
     },
@@ -3401,15 +4369,323 @@
           "output": "[stderr]\nbash: <synthetic-root>/outside/revert-bash.txt: Operation not permitted\n[sandbox: file access denied under read-only mode]\n[sandbox: escalation available — retry this exact command once with sandbox_permissions (the narrowest wider mode that suffices) + justification; the approval prompt asks the user]\n[exit code: 1]"
         }
       ],
-      "jsonlSha256": "964b05b3713eb49adc16f847647d20404d77cbee33b3a4924f684b87ade42e88",
+      "jsonlSha256": "d8bbc1c51b24ea44cd1f16c46238460e8396bc220a1ea994f7b2a61f7f08e57c",
       "physicalRows": 39,
       "officialAndPhysicalReadbackEqual": true
+    }
+  ],
+  "escalations": [
+    {
+      "id": "approved",
+      "sessionId": "synthetic-standard-escalation-approved",
+      "target": "workspace",
+      "autoApprove": false,
+      "explicitApprovalPolicy": null,
+      "outcome": "allowed-once",
+      "answererCalls": 1,
+      "fileCreatedAndReadBack": true,
+      "standingMode": "read-only",
+      "workspaceRootUnchanged": true,
+      "requests": 4,
+      "toolCalls": 3,
+      "processes": [
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "read-only",
+          "closed": true
+        },
+        {
+          "code": 0,
+          "signal": null,
+          "mode": "workspace-write",
+          "closed": true
+        },
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "read-only",
+          "closed": true
+        }
+      ],
+      "approvalAudit": [
+        {
+          "type": "approval/asked",
+          "seq": 20,
+          "time": 1792592300767,
+          "data": {
+            "id": "6b5de1ba-caca-47c6-9e77-9ffd85245c91",
+            "toolName": "bash",
+            "callId": "synthetic-standard-escalation-approved-27-0",
+            "reason": "escalate sandbox to workspace-write: Retry the denied synthetic command in its original workspace."
+          }
+        },
+        {
+          "type": "approval/decided",
+          "seq": 21,
+          "time": 1792592300767,
+          "data": {
+            "id": "6b5de1ba-caca-47c6-9e77-9ffd85245c91",
+            "outcome": "allowed-once"
+          }
+        }
+      ],
+      "officialPersistenceReadbackEqual": true
+    },
+    {
+      "id": "rejected",
+      "sessionId": "synthetic-standard-escalation-rejected",
+      "target": "workspace",
+      "autoApprove": false,
+      "explicitApprovalPolicy": null,
+      "outcome": "rejected",
+      "answererCalls": 1,
+      "fileCreatedAndReadBack": false,
+      "standingMode": "read-only",
+      "workspaceRootUnchanged": true,
+      "requests": 3,
+      "toolCalls": 2,
+      "processes": [
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "read-only",
+          "closed": true
+        }
+      ],
+      "approvalAudit": [
+        {
+          "type": "approval/asked",
+          "seq": 20,
+          "time": 1792592300835,
+          "data": {
+            "id": "32cdc263-4899-4028-b8be-482861fc1112",
+            "toolName": "bash",
+            "callId": "synthetic-standard-escalation-rejected-31-0",
+            "reason": "escalate sandbox to workspace-write: Retry the denied synthetic command in its original workspace."
+          }
+        },
+        {
+          "type": "approval/decided",
+          "seq": 21,
+          "time": 1792592300835,
+          "data": {
+            "id": "32cdc263-4899-4028-b8be-482861fc1112",
+            "outcome": "rejected"
+          }
+        }
+      ],
+      "officialPersistenceReadbackEqual": true
+    },
+    {
+      "id": "outside",
+      "sessionId": "synthetic-standard-escalation-outside",
+      "target": "outside",
+      "autoApprove": false,
+      "explicitApprovalPolicy": null,
+      "outcome": "allowed-once",
+      "answererCalls": 1,
+      "fileCreatedAndReadBack": false,
+      "standingMode": "read-only",
+      "workspaceRootUnchanged": true,
+      "requests": 3,
+      "toolCalls": 2,
+      "processes": [
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "read-only",
+          "closed": true
+        },
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "workspace-write",
+          "closed": true
+        }
+      ],
+      "approvalAudit": [
+        {
+          "type": "approval/asked",
+          "seq": 20,
+          "time": 1792592300878,
+          "data": {
+            "id": "c31d2ffd-bb1e-43b2-812f-09b17c6849d2",
+            "toolName": "bash",
+            "callId": "synthetic-standard-escalation-outside-34-0",
+            "reason": "escalate sandbox to workspace-write: Retry the denied synthetic command in its original workspace."
+          }
+        },
+        {
+          "type": "approval/decided",
+          "seq": 21,
+          "time": 1792592300878,
+          "data": {
+            "id": "c31d2ffd-bb1e-43b2-812f-09b17c6849d2",
+            "outcome": "allowed-once"
+          }
+        }
+      ],
+      "officialPersistenceReadbackEqual": true
+    },
+    {
+      "id": "third",
+      "sessionId": "synthetic-standard-escalation-third",
+      "target": "third",
+      "autoApprove": false,
+      "explicitApprovalPolicy": null,
+      "outcome": "allowed-once",
+      "answererCalls": 1,
+      "fileCreatedAndReadBack": false,
+      "standingMode": "read-only",
+      "workspaceRootUnchanged": true,
+      "requests": 3,
+      "toolCalls": 2,
+      "processes": [
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "read-only",
+          "closed": true
+        },
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "workspace-write",
+          "closed": true
+        }
+      ],
+      "approvalAudit": [
+        {
+          "type": "approval/asked",
+          "seq": 20,
+          "time": 1792592300931,
+          "data": {
+            "id": "d7730a55-93df-4bb5-a693-40bfbed493e2",
+            "toolName": "bash",
+            "callId": "synthetic-standard-escalation-third-37-0",
+            "reason": "escalate sandbox to workspace-write: Retry the denied synthetic command in its original workspace."
+          }
+        },
+        {
+          "type": "approval/decided",
+          "seq": 21,
+          "time": 1792592300931,
+          "data": {
+            "id": "d7730a55-93df-4bb5-a693-40bfbed493e2",
+            "outcome": "allowed-once"
+          }
+        }
+      ],
+      "officialPersistenceReadbackEqual": true
+    },
+    {
+      "id": "auto-approved",
+      "sessionId": "synthetic-standard-escalation-auto-approved",
+      "target": "workspace",
+      "autoApprove": true,
+      "explicitApprovalPolicy": null,
+      "outcome": "allowed-once",
+      "answererCalls": 0,
+      "fileCreatedAndReadBack": true,
+      "standingMode": "read-only",
+      "workspaceRootUnchanged": true,
+      "requests": 4,
+      "toolCalls": 3,
+      "processes": [
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "read-only",
+          "closed": true
+        },
+        {
+          "code": 0,
+          "signal": null,
+          "mode": "workspace-write",
+          "closed": true
+        },
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "read-only",
+          "closed": true
+        }
+      ],
+      "approvalAudit": [
+        {
+          "type": "approval/asked",
+          "seq": 20,
+          "time": 1792592300989,
+          "data": {
+            "id": "0dea9f37-86de-468c-af39-a23fb571e84d",
+            "toolName": "bash",
+            "callId": "synthetic-standard-escalation-auto-approved-40-0",
+            "reason": "escalate sandbox to workspace-write: Retry the denied synthetic command in its original workspace."
+          }
+        },
+        {
+          "type": "approval/decided",
+          "seq": 21,
+          "time": 1792592300989,
+          "data": {
+            "id": "0dea9f37-86de-468c-af39-a23fb571e84d",
+            "outcome": "allowed-once"
+          }
+        }
+      ],
+      "officialPersistenceReadbackEqual": true
+    },
+    {
+      "id": "explicit-never",
+      "sessionId": "synthetic-standard-escalation-explicit-never",
+      "target": "workspace",
+      "autoApprove": true,
+      "explicitApprovalPolicy": "never",
+      "outcome": "rejected",
+      "answererCalls": 0,
+      "fileCreatedAndReadBack": false,
+      "standingMode": "read-only",
+      "workspaceRootUnchanged": true,
+      "requests": 3,
+      "toolCalls": 2,
+      "processes": [
+        {
+          "code": 1,
+          "signal": null,
+          "mode": "read-only",
+          "closed": true
+        }
+      ],
+      "approvalAudit": [
+        {
+          "type": "approval/asked",
+          "seq": 21,
+          "time": 1792592301061,
+          "data": {
+            "id": "541fbde6-feee-4add-9631-a8331e7d4801",
+            "toolName": "bash",
+            "callId": "synthetic-standard-escalation-explicit-never-44-0",
+            "reason": "escalate sandbox to workspace-write: Retry the denied synthetic command in its original workspace."
+          }
+        },
+        {
+          "type": "approval/decided",
+          "seq": 22,
+          "time": 1792592301061,
+          "data": {
+            "id": "541fbde6-feee-4add-9631-a8331e7d4801",
+            "outcome": "rejected"
+          }
+        }
+      ],
+      "officialPersistenceReadbackEqual": true
     }
   ],
   "sourceDigests": [
     {
       "path": "scripts/probe-standard-shell.mjs",
-      "sha256": "a35a3467c9ae93a0428169794ee0e8ae55e00fa859587f58934f0e080c3fc9a2"
+      "sha256": "19453ac00d24c8ce90813b568232633e8647b76476928e2be8c695384fa4dd3a"
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
@@ -3417,7 +4693,7 @@
     },
     {
       "path": "tests/helpers/standard-shell-guard.mjs",
-      "sha256": "e6718045262183bbf0207e757427ed85f315b2386efecdb17f58601d1327dc4d"
+      "sha256": "0aa808745acaf094625026914d554fb42c0f35e9d0000ae4c1fc0d87d8b995ee"
     },
     {
       "path": "tests/helpers/official-packages.mjs",
@@ -3440,6 +4716,7 @@
     "actualOfficialAgentLoopAndPreset": true,
     "actualFilesystemAndShell": true,
     "syntheticModelResponses": true,
+    "syntheticApprovalResponses": true,
     "realDesktopExecuted": false,
     "ptyExecuted": false,
     "realProfileModified": false,

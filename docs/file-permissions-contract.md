@@ -84,13 +84,13 @@ node --expose-internals --test tests/file-permissions-host.test.mjs
 | 同一个全访问会话显式切回只读     | 下一轮内外均拒绝，新目标不存在；插件全访问设置仍为 true |
 | 撤销插件后新建无显式覆盖会话     | 恢复官方只读默认，内外均拒绝                            |
 
-五个场景 **6 项通过**（父测试及 5 场景）。相同会话切换前后的历史结果保留；每次结果进入下一步模型输入，schema 不变，自写正文随启用/撤销一致。官方 JSONL reader 核对全部事件，物理 JSONL 另核对调用、结果和权限切换事件；四个会话、五轮数据均可追溯。
+初始五个场景 **6 项通过**（父测试及 5 场景）。相同会话切换前后的历史结果保留；每次结果进入下一步模型输入，schema 不变，自写正文随启用/撤销一致。官方 JSONL reader 核对全部事件，物理 JSONL 另核对调用、结果和权限切换事件；四个会话、五轮数据均可追溯。
 
 **拒绝语义不同，效果一致：**文件工具返回 `isError:true / FS_SANDBOX_DENIED`；已完成的 Bash 进程即使退出码非零，官方工具仍可返回 `isError:false`。本探针同时断言真实进程退出码为 1、原生沙箱拒绝说明存在、目标文件不存在；正向场景要求退出码 0 和逐字磁盘读回。不能把 Bash 的工具包装成功当作命令成功。
 
 只读和工作区模式实际通过官方生成的 `sandbox-exec` profile 执行；全访问路径按官方合同直接执行 Bash。命令只包含固定 printf 重定向，无外部程序、网络或用户输入。父环境从 `env -i` 建立，HOME/TMPDIR 均为本次临时目录；实际启动的 argv、环境及调用 Agent 身份检查后才允许执行。保持官方 profile，没有关闭或伪造内核沙箱。
 
-10 个子进程 close 均确认，subprocess/controlChannels 集合为 0，两处临时根删除，禁止访问记录与清理错误为空。源码摘要、逐场景结果和原生进程记录见 [standard-shell-acceptance.json](evidence/standard-shell-acceptance.json)。这不是 PTY、真实审批 UI、扩大权限后重试或网络限制验收；只证明这些固定文件变更场景在两个执行族中的一致性，不证明全部内核隔离性质。
+初始 10 个子进程 close 均确认，subprocess/controlChannels 集合为 0，两处临时根删除，禁止访问记录与清理错误为空。源码摘要、逐场景结果和原生进程记录见 [standard-shell-acceptance.json](evidence/standard-shell-acceptance.json)。后续同一探针增加六个单次审批重试场景，累计 22 个子进程均清理，见 [扩大权限合同](escalation-contract.md#完整-standard-bash-单次审批与实际重试2026-10-21)。这不是 PTY、真实审批 UI 或网络限制验收；只证明固定文件变更及指定重试场景，不证明全部内核隔离性质。
 
 ```sh
 /usr/bin/env -i PATH=/usr/bin:/bin \

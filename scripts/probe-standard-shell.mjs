@@ -70,7 +70,8 @@ test(
     // must not succeed through an unrelated /tmp allowance.
     assert.ok(outside.startsWith(presetProjectRoot));
     assert.ok(!outside.startsWith("/private/tmp/") && !outside.startsWith("/tmp/"));
-    const scenarios = [];
+    const scenarios = [],
+      escalations = [];
     const definitions = [
       {
         id: "readonly",
@@ -247,24 +248,199 @@ test(
       }
       assert.equal(scenarios.length, definitions.length);
       assert.equal(f.requests.length, 25);
+      // All retries pass through the full preset and official approval service.
+      // Only the model output and the final user-answer channel are synthetic.
+      f.adapter.apply();
+      f.settings.fullAccess = false;
+      const third = join(f.directory, "third");
+      mkdirSync(third);
+      for (const definition of [
+        { id: "approved", root: f.workspace, outcome: "allowed-once", writable: true },
+        { id: "rejected", root: f.workspace, outcome: "rejected", writable: false },
+        { id: "outside", root: outside, outcome: "allowed-once", writable: false },
+        { id: "third", root: third, outcome: "allowed-once", writable: false },
+        {
+          id: "auto-approved",
+          root: f.workspace,
+          outcome: "allowed-once",
+          writable: true,
+          autoApprove: true,
+        },
+        {
+          id: "explicit-never",
+          root: f.workspace,
+          outcome: "rejected",
+          writable: false,
+          autoApprove: true,
+          policy: "never",
+        },
+      ]) {
+        await t.test(`escalation-${definition.id}`, async () => {
+          f.settings.autoApprove = definition.autoApprove ?? false;
+          const target = join(definition.root, `escalation-${definition.id}.txt`);
+          const nextTarget = join(f.workspace, `escalation-${definition.id}-next.txt`);
+          const value = `SYNTHETIC_ESCALATION_${definition.id}`;
+          const command = `printf '%s' ${quote(value)} > ${quote(target)}`;
+          const nextCommand = `printf '%s' ${quote(value)} > ${quote(nextTarget)}`;
+          const call = (source, escalate = false) => ({
+            name: "bash",
+            arguments: {
+              command: source,
+              description: "Write only the specified disposable synthetic escalation fixture.",
+              ...(escalate
+                ? {
+                    sandbox_permissions: "workspace-write",
+                    justification: "Retry the denied synthetic command in its original workspace.",
+                  }
+                : {}),
+            },
+          });
+          let agent;
+          const actions = [
+            [call(command)],
+            {
+              kind: "hold",
+              wait() {
+                assert.equal(existsSync(target), false, "first attempt made no file");
+                const first = events(agent, "tool/result");
+                assert.equal(first.length, 1);
+                assert.match(text([first[0].data.message]), /\[exit code: 1\]/);
+                assert.ok(
+                  text([first[0].data.message]).includes(
+                    "[sandbox: file access denied under read-only mode]",
+                  ),
+                );
+                assert.equal(events(agent, "approval/asked").length, 0);
+              },
+              calls: [call(command, true)],
+            },
+          ];
+          if (definition.writable)
+            actions.push({
+              kind: "hold",
+              wait() {
+                assert.equal(readFileSync(target, "utf8"), value);
+                assert.equal(events(agent, "tool/result").length, 2);
+                assert.equal(events(agent, "approval/decided").at(-1).data.outcome, "allowed-once");
+                assert.equal(
+                  f.ctx.sandboxPolicy.resolve({ session: agent.session }).mode,
+                  "read-only",
+                );
+              },
+              calls: [call(nextCommand)],
+            });
+          actions.push("finish");
+          agent = await f.create(`escalation-${definition.id}`, actions);
+          // Leaving approval policy unset is necessary to test the plugin's
+          // opt-in default; an explicit never must override that default.
+          if (definition.policy) f.api.approval.setApprovalPolicy(agent.session, definition.policy);
+          f.api.sandboxPolicy.setSandboxMode(agent.session, "read-only");
+          const standingEvents = events(agent, "sandbox/mode");
+          let answers = 0;
+          agent.ctx.on("approval/request", (request) => {
+            answers++;
+            assert.equal(request.agent, agent);
+            assert.equal(request.toolName, "bash");
+            assert.equal(request.callId, events(agent, "tool/call").at(-1).data.callId);
+            assert.equal(existsSync(target), false, "approval precedes any successful retry");
+            return definition.outcome;
+          });
+          const approved = definition.outcome === "allowed-once";
+          const commands = [
+            command,
+            ...(approved ? [command] : []),
+            ...(definition.writable ? [nextCommand] : []),
+          ];
+          const modes = [
+            "read-only",
+            ...(approved ? ["workspace-write"] : []),
+            ...(definition.writable ? ["read-only"] : []),
+          ];
+          const processes = await f.standardShell.run(agent, modes, commands, () => f.run(agent));
+          assert.deepEqual(
+            processes.map((row) => row.code),
+            [
+              1,
+              ...(approved ? [definition.writable ? 0 : 1] : []),
+              ...(definition.writable ? [1] : []),
+            ],
+          );
+          assert.ok(processes.every((row) => row.closed && row.signal === null));
+          const results = events(agent, "tool/result");
+          const calls = events(agent, "tool/call");
+          assert.equal(results.length, definition.writable ? 3 : 2);
+          assert.equal(calls.length, results.length);
+          assert.ok(calls.every((row) => row.data.name === "bash"));
+          assert.equal(results[1].data.message.isError, !approved);
+          if (!approved) assert.match(text([results[1].data.message]), /user rejected/);
+          if (approved && !definition.writable)
+            assert.ok(
+              text([results[1].data.message]).includes(
+                "[sandbox: file access denied under workspace-write mode]",
+              ),
+            );
+          assert.equal(existsSync(target), definition.writable);
+          if (definition.writable) assert.equal(readFileSync(target, "utf8"), value);
+          assert.equal(existsSync(nextTarget), false, "later ordinary call stays read-only");
+          assert.deepEqual(events(agent, "sandbox/mode"), standingEvents);
+          const policy = f.ctx.sandboxPolicy.resolve({ session: agent.session });
+          assert.equal(policy.mode, "read-only");
+          assert.equal(policy.workspaceRoot, f.workspace);
+          const asked = events(agent, "approval/asked"),
+            decided = events(agent, "approval/decided");
+          assert.equal(asked.length, 1);
+          assert.equal(decided.length, 1);
+          assert.equal(asked[0].data.id, decided[0].data.id);
+          assert.equal(decided[0].data.outcome, definition.outcome);
+          assert.equal(answers, definition.autoApprove ? 0 : 1);
+          const requests = f.requests.filter((row) => row.sessionId === agent.id);
+          assert.equal(requests.length, results.length + 1);
+          for (let i = 0; i < results.length; i++)
+            assert.deepEqual(
+              requests[i + 1].messages.filter((message) => message.role === "tool"),
+              results.slice(0, i + 1).map((row) => row.data.message),
+            );
+          escalations.push({
+            id: definition.id,
+            sessionId: agent.id,
+            target: definition.root === f.workspace ? "workspace" : definition.id,
+            autoApprove: definition.autoApprove ?? false,
+            explicitApprovalPolicy: definition.policy ?? null,
+            outcome: definition.outcome,
+            answererCalls: answers,
+            fileCreatedAndReadBack: definition.writable,
+            standingMode: policy.mode,
+            workspaceRootUnchanged: true,
+            requests: requests.length,
+            toolCalls: calls.length,
+            processes,
+            approvalAudit: [...asked, ...decided],
+            officialPersistenceReadbackEqual: true,
+          });
+        });
+      }
+      assert.equal(escalations.length, 6);
+      assert.equal(f.requests.length, 45);
       assert.deepEqual(f.errors, []);
     } finally {
       await f.dispose();
     }
     const evidence = {
       schemaVersion: 1,
-      behaviorIds: ["CORE-FILES", "CORE-PERMISSION", "CORE-MODES"],
-      developmentBasis: "50607362d76d284eaced4bdcd482d4b9caf896f9",
+      behaviorIds: ["CORE-FILES", "CORE-PERMISSION", "CORE-MODES", "CORE-ESCALATION"],
+      developmentBasis: "cff1d197541e9b139ec42e5ae09598321231408b",
       generatedAt: new Date().toISOString(),
       node: process.version,
       platform: { os: process.platform, arch: process.arch },
       ...f.evidence(),
       scenarios,
+      escalations,
       sourceDigests,
       boundaries: {
         actualOfficialAgentLoopAndPreset: true,
         actualFilesystemAndShell: true,
         syntheticModelResponses: true,
+        syntheticApprovalResponses: true,
         realDesktopExecuted: false,
         ptyExecuted: false,
         realProfileModified: false,
