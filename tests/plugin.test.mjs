@@ -83,6 +83,90 @@ test("plugin unload closes owned process service before its database", hostOnly,
 });
 
 test(
+  "disabled mounted plugin restores marked prompts through pre-step and releases pending callbacks on unload",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    assert.equal(f.controller.store.dispatch("settings.get").value.enabled, false);
+    assert.equal(f.controller.runtime.enabled, false);
+    const marked = f.agent("synthetic-marked-prompt");
+    const unmarked = f.agent("synthetic-unmarked-prompt");
+    const message = (agent, owned) => {
+      agent.session.append("turn/start", { turn: 1 });
+      agent.session.append("step/start", { turn: 1, step: 1 });
+      agent.session.append(
+        "system/message",
+        {
+          turn: 1,
+          step: 1,
+          message: {
+            id: `${agent.id}-system`,
+            role: "system",
+            content: [{ type: "text", text: "SYNTHETIC_IDENTICAL_PROMPT_TEXT" }],
+            source: {
+              kind: "system-prompt",
+              ...(owned ? { "dsh-unlimit": { version: 1, owner: "managed-prompt" } } : {}),
+            },
+          },
+        },
+        { surfaceOp: "append" },
+      );
+      agent.session.append("step/end", { turn: 1, step: 1, reason: { kind: "completed" } });
+      agent.session.append("turn/end", { turn: 1, reason: { kind: "completed" } });
+    };
+    message(marked, true);
+    message(unmarked, false);
+    const markedBefore = marked.session.snapshotEvents();
+    const unmarkedBefore = unmarked.session.snapshotEvents();
+    const signal = new AbortController().signal;
+    const preStep = (agent, next) =>
+      f.api
+        .agentEvents(f.ctx, agent)
+        .waterfall("agent/pre-step", { messages: [], turn: 2, step: 1, signal }, next);
+    let databaseCalls = 0;
+    const dispatch = f.controller.store.dispatch;
+    const dispatchMock = t.mock.method(f.controller.store, "dispatch", function (...args) {
+      databaseCalls++;
+      return Reflect.apply(dispatch, this, args);
+    });
+    const enter = { kind: "enter", messages: [] };
+    assert.deepEqual(await preStep(marked, async () => enter), {
+      ...enter,
+      startsRequestSeries: true,
+    });
+    assert.equal(enter.startsRequestSeries, undefined, "the official decision is not mutated");
+    assert.equal(await preStep(unmarked, async () => enter), enter);
+    const rejected = { kind: "reject", reason: "synthetic-denial" };
+    assert.equal(await preStep(marked, async () => rejected), rejected);
+    assert.equal(databaseCalls, 0, "prompt recovery never reads the settings database");
+    assert.equal(f.controller.runtime.enabled, false);
+    assert.deepEqual(
+      Object.getOwnPropertyDescriptor(f.ctx.systemPrompt, "assemble"),
+      f.originalPrompt,
+    );
+    assert.deepEqual(Object.getOwnPropertyDescriptor(f.ctx.approval, "decide"), f.originalApproval);
+    assert.deepEqual(marked.session.snapshotEvents(), markedBefore);
+    assert.deepEqual(unmarked.session.snapshotEvents(), unmarkedBefore);
+    dispatchMock.mock.restore();
+
+    const entered = Promise.withResolvers();
+    const gate = Promise.withResolvers();
+    t.after(() => gate.resolve(enter));
+    const pending = preStep(marked, () => {
+      entered.resolve();
+      return gate.promise;
+    });
+    await entered.promise;
+    await f.dispose();
+    gate.resolve(enter);
+    assert.equal(await pending, enter, "unload invalidates an already waiting callback");
+    assert.equal(await preStep(marked, async () => enter), enter);
+    assert.deepEqual(marked.session.snapshotEvents(), markedBefore);
+    assert.deepEqual(unmarked.session.snapshotEvents(), unmarkedBefore);
+  },
+);
+
+test(
   "mounted local scope import and DNS snapshots use HTTP receipts while model tools cannot invoke them",
   hostOnly,
   async (t) => {
@@ -232,7 +316,7 @@ function loadOfficial() {
       );
       return import(pathToFileURL(filename).href);
     };
-    const [cordis, prompt, approval, sandbox, projections, sessions, tools, skills] =
+    const [cordis, prompt, approval, sandbox, projections, sessions, tools, skills, agents] =
       await Promise.all([
         load("@deepseek-ai/cordis"),
         load("@deepseek-ai/dsh-system-prompt"),
@@ -242,6 +326,7 @@ function loadOfficial() {
         load("@deepseek-ai/dsh-session"),
         load("@deepseek-ai/dsh-tools"),
         load("@deepseek-ai/dsh-skill"),
+        load("@deepseek-ai/dsh-agent"),
       ]);
     return {
       ...cordis,
@@ -252,6 +337,7 @@ function loadOfficial() {
       ...sessions,
       ...tools,
       ...skills,
+      ...agents,
     };
   })();
   return official;

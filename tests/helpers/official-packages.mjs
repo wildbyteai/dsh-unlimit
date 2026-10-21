@@ -89,6 +89,8 @@ export function officialReadRuntime(runtimeRoot, cache, { presets = false } = {}
     "@deepseek-ai/cordis",
     "@deepseek-ai/cordis-plugin-loader",
     "@deepseek-ai/dsh-hmr",
+    "@deepseek-ai/dsh-session",
+    "@deepseek-ai/dsh-agent-loop",
   ];
   const put = (path, bytes) => {
     mkdirSync(dirname(path), { recursive: true });

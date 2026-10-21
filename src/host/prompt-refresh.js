@@ -1,5 +1,45 @@
 import { resolveOfficialPackage } from "./official-package.js";
 
+const promptOwner = Object.freeze({ version: 1, owner: "managed-prompt" });
+
+function hasManagedPrompt(agent) {
+  return agent.session.deriveMessages().some((message) => {
+    const owner = message.source["dsh-unlimit"];
+    return (
+      message.role === "system" &&
+      message.source.kind === "system-prompt" &&
+      message.content.length > 0 &&
+      owner?.version === promptOwner.version &&
+      owner.owner === promptOwner.owner
+    );
+  });
+}
+
+// This listener belongs to the plugin scope, not an activation or an Agent.
+// It can therefore restore a persisted prompt while controls start disabled.
+export function connectPromptRecovery(ctx, runtime) {
+  let active = true;
+  const dispose = ctx.on("agent/pre-step", async ({ agent }, next) => {
+    const decision = await next();
+    if (
+      !active ||
+      decision.kind !== "enter" ||
+      (runtime.enabled && runtime.settings().enabled) ||
+      !hasManagedPrompt(agent)
+    )
+      return decision;
+    for (const name of ["@deepseek-ai/dsh-session", "@deepseek-ai/dsh-agent-loop"]) {
+      const resolved = resolveOfficialPackage(runtime.host.runtimeRoot, name);
+      if (!resolved.url) throw new Error(`已保存提示词的恢复接口不可用：${resolved.reason}`);
+    }
+    return { ...decision, startsRequestSeries: true };
+  });
+  return () => {
+    active = false;
+    dispose();
+  };
+}
+
 function retainsPrompt(agent, message) {
   return (
     message !== undefined &&
@@ -91,12 +131,25 @@ export function connectPromptRefresh(ctx, runtime) {
       entry.wrapper = function (text, ...args) {
         const managed = active && runtime.settings().enabled;
         if (managed && args.length) args[0] = { ...args[0], inHistory: false };
-        const commits = original.call(
+        let commits = original.call(
           this,
           managed && entry.text !== undefined ? entry.text : text,
           ...args,
         );
         if (managed && agent.session) {
+          // Official messages are frozen. Preserve their IDs and native source
+          // kind while adding versioned ownership before the host journals them.
+          commits = commits.map((commit) =>
+            commit.message.content.length === 0
+              ? commit
+              : {
+                  ...commit,
+                  message: {
+                    ...commit.message,
+                    source: { ...commit.message.source, "dsh-unlimit": promptOwner },
+                  },
+                },
+          );
           const current = commits.findLast(({ message }) => message.content.length > 0);
           if (current) entry.lastMessage = JSON.stringify(current.message);
         }

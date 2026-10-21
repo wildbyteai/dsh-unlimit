@@ -4,7 +4,7 @@ import {
   selectedRule,
   usesWorkspaceInstructions,
 } from "../core/prompts.js";
-import { connectPromptRefresh } from "./prompt-refresh.js";
+import { connectPromptRecovery, connectPromptRefresh } from "./prompt-refresh.js";
 import { PermissionDefaults } from "./permission-defaults.js";
 import { NativeInstructions } from "./native-instructions.js";
 
@@ -53,6 +53,14 @@ export class DesktopRuntime {
     this.host = host;
     this.permissionDefaults = new PermissionDefaults(ctx, store, host);
     this.nativeInstructions = new NativeInstructions(this);
+    if (
+      host.supported &&
+      host.runtimeRoot &&
+      typeof ctx.on === "function" &&
+      typeof ctx.effect === "function"
+    ) {
+      ctx.effect(() => connectPromptRecovery(ctx, this));
+    }
   }
   settings() {
     return this.store.dispatch("settings.get", {}).value;
