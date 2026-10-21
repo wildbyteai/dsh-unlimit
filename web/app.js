@@ -3465,11 +3465,19 @@ function openRewind(item) {
   dialog.innerHTML = `<form id="rewind-form"><div class="dialoghead"><h2>会话回退</h2><button class="quiet small" type="button" id="close-rewind">关闭</button></div><div class="note">${esc(rewindNotice)}</div>${renderField(
     field("mode", "回退方式", "select", {
       options: [
-        ["turn", "回退整轮 · 子代理定位到创建来源"],
+        ["turn", "回退整轮"],
         ["step", "回退一步 · 回到前一步结束"],
       ],
     }),
     "turn",
+  )}${renderField(
+    field("childOrigin", "子代理定位依据（普通会话忽略）", "select", {
+      options: [
+        ["creation", "创建来源"],
+        ["latest", "最近接纳输入 · 需有来源记录"],
+      ],
+    }),
+    "creation",
   )}<div id="rewind-result"></div><p id="rewind-error" class="inlineerror" role="alert"></p><div class="dialogfoot"><button type="button" id="cancel-rewind">取消</button><button class="primary" type="submit" id="submit-rewind">创建回退分支</button></div></form>`;
   const binding = bindMemoryDraft($("#rewind-form"), draftScope(`rewind:${item.id}`));
   const editor = { binding, saving: false };
@@ -3499,12 +3507,14 @@ function openRewind(item) {
           fork = await api("sessions.rewind", {
             id: item.id,
             mode: new FormData(e.target).get("mode"),
+            childOrigin: new FormData(e.target).get("childOrigin"),
             draftBridgeReady: true,
             draftBridgeSupports: state.bridgeSupports,
           });
           binding.commit();
           state.rewindOutcome = { ...fork, draftStatus: "pending-client" };
           $("#f-mode").disabled = true;
+          $("#f-childOrigin").disabled = true;
         }
         try {
           const restored = await bridgeRequest("restore", {

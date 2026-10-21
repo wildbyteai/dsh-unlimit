@@ -6,7 +6,7 @@ const escape = (value) =>
   );
 
 export const rewindNotice =
-  "将创建新分支，保留并归档原会话，清空新分支继承的待处理输入，再恢复未发送的草稿。子代理按可核验的创建来源回到主会话对应轮次或步骤，该切点之后的事件一并撤回；再次激活的轮次及来源不明的嵌套代理不作推断。";
+  "将创建新分支，保留并归档原会话，清空新分支继承的待处理输入，再恢复未发送的草稿。子代理按可核验的创建来源回到主会话对应轮次或步骤，该切点之后的事件一并撤回；也可选择最近接纳的输入，需启用运行控制时留下的父调用关联记录。旧日志或来源不明的输入不作推断。";
 
 export function rewindSummary(outcome) {
   if (!outcome) return "";
@@ -49,10 +49,9 @@ export function rewindSummary(outcome) {
   const attachmentInfo = outcome.attachmentBatch
     ? ` 附件：${attachmentLabels[outcome.attachmentStatus] || "未确认"}；文件上传：${uploadLabels[outcome.uploadStatus] || "未确认"}。`
     : "";
-  const mapping =
-    outcome.mapping?.basis === "creation"
-      ? `<p>按子代理创建来源定位：<span class="mono">${escape(outcome.mapping.requestedSessionId)}</span> → 主会话 <span class="mono">${escape(outcome.mapping.targetSessionId)}</span>。${outcome.atSeq === undefined ? "回到首轮前的空白分支。" : `保留到事件 ${escape(outcome.atSeq)}，之后的事件一并撤回。`}</p>`
-      : "";
+  const mapping = ["creation", "recorded-input"].includes(outcome.mapping?.basis)
+    ? `<p>${outcome.mapping.basis === "creation" ? "按子代理创建来源定位" : "按子代理输入关联记录定位"}：<span class="mono">${escape(outcome.mapping.requestedSessionId)}</span> → 主会话 <span class="mono">${escape(outcome.mapping.targetSessionId)}</span>。${outcome.atSeq === undefined ? "回到首轮前的空白分支。" : `保留到事件 ${escape(outcome.atSeq)}，之后的事件一并撤回。`}</p>`
+    : "";
   const queue = outcome.newSessionStop?.requested
     ? outcome.newSessionStop.settledIds?.includes(outcome.newSessionId) &&
       outcome.newSessionStop.pendingIds?.length === 0

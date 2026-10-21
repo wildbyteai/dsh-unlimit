@@ -782,3 +782,291 @@ test("failed rewind releases its attachment authorization and never exposes a to
     return true;
   });
 });
+
+function appendEvents(session, entries) {
+  const additions = events(entries);
+  for (const event of additions) {
+    event.seq = session.events.length;
+    if (event.type === "plugin:dsh-unlimit/child-input") event.ignorable = true;
+    if (event.type === "tool/result") event.surfaceOp = "append";
+    session.events.push(event);
+  }
+  return additions;
+}
+function deliver(
+  parent,
+  child,
+  { consumed = true, turn = 4, step = 1, label = "Recorded relay" } = {},
+) {
+  const messageId = `input-${parent.meta.id}-${turn}`;
+  const callId = `send-${parent.meta.id}-${turn}`;
+  const message = {
+    id: messageId,
+    role: "user",
+    source: { kind: "agent-message", form: "relay", senderSessionId: parent.meta.id },
+    content: [{ type: "text", text: label }],
+  };
+  let [turnStart, stepStart] = appendEvents(parent, [
+    ["turn/start", { turn }],
+    ["step/start", { turn, step: 1 }],
+    ...(parent.meta.origin === "subagent"
+      ? []
+      : [["user/message", human(`Human direction ${turn}`)]]),
+  ]);
+  if (step === 2) {
+    [, stepStart] = appendEvents(parent, [["step/end"], ["step/start", { turn, step }]]);
+  }
+  const [call] = appendEvents(parent, [
+    [
+      "tool/call",
+      {
+        turn,
+        step,
+        name: "send_message",
+        callId,
+        arguments: JSON.stringify({ agent_id: child.meta.id, message: label }),
+      },
+    ],
+  ]);
+  appendEvents(child, [
+    ["agent/inbox/spliced", { target: "next-step", start: 0, inserted: [message] }],
+  ]);
+  if (consumed)
+    appendEvents(child, [
+      ["turn/start", { turn }],
+      ["step/start", { turn, step: 1 }],
+      ["user/message", message],
+    ]);
+  const [record, result] = appendEvents(parent, [
+    [
+      "plugin:dsh-unlimit/child-input",
+      {
+        version: 1,
+        parentSessionId: parent.meta.id,
+        parentCreatedAt: parent.meta.createdAt,
+        childSessionId: child.meta.id,
+        childCreatedAt: child.meta.createdAt,
+        messageId,
+        callId,
+        callSeq: call.seq,
+        turnStartSeq: turnStart.seq,
+        stepStartSeq: stepStart.seq,
+      },
+    ],
+    [
+      "tool/result",
+      {
+        turn,
+        step,
+        message: {
+          toolCallId: callId,
+          source: { kind: "tool", callId },
+          content: [{ type: "text", text: "delivered" }],
+        },
+      },
+    ],
+    ["step/end"],
+    ["turn/end"],
+  ]);
+  result.sourceEventSeqs = [call.seq];
+  return { record, result, call, message, atSeq: turnStart.seq - 1, stepAtSeq: stepStart.seq - 1 };
+}
+
+test("latest input uses a recorded delivery for pending and consumed messages; creation remains the default", async (t) => {
+  for (const consumed of [false, true]) {
+    const f = lineageFixture(t);
+    const delivery = deliver(f.original, f.child, { consumed });
+    appendEvents(f.original, [
+      ["turn/start", { turn: 5 }],
+      ["step/start", { turn: 5, step: 1 }],
+      ["user/message", human("Later unrelated root input")],
+      ["step/end"],
+      ["turn/end"],
+    ]);
+    const before = structuredClone([f.original, f.child]);
+    assert.equal((await f.adapter.prepare({ id: "child" })).atSeq, 6);
+    const plan = await f.adapter.prepare({ id: "child", childOrigin: "latest" });
+    assert.equal(plan.atSeq, delivery.atSeq);
+    assert.equal(plan.draft, "Human direction 4");
+    assert.equal(plan.mapping.basis, "recorded-input");
+    assert.equal(plan.mapping.requestedOrigin, "latest");
+    assert.equal(plan.mapping.links[0].messageId, delivery.message.id);
+    assert.deepEqual([f.original, f.child], before);
+    assert.deepEqual(writes(f.trace), []);
+    const result = await f.adapter.rewind({
+      id: "child",
+      childOrigin: "latest",
+      draftBridgeReady: true,
+    });
+    assert.equal(result.atSeq, delivery.atSeq);
+    assert.deepEqual(result.stop.settledIds, ["original", "child", "grandchild"]);
+    assert.deepEqual(result.newSessionStop.pendingIds, []);
+  }
+});
+
+test("latest input with incomplete, inherited, conflicting or failed delivery evidence never writes", async (t) => {
+  const cases = [
+    (f, d) => {
+      d.record.type = "plugin:dsh-unlimit/unrelated";
+    },
+    (f, d) => {
+      d.record.ignorable = false;
+    },
+    (f, d) => {
+      d.record.data.version = 2;
+    },
+    (f, d) => {
+      d.record.data.parentCreatedAt++;
+    },
+    (f, d) => {
+      d.record.data.childCreatedAt++;
+    },
+    (f, d) => {
+      d.record.data.turnStartSeq++;
+    },
+    (f, d) => {
+      for (const event of [
+        f.original.events[d.record.data.turnStartSeq],
+        f.original.events[d.record.data.stepStartSeq],
+        d.call,
+        d.result,
+      ]) {
+        delete event.data.turn;
+        delete event.data.step;
+      }
+    },
+    (f, d) => {
+      d.call.data.arguments = JSON.stringify({ agent_id: "another-child" });
+    },
+    (f, d) => {
+      d.result.data.message.isError = true;
+    },
+    (f, d) => {
+      d.result.sourceEventSeqs = [d.call.seq - 1];
+    },
+    (f, d) => {
+      d.result.type = "unrelated";
+    },
+    (f, d) => {
+      f.original.inheritedEventCount = d.record.seq + 1;
+    },
+    (f, d) => {
+      appendEvents(f.original, [[d.record.type, d.record.data]]);
+    },
+    (f, d) => {
+      appendEvents(f.child, [["user/message", d.message]]);
+    },
+    (f, d) => {
+      d.message.source.senderSessionId = "unrelated";
+    },
+    (f, d) => {
+      appendEvents(f.child, [["user/message", human("Later direct child input")]]);
+    },
+  ];
+  for (const change of cases) {
+    const f = lineageFixture(t);
+    const d = deliver(f.original, f.child);
+    change(f, d);
+    await assert.rejects(
+      f.adapter.rewind({ id: "child", childOrigin: "latest", draftBridgeReady: true }),
+      code("AMBIGUOUS_REWIND_SOURCE"),
+    );
+    assert.deepEqual(writes(f.trace), []);
+  }
+});
+
+test("nested latest origin follows input consumed before the descendant call, ignoring later ancestor input", async (t) => {
+  const f = lineageFixture(t);
+  const first = deliver(f.original, f.child);
+  // Finish the child's receiving turn before its next turn sends to the grandchild.
+  appendEvents(f.child, [["step/end"], ["turn/end"]]);
+  const descendant = deliver(f.child, f.grandchild, { turn: 5 });
+  const later = deliver(f.original, f.child, { turn: 6 });
+  assert.notEqual(first.atSeq, later.atSeq);
+  const plan = await f.adapter.prepare({ id: "grandchild", childOrigin: "latest" });
+  assert.equal(plan.atSeq, first.atSeq);
+  assert.equal(plan.draft, "Human direction 4");
+  assert.deepEqual(
+    plan.mapping.links.map((link) => link.messageId),
+    [descendant.message.id, first.message.id],
+  );
+  assert.deepEqual(writes(f.trace), []);
+});
+
+test("latest child origin can fall back only to its sole original task, not an unrecorded relay", async (t) => {
+  const f = lineageFixture(t);
+  assert.equal(
+    (await f.adapter.prepare({ id: "child", childOrigin: "latest" })).mapping.basis,
+    "creation",
+  );
+  appendEvents(f.child, [
+    [
+      "user/message",
+      {
+        id: "unrecorded",
+        role: "user",
+        source: { kind: "agent-message", form: "relay", senderSessionId: "original" },
+        content: [{ type: "text", text: "Same visible text is not proof" }],
+      },
+    ],
+  ]);
+  await assert.rejects(
+    f.adapter.prepare({ id: "child", childOrigin: "latest" }),
+    code("AMBIGUOUS_REWIND_SOURCE"),
+  );
+  assert.equal((await f.adapter.prepare({ id: "child" })).mapping.basis, "creation");
+  await assert.rejects(
+    f.adapter.prepare({ id: "child", childOrigin: "guess" }),
+    code("INVALID_INPUT"),
+  );
+  assert.deepEqual(writes(f.trace), []);
+});
+
+test("recorded input mapping is rendered distinctly and escapes session identities", () => {
+  const html = rewindSummary({
+    mapping: { basis: "recorded-input", requestedSessionId: "<child>", targetSessionId: "<root>" },
+    atSeq: 42,
+  });
+  assert.match(html, /按子代理输入关联记录定位/);
+  assert.match(html, /保留到事件 42/);
+  assert.match(html, /&lt;child&gt;/);
+  assert.equal(html.includes("<root>"), false);
+});
+
+test("latest origin follows the sole original task across automatic ancestor turns while default creation stays strict", async (t) => {
+  const f = lineageFixture(t);
+  const entries = f.child.events.map((event) => [event.type, event.data]);
+  entries.splice(
+    4,
+    0,
+    ["step/end"],
+    ["turn/end"],
+    ["turn/start", { turn: 2 }],
+    ["step/start", { turn: 2, step: 1 }],
+    ["user/message", { ...human("Runtime update only"), source: { kind: "runtime-context" } }],
+  );
+  f.child.events = events(entries);
+  appendEvents(f.grandchild, [
+    ["turn/start", { turn: 1 }],
+    ["step/start", { turn: 1, step: 1 }],
+    ["user/message", human("Initial delegated task")],
+  ]);
+  await assert.rejects(f.adapter.prepare({ id: "grandchild" }), code("AMBIGUOUS_REWIND_SOURCE"));
+  const plan = await f.adapter.prepare({ id: "grandchild", childOrigin: "latest" });
+  assert.equal(plan.atSeq, 6);
+  assert.equal(plan.mapping.basis, "creation");
+  assert.equal(plan.mapping.requestedOrigin, "latest");
+  assert.equal(plan.mapping.links.length, 2);
+  assert.deepEqual(writes(f.trace), []);
+});
+
+test("recorded input step rewind retains the completed earlier parent step", async (t) => {
+  const f = lineageFixture(t);
+  const delivery = deliver(f.original, f.child, { step: 2 });
+  const plan = await f.adapter.prepare({ id: "child", childOrigin: "latest", mode: "step" });
+  assert.equal(plan.atSeq, delivery.stepAtSeq);
+  assert.equal(f.original.events[plan.atSeq].type, "step/end");
+  assert.equal(plan.draft, "");
+  assert.equal(plan.mapping.links[0].stepStartSeq, plan.atSeq + 1);
+  assert.deepEqual(writes(f.trace), []);
+});

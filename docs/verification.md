@@ -327,3 +327,18 @@ JS
 同时只读核对完整预设的加载来源：三份 `dsh-web-app/presets/{standard,minimal,ptc}.patch.yml` 摘要匹配发行清单，但安装的 `dsh-web-app/cordis.patch.yml` 本体不匹配。后者只读结构后即从官方可信结论中排除，没有执行或修改；其他已知修改入口也未执行。后续完整预设需使用可核验的隔离副本与真实 Loader/Registry，而不能把当前逐项挂载服务改称完整预设。
 
 语法 141/141、格式、有限来源与分层检查、117 项验收前五列、构建及离线打包均通过。新增执行证据的五项源码摘要与最终文件一致。安装包仍为上节的 67 项和相同 SHA-256，逐文件字节核对通过；没有把新增开发测试放进运行包，没有重复页面预览、真实安装或配置变更。
+
+## 子代理最近输入来源记录与回退（2026-10-21）
+
+新增 `ChildOrigins` 观察器及 `childOrigin:latest` 读回路径，默认创建来源保持原样。记录器仅在总开关与运行控制均启用时，使用官方 `appendPluginRecord` 保存父调用/子会话/消息 ID 的关联元数据；不含正文、不进入模型消息。旧日志没有记录时不猜测来源。合同、数据形状和未支持路径见 [子代理来源回退](child-rewind-contract.md)。
+
+- `tests/child-origins.test.mjs` **40 项通过**：启停、重连、去重、错误身份/来源/边界、发行摘要失败及写入失败。此文件使用原创合成模块外壳，不作为官方模块证据。
+- `tests/sessions.test.mjs` **30 项通过**，保留原 23 项，新增最近接纳输入的 pending/consumed 对照、拒绝不完整链、嵌套消费时点、初始任务跨自动轮次、精确一步切点及界面转义。明确检验缺失 turn/step 不能以 undefined 相等蒙混通过；默认创建链的原严格嵌套断言仍存在。
+- `tests/sessions-host.test.mjs` **11 项通过**，保留原 9 项并新增官方标准 `send_message` 两条路径。驻留子代理：真实 ToolRuntime 投递、子 inbox 的准确 ID、新父元数据、物理 JSONL、prepare 根切点、实际 fork/archive/cancel 与新分支 JSONL 连通；冷恢复：同一稳定 child 身份、没有第二 catalog、最近输入 prepare 定位。父 turn/assistant/tool-call/result 外壳由 fixture 手动构造，使用官方消息构造器及严格 JSONL 校验；没有真实模型调用，不冒充 AgentLoop 完整调度或桌面验收。
+- 本机官方 Node **v24.21.0**、显式 **0.2.1-rc.2** 运行时及已校验官方归档的完整回归：**694 项通过、0 失败、0 跳过**。包含真实 Cordis mount 集成，不读取真实会话、不发送网络模型请求。结构化记录见 [证据](evidence/child-input-origin-acceptance.json)。
+
+页面预览使用 1280×720 本地回环页面、独立临时库及明确标注的模拟父 iframe/草稿桥。实际操作“会话管理 → 回退 / 分支”，确认默认创建来源，改为最近接纳输入并提交；服务端读回 `childOrigin:latest`，结果显示输入关联依据、根会话切点和草稿未自动发送，两个选择器锁定。使用产品真实 app.js/rewind.js/CSS；回退和草稿桥响应为合成桩，不能证明实际 DSH 输入框、导航或安装成功。截图及请求读回保存在本地 `artifacts/child-input-ui-preview.jpg`、`artifacts/child-input-ui-request.json`。
+
+未改真实 DSH 配置，没有安装、重载或操作真实会话；117 项验收前五列保持原基线。未记录旧历史、直接 API、PTC 内部调用来源、外部任务状态恢复和桌面实际交互仍有差距。本批不改来源事实、原仓库、第三方声明或许可证状态。
+
+本批发布检查：语法 **144/144**，格式、有限来源与分层检查、构建及离线打包通过。实际 tgz 共 **69 个普通文件、909950 字节解包内容**，逐文件与工作区一致；隔离解包后导入 plugin、sessions、child-origins、child-rewind 入口成功，未 mount。包 SHA-256：`594267249fc74d3732df29211d440a61bf18623716eaf0edd8026099f68fc397`。运行包仅带用户指南和既有概览截图等允许项，不含官方模块、开发测试、profile 或数据库；临时解包目录已清理。

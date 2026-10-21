@@ -58,7 +58,10 @@ export function mount(ctx, host) {
   const catalog = new HostCatalog(ctx, { library: skills, toolkit, environment });
   const plans = new DesktopWorkflowPlan(workflow, { catalog });
   const continuation = new Continuation(ctx, store, host);
-  const sessions = new DesktopSessions(ctx, store);
+  const sessions = new DesktopSessions(ctx, store, {
+    host,
+    enabled: () => runtime.enabled && runtime.settings().enabled,
+  });
   let skillConnection;
   const controller = new Controller({
     store,
@@ -144,6 +147,10 @@ export function mount(ctx, host) {
     scope.effect(() => () => {
       skillConnection = undefined;
     });
+  });
+  ctx.inject(["tools", "agents"], async (scope) => {
+    await sessions.origins.connect();
+    scope.effect(() => () => sessions.origins.close());
   });
   ctx.inject(["tools"], async (scope) => {
     const dispose = await installTools(scope, controller, host);

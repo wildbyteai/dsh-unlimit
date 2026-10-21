@@ -1,4 +1,6 @@
 import { AttachmentBatches } from "./attachment-batches.js";
+import { ChildOrigins } from "./child-origins.js";
+import { latestChildInput, parentBoundary, recordedInputOrigin } from "./child-rewind.js";
 import { StoreError, enumValue, fail, object, string } from "../core/validation.js";
 
 const CUT_TYPES = new Set(["step/end", "turn/end", "session/end-seed"]);
@@ -35,10 +37,11 @@ export class SessionOperationError extends StoreError {
 
 /** Official-service adapter. Never reads Session storage files or edits log events. */
 export class DesktopSessions {
-  constructor(ctx, store) {
+  constructor(ctx, store, options) {
     this.ctx = ctx;
     this.store = store;
     this.inFlight = new Set();
+    this.origins = options ? new ChildOrigins(ctx, options.host, options.enabled) : undefined;
     this.attachmentBatches = new AttachmentBatches(() => this.services());
   }
   services() {
@@ -79,8 +82,12 @@ export class DesktopSessions {
       rewind: required.every((name) => methods[name]),
       draftRestore: "client-bridge-required",
       missing: required.filter((name) => !methods[name]),
-      subagentRewind: "creation-origin",
-      unsupported: ["subagent-latest-activation-cut", "task-state-rewrite"],
+      subagentRewind: "creation-or-recorded-input",
+      originTracking: this.origins?.status() ?? {
+        state: "unsupported",
+        reason: "Input origin recording is not connected",
+      },
+      unsupported: ["unrecorded-subagent-input-origin", "task-state-rewrite"],
       attachmentRecovery:
         typeof this.services().attachments?.readImage === "function" &&
         typeof this.services().attachments?.readFileStream === "function",
@@ -168,7 +175,7 @@ export class DesktopSessions {
     if (progress.pendingIds.length)
       fail("STOP_INCOMPLETE", "Some target agents still have running or queued work");
   }
-  async rewindSource(sessionId, claim) {
+  async rewindSource(sessionId, claim, childOrigin) {
     const { controller, registry } = this.services();
     const inspect = async (id) => {
       if (registry.archivedSessionIds.includes(id))
@@ -223,28 +230,16 @@ export class DesktopSessions {
           "AMBIGUOUS_REWIND_SOURCE",
           "The parent has no unique own catalog event matching this subagent creation",
         );
-      const turn = source.events.findLast(
-        (event) => event.seq < catalog.seq && event.type === "turn/start",
-      );
-      const step = source.events.findLast(
-        (event) => event.seq < catalog.seq && event.type === "step/start",
-      );
-      if (
-        !turn ||
-        !step ||
-        step.seq < turn.seq ||
-        source.events.some(
-          (event) =>
-            event.seq < catalog.seq &&
-            ((event.type === "turn/end" && event.seq > turn.seq) ||
-              (event.type === "step/end" && event.seq > step.seq)),
-        )
-      )
-        fail(
-          "NO_REWIND_BOUNDARY",
-          "The subagent creation is not associated with an active parent turn and step",
-        );
-      if (source.meta.origin === "subagent") {
+      const input =
+        childOrigin === "latest" ? latestChildInput(child, anchorSeq) : { basis: "creation" };
+      if (input.basis === "recorded-input") {
+        const link = recordedInputOrigin(source, child, input.messageId);
+        anchorSeq = link.callSeq;
+        links.push(link);
+        continue;
+      }
+      const { turn, step } = parentBoundary(source, catalog.seq);
+      if (source.meta.origin === "subagent" && childOrigin === "creation") {
         const ownedBefore = source.events.slice(inherited, catalog.seq);
         const inputs = ownedBefore.filter(
           (event) =>
@@ -264,6 +259,7 @@ export class DesktopSessions {
       }
       anchorSeq = catalog.seq;
       links.push({
+        basis: "creation",
         childSessionId: child.meta.id,
         parentSessionId: parentId,
         catalogSeq: catalog.seq,
@@ -278,6 +274,10 @@ export class DesktopSessions {
     object(payload);
     const sessionId = string(payload.sessionId ?? payload.id, "sessionId");
     const mode = enumValue(payload.mode ?? "turn", "mode", ["turn", "step"]);
+    const childOrigin = enumValue(payload.childOrigin ?? "creation", "childOrigin", [
+      "creation",
+      "latest",
+    ]);
     if (payload.atSeq !== undefined && (!Number.isSafeInteger(payload.atSeq) || payload.atSeq < 0))
       fail("INVALID_INPUT", "atSeq must be a non-negative safe integer");
     const capabilities = this.capabilities();
@@ -286,7 +286,7 @@ export class DesktopSessions {
         "UNSUPPORTED_CAPABILITY",
         `Required official capabilities are unavailable: ${capabilities.missing.join(", ")}`,
       );
-    const { source, anchorSeq, links } = await this.rewindSource(sessionId, claim);
+    const { source, anchorSeq, links } = await this.rewindSource(sessionId, claim, childOrigin);
     const targetId = source.meta.id;
     if (links.length && payload.atSeq !== undefined)
       fail(
@@ -373,7 +373,10 @@ export class DesktopSessions {
             mapping: {
               requestedSessionId: sessionId,
               targetSessionId: targetId,
-              basis: "creation",
+              basis: links.some((link) => link.basis === "recorded-input")
+                ? "recorded-input"
+                : "creation",
+              requestedOrigin: childOrigin,
               links,
             },
           }
@@ -523,6 +526,7 @@ export class DesktopSessions {
     return this.attachmentBatches.release(payload);
   }
   close() {
+    this.origins?.close();
     this.attachmentBatches.close();
   }
 }

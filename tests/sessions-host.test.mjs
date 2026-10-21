@@ -10,6 +10,7 @@ import net from "node:net";
 import dgram from "node:dgram";
 import childProcess from "node:child_process";
 import { DesktopSessions } from "../src/host/sessions.js";
+import { CHILD_INPUT_RECORD, ChildOrigins } from "../src/host/child-origins.js";
 import { WorkspaceStore } from "../src/core/store.js";
 
 const runtimeRoot = process.env.DSH_UNLIMIT_RUNTIME;
@@ -85,6 +86,7 @@ async function loadOfficial() {
       todo: "@deepseek-ai/dsh-tool-todo",
       subagents: "@deepseek-ai/dsh-subagent",
       spawn: "@deepseek-ai/dsh-subagent-spawn-in-process",
+      subagentControls: "@deepseek-ai/dsh-tool-subagent-control",
       directories: "@deepseek-ai/dsh-working-directory",
     };
     return Object.fromEntries(
@@ -100,6 +102,7 @@ async function fixture(
     attachments: useAttachments = false,
     todo: useTodo = false,
     subagents: useSubagents = false,
+    subagentControls: useSubagentControls = false,
   } = {},
 ) {
   denyExternalExecution(t);
@@ -226,6 +229,7 @@ async function fixture(
     await mount(api.directories.WorkingDirectoryService, { defaultDirectory: project });
     await mount(api.subagents.SubagentRuntime, { maxDepth: 2, maxActiveSubagents: 8 });
     await mount(api.spawn, { providerName: "spawn" });
+    if (useSubagentControls) await mount(api.subagentControls);
   }
   const adapter = new DesktopSessions(ctx, store);
   t.after(() => adapter.close());
@@ -286,6 +290,275 @@ async function fixture(
     startChild,
   };
 }
+
+test(
+  "official send_message preserves its exact child input in an ignorable durable origin record",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t, { subagents: true, subagentControls: true });
+    const root = await f.create();
+    f.beginTurn(root, 1, "Synthetic root creation input");
+    const { child, receipt } = await f.startChild(root);
+    f.endTurn(root, 1);
+    const origins = new ChildOrigins(f.ctx, { supported: true, runtimeRoot }, () => true);
+    t.after(() => origins.close());
+    const send = async (turn, callId) => {
+      f.beginTurn(root, turn, `Synthetic parent turn ${turn}`);
+      const args = { agent_id: child.id, message: `Synthetic child follow-up ${turn}` };
+      root.session.append(
+        "assistant/message",
+        {
+          turn,
+          step: 1,
+          message: f.api.llm.createAssistantMessage({
+            source: { provider: "synthetic-offline", model: "never-called" },
+            content: [
+              {
+                type: "tool-call",
+                id: callId,
+                name: "send_message",
+                arguments: JSON.stringify(args),
+              },
+            ],
+          }),
+          stream: [],
+        },
+        { surfaceOp: "append" },
+      );
+      const call = root.session.append("tool/call", {
+        turn,
+        step: 1,
+        callId,
+        name: "send_message",
+        arguments: JSON.stringify(args),
+      });
+      const result = await f.ctx.tools.execute({
+        agent: root,
+        name: "send_message",
+        arguments: args,
+        callId,
+        signal: new AbortController().signal,
+      });
+      assert.equal(result.isError, false);
+      assert.equal(typeof result.value.messageId, "string");
+      // The existing fixture owns synthetic parent turn/call/result envelopes.
+      // Execute the real tool and preserve exactly the fields AgentLoop commits.
+      const logged = root.session.append(
+        "tool/result",
+        {
+          turn,
+          step: 1,
+          message: f.api.llm.createToolResultMessage({
+            callId,
+            content: result.content,
+            isError: result.isError,
+          }),
+          ...(result.meta === undefined ? {} : { meta: result.meta }),
+        },
+        { surfaceOp: "append", sourceEventSeqs: [call.seq] },
+      );
+      f.endTurn(root, turn);
+      return { call, result, logged };
+    };
+
+    const untracked = await send(2, "synthetic-untracked-send");
+    assert.equal(
+      root.session.snapshotEvents().filter((event) => event.type === CHILD_INPUT_RECORD).length,
+      0,
+    );
+    assert.ok(!JSON.stringify(untracked.logged).includes(untracked.result.value.messageId));
+    assert.equal(untracked.result.meta, undefined);
+    assert.deepEqual(untracked.logged.sourceEventSeqs, [untracked.call.seq]);
+
+    assert.deepEqual(await origins.connect(), { state: "active" });
+    const tracked = await send(3, "synthetic-tracked-send");
+    const records = root.session
+      .snapshotEvents()
+      .filter((event) => event.type === CHILD_INPUT_RECORD);
+    assert.equal(records.length, 1);
+    const record = records[0];
+    const parentEvents = root.session.snapshotEvents();
+    const turnStart = parentEvents.find(
+      (event) => event.type === "turn/start" && event.data.turn === 3,
+    );
+    const stepStart = parentEvents.find(
+      (event) => event.type === "step/start" && event.data.turn === 3,
+    );
+    assert.deepEqual(record.data, {
+      version: 1,
+      parentSessionId: root.id,
+      parentCreatedAt: root.session.header.createdAt,
+      childSessionId: child.id,
+      childCreatedAt: child.session.header.createdAt,
+      messageId: tracked.result.value.messageId,
+      callId: "synthetic-tracked-send",
+      callSeq: tracked.call.seq,
+      turnStartSeq: turnStart.seq,
+      stepStartSeq: stepStart.seq,
+    });
+    const childInputs = child.session
+      .snapshotEvents()
+      .slice(child.session.inheritedEventCount)
+      .flatMap((event) => (event.type === "agent/inbox/spliced" ? event.data.inserted : []))
+      .filter((message) => message.id === record.data.messageId);
+    assert.equal(childInputs.length, 1);
+    assert.deepEqual(childInputs[0].source, {
+      kind: "agent-message",
+      form: "relay",
+      senderSessionId: root.id,
+    });
+    assert.equal(record.ignorable, true);
+    assert.equal(record.surfaceOp, undefined);
+    assert.ok(!root.session.surface.nodes.includes(record.seq));
+    assert.equal(f.api.sessions.deriveEventMessage(record), null);
+    assert.ok(!JSON.stringify(record).includes("Synthetic child follow-up"));
+    assert.ok(!JSON.stringify(tracked.logged).includes(record.data.messageId));
+
+    await f.ctx.sessionPersistence.flush();
+    const reader = await f.ctx.sessionPersistence.open(root.id, "read");
+    try {
+      const durable = await reader.read();
+      assert.deepEqual(
+        durable.events.filter((event) => event.type === CHILD_INPUT_RECORD),
+        records,
+      );
+      assert.equal(reader.header.id, root.id);
+    } finally {
+      await reader.close();
+    }
+    const plan = await f.adapter.prepare({ sessionId: child.id, childOrigin: "latest" });
+    assert.equal(plan.sessionId, root.id);
+    assert.equal(plan.mapping.basis, "recorded-input");
+    assert.equal(plan.mapping.requestedOrigin, "latest");
+    assert.equal(plan.mapping.links[0].messageId, tracked.result.value.messageId);
+    assert.equal(plan.mapping.links[0].callSeq, tracked.call.seq);
+    assert.equal(
+      plan.atSeq,
+      parentEvents.findLast((event) => event.type === "turn/end" && event.data.turn === 2).seq,
+    );
+    assert.equal(plan.draft, "Synthetic parent turn 3");
+    const rewound = await f.adapter.rewind({
+      sessionId: child.id,
+      childOrigin: "latest",
+      draftBridgeReady: true,
+    });
+    assert.equal(rewound.sessionId, root.id);
+    assert.equal(rewound.mapping.links[0].messageId, tracked.result.value.messageId);
+    assert.equal(rewound.atSeq, plan.atSeq);
+    assert.equal(rewound.draft, plan.draft);
+    assert.equal(rewound.archived, true);
+    assert.deepEqual(rewound.stop.pendingIds, []);
+    assert.deepEqual(rewound.newSessionStop.pendingIds, []);
+    const continuation = await f.ctx.sessionController.inspect(rewound.newSessionId);
+    assert.deepEqual(
+      continuation.events.slice(0, continuation.inheritedEventCount),
+      parentEvents.slice(0, plan.atSeq + 1),
+    );
+    assert.ok(!continuation.events.some((event) => event.type === CHILD_INPUT_RECORD));
+    await f.ctx.sessionPersistence.flush();
+    const continuationReader = await f.ctx.sessionPersistence.open(rewound.newSessionId, "read");
+    try {
+      assert.deepEqual((await continuationReader.read()).events, continuation.events);
+    } finally {
+      await continuationReader.close();
+    }
+    origins.close();
+    assert.deepEqual(origins.status(), { state: "available" });
+    await receipt.dispose();
+  },
+);
+
+test(
+  "official cold-resumed send_message records the same immutable child identity",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t, { subagents: true, subagentControls: true });
+    const root = await f.create();
+    f.beginTurn(root, 1, "Synthetic root creation input");
+    const { child, receipt } = await f.startChild(root);
+    f.endTurn(root, 1);
+    await receipt.dispose();
+    assert.equal(f.ctx.agents.get(child.id), undefined);
+    const origins = new ChildOrigins(f.ctx, { supported: true, runtimeRoot }, () => true);
+    t.after(() => origins.close());
+    await origins.connect();
+    f.beginTurn(root, 2, "Synthetic root task resuming the child");
+    const args = { agent_id: child.id, message: "Synthetic cold-resume input" };
+    root.session.append(
+      "assistant/message",
+      {
+        turn: 2,
+        step: 1,
+        message: f.api.llm.createAssistantMessage({
+          source: { provider: "synthetic-offline", model: "never-called" },
+          content: [
+            {
+              type: "tool-call",
+              id: "synthetic-cold-resume-send",
+              name: "send_message",
+              arguments: JSON.stringify(args),
+            },
+          ],
+        }),
+        stream: [],
+      },
+      { surfaceOp: "append" },
+    );
+    const call = root.session.append("tool/call", {
+      turn: 2,
+      step: 1,
+      name: "send_message",
+      callId: "synthetic-cold-resume-send",
+      arguments: JSON.stringify(args),
+    });
+    const result = await f.ctx.tools.execute({
+      agent: root,
+      name: "send_message",
+      callId: call.data.callId,
+      arguments: args,
+      signal: new AbortController().signal,
+    });
+    assert.equal(result.isError, false);
+    root.session.append(
+      "tool/result",
+      {
+        turn: 2,
+        step: 1,
+        message: f.api.llm.createToolResultMessage({
+          callId: call.data.callId,
+          content: result.content,
+          isError: result.isError,
+        }),
+      },
+      { surfaceOp: "append", sourceEventSeqs: [call.seq] },
+    );
+    f.endTurn(root, 2);
+    const resumed = f.ctx.agents.get(child.id);
+    assert.ok(resumed);
+    assert.notEqual(resumed, child);
+    assert.equal(resumed.session.header.createdAt, child.session.header.createdAt);
+    const records = root.session
+      .snapshotEvents()
+      .filter((event) => event.type === CHILD_INPUT_RECORD);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].data.childCreatedAt, child.session.header.createdAt);
+    assert.equal(records[0].data.messageId, result.value.messageId);
+    assert.equal(records[0].data.callSeq, call.seq);
+    const plan = await f.adapter.prepare({ sessionId: child.id, childOrigin: "latest" });
+    assert.equal(plan.sessionId, root.id);
+    assert.equal(plan.mapping.basis, "recorded-input");
+    assert.equal(plan.mapping.links[0].messageId, result.value.messageId);
+    assert.equal(plan.mapping.links[0].callSeq, call.seq);
+    assert.equal(plan.draft, "Synthetic root task resuming the child");
+    assert.equal(
+      root.session.snapshotEvents().filter((event) => event.type === "subagent/catalog").length,
+      1,
+      "Cold resume must not invent a second creation fact",
+    );
+    resumed.cancel({ kind: "user" });
+    await resumed.whenIdle();
+  },
+);
 
 test(
   "real managed child creation rewinds its root creation turn despite later root input",

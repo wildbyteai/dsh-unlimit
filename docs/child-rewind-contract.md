@@ -1,6 +1,6 @@
-# 子代理创建来源回退
+# 子代理来源回退
 
-目标为桌面 `0.2.1-rc.2`，接口仍是 `sessions.prepare / sessions.rewind`。普通会话保持原来的整轮、一步及显式 `atSeq` 行为。选中子代理时，通过官方会话检查接口定位其创建来源；不读取会话存储文件，不改变旧日志，不用时间接近或父会话最新输入猜切点。
+目标为桌面 `0.2.1-rc.2`，接口仍是 `sessions.prepare / sessions.rewind`。普通会话保持原来的整轮、一步及显式 `atSeq` 行为。选中子代理时，默认通过官方会话检查接口定位其创建来源；可显式选择有记录的最近接纳输入。读回不直接读取会话存储文件，不改变旧事件，不用时间接近、正文相似或父会话最新输入猜切点。
 
 ## 来源定位
 
@@ -31,6 +31,37 @@ mapping: {
 
 绑定继承、附件授权、归档、取消均使用实际根会话。每次操作锁住选中会话及已解析的祖先，同一谱系的并发操作返回 `CONFLICT`，避免创建多个竞争分支；失败和完成都会释放锁。独立 fork 不因 `parentSession` 字段被当作 subagent 继续上溯。
 
+## 最近接纳输入与新关联记录
+
+`sessions.prepare / sessions.rewind` 新增 `childOrigin: "creation" | "latest"`，省略时仍为 `creation`；普通根会话不使用该选项。`latest` 指所选子代理历史上最近接纳的实质输入，含仍在排队及后来被取消的接纳记录，不等同于“当前激活”。同一个 ID 的 inbox 接纳和模型消费是两种表示，合并为一条输入；重复接纳、重复消费或来源冲突拒绝。
+
+桌面 `0.2.1-rc.2` 的标准 `send_message` 运行时返回 `value.messageId`，但持久 `tool/result` 只保留展示内容，不能据旧日志反推这条关联。插件挂载后，通过官方 `tools/result` 观察成功投递，仅在运行控制已启用且总开关开启时记录；关闭后停止新记录，既有审计记录保留。记录发生在模型工具调用路径，不增加自动发送。
+
+记录前核对实际活动父/子代理对象、直接父子关系、稳定创建时间、唯一父 `tool/call` 及其 turn/step，以及子日志中的准确消息 ID 和 `agent-message / relay / senderSessionId` 来源。然后使用官方 `appendPluginRecord` 写入父日志的 `plugin:dsh-unlimit/child-input`，格式如下：
+
+```js
+{
+  version: (1,
+    parentSessionId,
+    parentCreatedAt,
+    childSessionId,
+    childCreatedAt,
+    messageId,
+    callId,
+    callSeq,
+    turnStartSeq,
+    stepStartSeq);
+}
+```
+
+这是插件新增的 `ignorable` 元数据，不是宿主原有历史关联，不进入模型消息，不包含消息正文或凭据。重复工具通知不重复写入；写入失败交由官方观察器报告，读回缺记录时拒绝。卸载/服务退出撤销监听；重连重新验证官方模块入口摘要。
+
+读回除创建身份链外，还要求父自身唯一的上述记录与实际 `send_message` 调用参数、调用 ID、turn/step 一致；对应 `tool/result` 必须成功，且 `message.toolCallId`、`message.source.callId`、`sourceEventSeqs` 精确连回调用。继承前缀、版本未知、未完成结果、失败结果或记录冲突均不能定位。根切点改为该父调用所在的轮次或步骤，保留既有归档、取消、附件和草稿规则。
+
+嵌套链在每层下游调用之前，选择该祖先已消费的最近实质输入；下游调用以后才收到的消息、尚未消费的排队消息不能替代该因果输入。记录的 relay 可逐层上溯；唯一初始人工型子任务仍可依创建来源上溯，允许没有新增实质输入的自动继续轮次；默认 `creation` 的首个自有 turn 限制保持原样。任何直接人工插话、调度、其他未记录来源均拒绝，不退回较早创建轮次。
+
+结果 `mapping.requestedOrigin` 回显选择。只使用创建链时 `basis: "creation"`；包含输入关联链时为 `basis: "recorded-input"`。每条 link 亦返回自己的 basis，输入链携带 `messageId / callId / callSeq / recordSeq / turnStartSeq / stepStartSeq`。UI 保留“创建来源”默认值，新增“最近接纳输入 · 需有来源记录”；分支创建后锁定两个选择器，结果说明采用的依据及根会话切点。
+
 ## 新分支的待处理输入
 
 官方 fork 保留精确事件前缀，其中可能包含被撤回人工轮次的早先 `inbox/enqueue`。仅检查模型消息不够：继承队列如果未清理，用户下一次发送时旧输入可能再次入场。
@@ -43,4 +74,4 @@ mapping: {
 
 `tests/sessions.test.mjs` 验证直接/嵌套创建来源、较晚人工轮次、turn/step 切点、身份与继承边界、后续输入歧义、祖先并发、清理失败和界面结果表达。官方 catalog 验证见 `tests/sessions-host.test.mjs`；四种官方协议的回退后编辑重发、JSONL、拒绝与取消证据见 [回退协议合同](rewind-protocol-contract.md)。
 
-官方再次激活没有统一的持久父轮次关联。API 直接给子代理发消息、冷恢复以及中间祖先被插话等情形不能靠首次创建记录推出最新任务来源，这些路径仍是差距。没有修改原生 todo 状态，未实现外部任务复原；未执行真实安装、桌面输入框或导航验收。
+官方再次激活没有统一的持久父轮次关联。新增记录仅覆盖记录器有效期间、具有普通父 `tool/call` 的成功标准 `send_message` 路径。未记录的旧历史、API 直接投递、PTC 内部调度及来源不明的人工/调度插话仍不能推断。冷恢复需要本次成功投递留下新记录，不能由“已恢复”本身反推出父轮次。没有修改原生 todo 状态，未实现外部任务复原；未执行真实安装、桌面输入框或导航验收。

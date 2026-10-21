@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-21",
+  "baseCommit": "a8860de6453857ccabdf8bc6576a61c77ade4267",
+  "scope": "recorded standard send_message input origin, source reader, rewind and synthetic UI",
+  "sourceDigests": {
+    "src/host/child-origins.js": "018b2a4f70476ff1626891893247d7ed86e3e4c7993a87b6ba5548128fb3e140",
+    "src/host/child-rewind.js": "05b3d84fa9e0439e30dae70276b31e0fb7dcff409937d369972287311c2cfec1",
+    "src/host/sessions.js": "87be6b8a792c830e5250b38e3654c458fab66fd735bd69a604972dea8c18c424",
+    "src/host/plugin.js": "0e2bd10225d506f6a74825631318ef6d088e4e1311f2e0dd1f3f72021cfbf770",
+    "web/app.js": "d4c10316a49a164e225cf7492b459969a943122e8ac88726a3e799731b6b4757",
+    "web/rewind.js": "d04a582af59b9baeb12c8608d891df9ff1bac166099e102f3d069a2731be954d",
+    "tests/child-origins.test.mjs": "7b20f82394f8c30ec72d30da40f2511e0bfef92903ad402a4cef0b3d98cf96aa",
+    "tests/sessions.test.mjs": "a08fe33ef0ed29b579f875c0b1875a9584b334877983d60388a346c170a40d51",
+    "tests/sessions-host.test.mjs": "ba6c76866dd35f9903d239674be400dd6adfd15ad6e2156a021427ea4930bace"
+  },
+  "officialRuntime": {
+    "release": {
+      "schemaVersion": 1,
+      "version": "0.2.1-rc.2",
+      "hostProtocolVersion": 4,
+      "nodeVersion": "24.21.0",
+      "pnpmVersion": "11.28.5"
+    },
+    "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
+    "files": [
+      {
+        "path": "node_modules/@deepseek-ai/dsh-subagent/lib/index.js",
+        "sha256": "9a9572e70fffdb100deb63326167f32bbf63016ce49c0017495dabcb95b44168",
+        "inventorySha256": "9a9572e70fffdb100deb63326167f32bbf63016ce49c0017495dabcb95b44168",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-subagent/lib/types/internal.js",
+        "sha256": "e08b14221f417b73024e62e0466ec745ab9b45ecbcdca0c302ccc800ddadca6d",
+        "inventorySha256": "e08b14221f417b73024e62e0466ec745ab9b45ecbcdca0c302ccc800ddadca6d",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-subagent/lib/typert.host.js",
+        "sha256": "58e34812ae72879e792ab3df02bc934a1b493a81f753a707e20704ae7f03fb45",
+        "inventorySha256": "58e34812ae72879e792ab3df02bc934a1b493a81f753a707e20704ae7f03fb45",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-subagent/README.md",
+        "sha256": "ac080c1b7b9224a5b86f43fceee9384f0e86daea73bfe62811891b62608e6d2f",
+        "inventorySha256": "ac080c1b7b9224a5b86f43fceee9384f0e86daea73bfe62811891b62608e6d2f",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-subagent-spawn-in-process/lib/index.js",
+        "sha256": "249df2c7bdc046c1dd7149acbb40e604eabcba28a7e07ffa4226c2a03f0a3aaa",
+        "inventorySha256": "249df2c7bdc046c1dd7149acbb40e604eabcba28a7e07ffa4226c2a03f0a3aaa",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-tool-subagent/lib/index.js",
+        "sha256": "de7b10aaf52b1b1616d13a831a9ece1f820b8a6302fe94667f31b6d641b2f46e",
+        "inventorySha256": "de7b10aaf52b1b1616d13a831a9ece1f820b8a6302fe94667f31b6d641b2f46e",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-tool-subagent-control/lib/index.js",
+        "sha256": "3f64ef2df3bfc7d7f5e31607949246dc64c32bf4179b74188bc4b764e081af38",
+        "inventorySha256": "3f64ef2df3bfc7d7f5e31607949246dc64c32bf4179b74188bc4b764e081af38",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-tool-subagent-control/README.md",
+        "sha256": "12df264ec370697467a837077d52e2dfd6cd05956e2af1ebe1033e2b6a842bd3",
+        "inventorySha256": "12df264ec370697467a837077d52e2dfd6cd05956e2af1ebe1033e2b6a842bd3",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js",
+        "sha256": "cf57e3ecd487ac5c2553455aaa5cef2c6fb41e6bd61be5aa455675d1d7193033",
+        "inventorySha256": "cf57e3ecd487ac5c2553455aaa5cef2c6fb41e6bd61be5aa455675d1d7193033",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-agent/lib/index.js",
+        "sha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b",
+        "inventorySha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-tools/lib/index.js",
+        "sha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
+        "inventorySha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-llm/lib/types/message.js",
+        "sha256": "c87812f77a2afd284f271af071575edcadfde3daa7b6554d77b96810ce4688e0",
+        "inventorySha256": "c87812f77a2afd284f271af071575edcadfde3daa7b6554d77b96810ce4688e0",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-llm/lib/typert.host.js",
+        "sha256": "22d86e67e013714b9b70eb119f85b825d73a52e30d6ebd5d7894dc4a2965076a",
+        "inventorySha256": "22d86e67e013714b9b70eb119f85b825d73a52e30d6ebd5d7894dc4a2965076a",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-session/lib/index.js",
+        "sha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+        "inventorySha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-session/lib/types/index.js",
+        "sha256": "59cced30c7ee65813c62f4858c2fc15c8c636df96507b60c15543468178b72f2",
+        "inventorySha256": "59cced30c7ee65813c62f4858c2fc15c8c636df96507b60c15543468178b72f2",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-api-session-controller/lib/index.js",
+        "sha256": "a9801acb577b03053c5d5a3191ff555c5f1d791d0acddec113bea4511e33b386",
+        "inventorySha256": "a9801acb577b03053c5d5a3191ff555c5f1d791d0acddec113bea4511e33b386",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-session-format-v3-to-v4/lib/index.js",
+        "sha256": "a6b974d110572bd0b16aa7ab09a30d9061944e8dc9f811e8c4a35e4891f83f12",
+        "inventorySha256": "a6b974d110572bd0b16aa7ab09a30d9061944e8dc9f811e8c4a35e4891f83f12",
+        "matchesInventory": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-session-persistence-jsonl/lib/index.js",
+        "sha256": "973dd78679b2661d6f492343bc22b124ae958aa597d3b36c698a2c650f909984",
+        "inventorySha256": "973dd78679b2661d6f492343bc22b124ae958aa597d3b36c698a2c650f909984",
+        "matchesInventory": true
+      }
+    ]
+  },
+  "verification": {
+    "node": "v24.21.0",
+    "fullSuite": {
+      "passed": 694,
+      "failed": 0,
+      "skipped": 0
+    },
+    "captureUnitTests": 40,
+    "sessionsUnitTests": 30,
+    "sessionsOfficialTests": 11,
+    "newOfficialScenarios": [
+      "resident send_message -> accepted child message ID -> parent plugin record -> JSONL -> latest prepare -> rewind/fork/archive/cancel -> new branch JSONL",
+      "cold-resumed send_message -> same stable child identity -> one catalog -> recorded input -> latest prepare"
+    ],
+    "officialFixtureBoundary": "Real ToolRuntime, subagent runtime, session storage and controller; parent turn/assistant/tool-call/result envelopes are manually constructed synthetic events using official message constructors. No model request.",
+    "ui": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "actualAssets": ["web/app.js", "web/rewind.js", "web/styles.css"],
+      "syntheticBoundaries": ["parent iframe draft bridge", "session list and rewind response"],
+      "requestReadback": {
+        "id": "synthetic-child",
+        "mode": "turn",
+        "childOrigin": "latest",
+        "draftBridgeReady": true,
+        "draftBridgeSupports": {
+          "attachments": false
+        }
+      },
+      "defaultOrigin": "creation",
+      "selectedOrigin": "latest",
+      "resultMapping": "recorded-input",
+      "selectorsDisabledAfterFork": true,
+      "navigationConfirmed": false,
+      "screenshotSha256": "f8b6dd34293719c47641512c5c0f2c0e21d42ba3b6edda96c093a07478d462f5"
+    },
+    "baselineRows": 117,
+    "baselineExpectationColumnsPreserved": 5
+  },
+  "notVerified": [
+    "real desktop installation/composer/navigation",
+    "unrecorded historical child inputs",
+    "direct API input origin",
+    "PTC internal calls",
+    "external task-state restoration"
+  ],
+  "realProfileChanged": false,
+  "desktopInstalled": false,
+  "messageBodyStoredInOriginRecord": false,
+  "originRecordEntersModelMessages": false
+}
