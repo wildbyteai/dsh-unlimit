@@ -1129,22 +1129,57 @@ test(
 );
 
 test(
-  "PTC direct-tool restrictions are retained when a rewind requires todo restoration",
+  "PTC todo rewind rejects before creating a branch or changing the source",
   optionalHost,
   async (t) => {
     const f = await completedTodoStep(t, { toolMode: "ptc" });
+    const before = f.original.session.snapshotEvents();
+    const fork = t.mock.method(f.ctx.sessionController, "fork");
+    const create = t.mock.method(f.ctx.sessionController, "create");
     let executions = 0;
     f.ctx.on("tools/pre-execute", () => {
       executions++;
     });
+    await assert.rejects(f.rewind(), { code: "TODO_RESET_UNSUPPORTED" });
+    assert.equal(fork.mock.callCount(), 0);
+    assert.equal(create.mock.callCount(), 0);
+    assert.equal(executions, 0);
+    assert.deepEqual(f.original.session.snapshotEvents(), before);
+    assert.deepEqual(f.todos(f.original.id), f.later);
+    assert.deepEqual(f.ctx.workspaceRegistry.archivedSessionIds, []);
+  },
+);
+
+test(
+  "a durable but malformed branch journal cannot confirm todo restoration or archive the source",
+  optionalHost,
+  async (t) => {
+    const f = await completedTodoStep(t);
+    const before = f.original.session.snapshotEvents();
+    f.ctx.on("tools/post-execute", (exec) => {
+      if (exec.name !== "todo_write") return;
+      // Fault injection: an idle fork has no open turn. The writer accepts
+      // this event, but the official persistence reader must reject it.
+      exec.agent.session.append("step/start", { turn: 2, step: 1 });
+    });
+    let childId;
     await assert.rejects(f.rewind(), (error) => {
+      assert.equal(error.code, "REWIND_PARTIAL");
       assert.equal(error.partial.failedAt, "reset-todos");
-      assert.equal(error.partial.causeCode, "TODO_RESET_UNSUPPORTED");
+      assert.equal(error.partial.todoReset.verified, false);
+      assert.equal(error.partial.todoReset.resetCount, 0);
       assert.equal(error.partial.archived, false);
-      assert.deepEqual(f.todos(error.partial.newSessionId), f.before);
+      childId = error.partial.newSessionId;
+      assert.deepEqual(f.todos(childId), f.expected, "An in-memory write is not durable validity");
+      assert.match(error.message, /stored log is corrupt/);
       return true;
     });
-    assert.equal(executions, 0);
+    await assert.rejects(
+      f.ctx.sessionPersistence.open(childId, "read"),
+      /step\/start does not match the open turn and next step/,
+    );
+    assert.deepEqual(f.original.session.snapshotEvents(), before);
+    assert.deepEqual(f.ctx.workspaceRegistry.archivedSessionIds, []);
   },
 );
 

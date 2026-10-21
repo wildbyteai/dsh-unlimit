@@ -366,7 +366,7 @@ export class DesktopSessions {
     }
     const workspace = this.store.dispatch("workspaces.forSession", { sessionId: targetId }).item;
     const todoReset = planTodoReset(events, atSeq);
-    if (todoReset) this.todos.check();
+    if (todoReset) this.todos.check(this.services().agents.get(targetId));
     const attachmentBatch = removedHuman
       ? this.attachmentBatches.create(targetId, removedHuman, content)
       : undefined;

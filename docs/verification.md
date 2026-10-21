@@ -626,3 +626,17 @@ node --test tests/parity-baseline.test.mjs tests/package-contents.test.mjs
 最终 bundled Node **v24.21.0**、指定 **0.2.1-rc.2** 运行时和固定官方归档的完整隔离回归 **987 通过、0 失败、0 跳过**，本地日志 `artifacts/prompt-recovery-final.log`；语法 **182/182**，有限来源与分层检查通过。离线构建和打包完成，**75 个文件、1,029,355 字节解包内容**逐项与工作树一致；SHA-256 `334de78c3888e0a96d0b2071ce4d28e4950c5c9f6fbc4aca45b00099c2d41d81`。
 
 原 117 项验收前五列、来源说明、NOTICE、UNLICENSED 与第三方归属保留，仅更新 DESK-REVERT 的实际状态。旧版无标记历史、插件完全卸载后的冷恢复、真实应用重启/HMR及桌面嵌入仍不宣称通过；所有模型传输和会话为合成数据。本批没有 UI 改动、真实安装、重载、profile 读写或真实模型调用。
+
+## 待办回退的提前拒绝与日志完整性（2026-10-21）
+
+从 `e5c09759a04fce642aad04988b33e83b40cc9f94` 继续，本批没有补成 PTC 待办恢复。此前尝试通过完整 PTC 预设的 `run_code` 调用嵌套 `todo_write`，实际后端写入成功，但官方 reader 在重新读取分支时拒绝：`tool/ptc-dispatch-start is outside an open turn`。该尝试已撤回；本地失败记录为 `artifacts/ptc-rewind-backend.log`，实验脚本副本为 `artifacts/ptc-rewind-attempt.mjs`，均不发布。公开接口核对及限制见 [会话合同](session-attachments-contract.md#原生-todo-语义)。不能把前一版测试通过或工具返回成功写成 PTC 功能已完成。
+
+实际交付两项修复：已加载源 Agent 不支持直接恢复时，在创建分支前明确返回 `TODO_RESET_UNSUPPORTED`；支持的普通模式写入后，必须由官方 reader 完整读取合法日志，并核对持久事件、内存事件和任务投影，才允许报告恢复完成、归档原会话。冷源或分支能力不同仍可在创建后失败，此时保留准确的部分结果。
+
+[会话专项](../tests/sessions-host.test.mjs)与选择算法共 **21 项通过**，新增故障注入证明“flush 成功、内存待办正确、保存日志非法”不会被认作成功，不归档源会话。源 PTC 拒绝也确认零 create/fork/tool execution、原事件和待办不变。写入后策略拒绝但日志合法的已有场景仍报告 `verified:true` 与整体 partial，两者没有混淆。
+
+另外显式执行 [完整 PTC 预设回归](../scripts/probe-ptc-rewind.mjs)，**1 项通过**，结果为 `unsupported-as-expected`。官方预设、schema 和 reader 实际加载，`run_code` 可见且嵌套 SDK 包含待办工具；调用本项目 rewind 后，在建分支前拒绝，零新会话、归档、工具调用、模型请求和后端子进程。原会话物理 JSONL 字节及完整官方读回前后相同，隔离目录清理通过。[结构化记录](evidence/ptc-rewind-acceptance.json)明确标记未执行实际 PTC 后端，不复用此前实验的成功断言。夹具只增加经发行清单校验的 tool-todo 与 tools 包，未放宽摘要门或宿主策略。
+
+最终 bundled Node **v24.21.0**、指定 **0.2.1-rc.2** 运行时与固定归档的完整隔离回归 **988 通过、0 失败、0 跳过**，日志 `artifacts/rewind-validity-full.log`。语法 **183/183**、有限来源与分层检查通过；117 项原验收前五列未变。进度首页增加面向使用场景的简表，来源说明、NOTICE、UNLICENSED 和第三方归属保持。本批没有 UI 代码变化，未重复页面验收；没有安装、重载、读写真实 DSH profile 或模型联网。完整 1:1 和真实桌面验收仍未完成。
+
+格式、离线构建及打包通过；包内 **75 个文件、1,030,157 字节解包内容**逐文件与工作树一致，SHA-256 为 `92ee376e7e87343117d425c47ea07f7e6c0a6a54c68eb6f9dc37f435e5cd8b01`。打包后原验收基线和实际发布文件/链接检查 **3 项通过**，新增显式 PTC 证据的 8 个源码摘要与当前文件一致。

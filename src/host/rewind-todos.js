@@ -70,7 +70,7 @@ export class RewindTodos {
     this.host = host;
   }
 
-  check() {
+  check(agent) {
     if (this.#closed) fail("TODO_RESET_UNSUPPORTED", "待办恢复接口已关闭");
     if (this.host?.supported !== true)
       fail("TODO_RESET_UNSUPPORTED", "当前宿主尚未验证待办恢复接口");
@@ -80,22 +80,26 @@ export class RewindTodos {
     const tools = service(this.ctx, "tools");
     const projections = service(this.ctx, "sessionProjections");
     const sessions = service(this.ctx, "sessions");
+    const persistence = service(this.ctx, "sessionPersistence");
     if (
       typeof tools?.execute !== "function" ||
       typeof tools?.resolveExecution !== "function" ||
       typeof projections?.snapshot !== "function" ||
       typeof sessions?.flush !== "function" ||
+      typeof persistence?.open !== "function" ||
       typeof this.ctx.on !== "function"
     )
       fail("TODO_RESET_UNSUPPORTED", "当前未提供完整的官方待办写入与读回接口");
-    return { tools, projections, sessions };
+    // PTC dispatches require an open host turn. A fork is idle, so run_code
+    // would leave an invalid journal even when the nested todo write succeeds.
+    if (agent && !tools.resolveExecution("todo_write", agent, false))
+      fail("TODO_RESET_UNSUPPORTED", "当前模式无法在空闲分支恢复待办，未更改原会话");
+    return { tools, projections, sessions, persistence };
   }
 
   async apply(agent, plan, progress) {
-    const { tools, projections, sessions } = this.check();
+    const { tools, projections, sessions, persistence } = this.check(agent);
     const snapshot = () => projections.snapshot(agent.session, ["todos"]).values.todos;
-    if (!tools.resolveExecution("todo_write", agent, false))
-      fail("TODO_RESET_UNSUPPORTED", "新分支当前模式不能直接调用待办工具，未归档原会话");
     if (!equal(snapshot(), plan.before))
       fail("TODO_RESET_CONFLICT", "新分支待办已发生变化，未覆盖或归档原会话");
     const abort = new AbortController();
@@ -125,11 +129,20 @@ export class RewindTodos {
       // A post-execution policy may reject after the official write committed.
       // Record that fact even when the overall rewind remains incomplete.
       const durable = await sessions.flush(agent.session);
+      let recorded;
+      if (durable === true) {
+        const reader = await persistence.open(agent.id, "read");
+        try {
+          recorded = (await reader.read()).events;
+        } finally {
+          await reader.close();
+        }
+      }
       progress.verified =
         durable === true &&
         equal(snapshot(), plan.todos) &&
-        agent.session
-          .snapshotEvents()
+        equal(recorded, agent.session.snapshotEvents()) &&
+        recorded
           .slice(start)
           .some((event) => event.type === "todo/write" && equal(event.data?.todos, plan.todos));
       progress.resetCount = progress.verified ? plan.plannedCount : 0;

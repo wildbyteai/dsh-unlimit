@@ -67,9 +67,11 @@ bridge 仅接受精确 `event.origin === location.origin`、`event.source === �
 
 `src/host/rewind-todos.js` 只恢复一种可核验的任务关系：任务在保留前缀投影中为 `in_progress`，在切点之后、下一次 `turn/start` 之前的后缀 todo 快照中始终存在，且最后状态为 `completed`，才在新分支改为 `pending`。匹配使用精确 `content`；重命名、删除后重建都不作关联。保留列表的其他任务、顺序与内容不变，仅在被切除后缀新增的任务不带回。无待恢复任务时沿用原生投影，不调用写入工具。官方清单只有 `content/status`，不推断跨轮或外部任务身份。
 
-有实际恢复项时，宿主先完成新分支的取消与队列清理，再通过官方 `tools.execute({name:'todo_write', arguments:{todos}, agent:新分支Agent, callId, signal})` 写入完整列表，保留工具可见性、执行前策略、审批和执行后策略。插件不改原会话事件，不伪造模型消息或 `tool/call`、`tool/result`。写入后调用官方 `sessions.flush`，同时核对 `todos` 投影和新追加的 `todo/write` 事件；三者均确认后才报告 `verified:true`，然后继续原会话归档。
+有实际恢复项时，宿主先完成新分支的取消与队列清理，再通过官方 `tools.execute({name:'todo_write', arguments:{todos}, agent:新分支Agent, callId, signal})` 写入完整列表，保留工具可见性、执行前策略、审批和执行后策略。插件不改原会话事件，不伪造模型消息或 `tool/call`、`tool/result`。写入后调用官方 `sessions.flush`，再用 `sessionPersistence.open/read` 完整读取日志；官方格式检查通过、持久事件与当前内存事件完全一致、`todos` 投影及新增 `todo/write` 均符合计划，才报告 `verified:true`，然后继续原会话归档。仅写入和 flush 成功不能证明会话可重新打开；读取失败则保留新分支、报告未确认，不归档原会话。
 
-回执仅在有实际恢复项时包含 `todoReset:{requested:true, plannedCount, verified, resetCount}`。`resetCount` 仅在读回确认时为计划数量，否则为 0。PTC 等当前模式不允许直接调用 `todo_write` 时，不绕过限制；新分支已经创建，原会话尚未归档，以 `REWIND_PARTIAL` 和 `failedAt:'reset-todos'` 披露。执行后策略也可能在写入已经落盘后拒绝，此时可同时出现 `verified:true` 和整体回退未完成，必须分别展示。等待工具策略期间若新分支接纳其他输入，或 adapter 关闭，该次恢复信号会取消；后续读回仍报告实际已发生的结果。
+回执仅在有实际恢复项时包含 `todoReset:{requested:true, plannedCount, verified, resetCount}`。`resetCount` 仅在读回确认时为计划数量，否则为 0。源 Agent 已加载且当前模式不允许直接调用 `todo_write` 时，在创建分支前返回 `TODO_RESET_UNSUPPORTED`，不改变源会话。源 Agent 未加载或新分支能力与源会话不同的情况下，仍在新分支写入前再检查；此时可能已创建分支，以 `REWIND_PARTIAL` 和 `failedAt:'reset-todos'` 披露，原会话不归档。执行后策略也可能在写入已经落盘后拒绝，此时可同时出现 `verified:true` 和整体回退未完成，必须分别展示。等待工具策略期间若新分支接纳其他输入，或 adapter 关闭，该次恢复信号会取消；后续读回仍报告实际已发生的结果。
+
+PTC 不能以空闲分支中的 `run_code` 替代上述调用：实际隔离探针虽然写入成功，但官方 reader 报 `tool/ptc-dispatch-start is outside an open turn`。0.2.1-rc.2 的公开 `tools.execute` 不创建 turn，`runMaintenance` 仅切换阶段，官方 fork 已闭合回合；当前未找到可用的独立工具回合入口。本实现没有保留该尝试，没有伪造用户输入或日志，也没有将恢复延期到下一次用户发送并声称立即完成。完整 PTC 预设的提前拒绝证据见 [ptc-rewind-acceptance.json](evidence/ptc-rewind-acceptance.json)。
 
 下一轮仍由原生 `turn/start` 清空 todo 投影，不注册重应用机制。以上是当前限定的会话任务恢复能力，不代表完整 SESSION-VIEW、真实桌面切换或任意外部任务系统已经验收。新增合成场景见 `tests/rewind-todos.test.mjs`；官方隔离场景见 `tests/sessions-host.test.mjs` 的限定恢复、持久读回、前后策略拒绝、PTC 限制、新输入及关闭取消场景；界面回执见 `tests/rewind-todo-ui.test.mjs`。具体执行结果以对应修订的验证记录为准。
 
