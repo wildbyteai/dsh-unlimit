@@ -1,5 +1,6 @@
 import { rewindSummary, rewindNotice } from "./rewind.js";
 import { networkScopeFlow, networkScopePanel, networkScopePreview } from "./network-scope.js";
+import { DataUpdates } from "./data-updates.js";
 import { MemoryDrafts } from "./drafts.js";
 import { admissionPage } from "./admission.js";
 import { environmentSettings } from "./environment-settings.js";
@@ -31,7 +32,6 @@ const state = {
   recordKind: "credential",
   query: "",
   request: 0,
-  report: "",
   graph: null,
   bridgeReady: false,
   bridgeSupports: { attachments: false },
@@ -52,6 +52,20 @@ const state = {
   uninstallOutcome: null,
 };
 const drafts = new MemoryDrafts();
+const dataUpdates = new DataUpdates();
+const dataPages = new Set([
+  "overview",
+  "workspaces",
+  "assets",
+  "findings",
+  "evidence",
+  "files",
+  "graph",
+  "progress",
+  "knowledge",
+  "roles",
+  "reports",
+]);
 let mountedDrafts = [];
 let disposePage;
 let editorDraft = null;
@@ -736,7 +750,10 @@ function skeleton() {
 }
 function shell() {
   $("#app").innerHTML =
-    `<div class="shell"><aside class="sidebar"><div class="brand"><span class="brandmark">U</span><div><strong>UNLIMIT</strong><small>DESKTOP WORKSPACE</small></div></div><nav aria-label="主导航">${pages.map((p, i) => `${groups[i] ? `<div class="navgroup">${groups[i]}</div>` : ""}<button class="navitem ${p[0] === state.page ? "active" : ""}" data-page="${p[0]}"><span class="navicon" aria-hidden="true">${p[1]}</span>${p[2]}</button>`).join("")}</nav><div class="sidebarfooter"><div class="connection"><i class="dot off" id="connection-dot"></i><span id="connection-label">连接中</span></div><div id="version-label">独立桌面工作台</div></div></aside><main class="main"><header class="topbar"><div class="breadcrumb">DSH UNLIMIT <span style="margin:0 10px">/</span> <b id="crumb">工作台概览</b></div><div class="topright"><span class="tag gray" id="instance-label">本地实例</span><span>当前项目</span><select id="workspace-select" aria-label="当前演练项目"><option value="">尚未激活项目</option></select><span class="avatar" title="本地工作台">L</span></div></header><div class="content" id="content">${skeleton()}</div></main></div>`;
+    `<div class="shell"><aside class="sidebar"><div class="brand"><span class="brandmark">U</span><div><strong>UNLIMIT</strong><small>DESKTOP WORKSPACE</small></div></div><nav aria-label="主导航">${pages.map((p, i) => `${groups[i] ? `<div class="navgroup">${groups[i]}</div>` : ""}<button class="navitem ${p[0] === state.page ? "active" : ""}" data-page="${p[0]}"><span class="navicon" aria-hidden="true">${p[1]}</span>${p[2]}<span class="update-badge" data-updates="${p[0]}" hidden>有更新</span></button>`).join("")}</nav><div class="sidebarfooter"><div class="connection"><i class="dot off" id="connection-dot"></i><span id="connection-label">连接中</span></div><div id="version-label">独立桌面工作台</div></div></aside><main class="main"><header class="topbar"><div class="breadcrumb">DSH UNLIMIT <span style="margin:0 10px">/</span> <b id="crumb">工作台概览</b></div><div class="topright"><span class="tag gray" id="instance-label">本地实例</span><span>当前项目</span><select id="workspace-select" aria-label="当前演练项目"><option value="">尚未激活项目</option></select><button id="refresh-data" class="small" title="重新读取项目与当前页数据；保留本面板草稿">↻ 刷新数据</button></div></header><div class="content" id="content">${skeleton()}</div></main></div>`;
+  $("#refresh-data").onclick = () => {
+    if (canLeaveEditor()) render();
+  };
   $$(".navitem").forEach((b) => b.addEventListener("click", () => navigate(b.dataset.page)));
   $("#workspace-select").addEventListener("change", (e) =>
     run(e.target, async () => {
@@ -745,29 +762,29 @@ function shell() {
         e.target.value = state.workspaceId;
         return;
       }
-      await api("workspaces.activate", { id: e.target.value });
-      state.workspaceId = e.target.value;
-      await refreshProjects();
+      const id = e.target.value;
+      ++state.request; // Abandon old page reads before activating another project.
+      await api("workspaces.activate", { id });
       await render();
     }),
   );
 }
-async function refreshProjects() {
-  state.admission = await api("admission.status");
+async function refreshProjects(read = api) {
+  state.admission = await read("admission.status");
   if (!state.admission.accepted) {
     state.workspaces = [];
     state.workspaceId = "";
     $("#workspace-select").innerHTML = '<option value="">演练入口待确认</option>';
     return;
   }
-  const data = await api("workspaces.list");
+  const data = await read("workspaces.list");
   state.workspaces = data.items || [];
   state.workspaceId = data.activeId || "";
   $("#workspace-select").innerHTML =
     `<option value="">尚未激活项目</option>${state.workspaces.map((w) => `<option value="${esc(w.id)}" ${w.id === state.workspaceId ? "selected" : ""}>${esc(w.name)}</option>`).join("")}`;
 }
-async function refreshStatus() {
-  state.status = await api("status");
+async function refreshStatus(read = api) {
+  state.status = await read("status");
   state.admission = state.status.admission;
   if (state.status.settings) state.settings = state.status.settings;
   $("#instance-label").textContent =
@@ -788,6 +805,34 @@ function navigate(page) {
   $("#crumb").textContent = descriptions[page][2];
   render();
 }
+function updateDataBadges() {
+  for (const badge of $$("[data-updates]"))
+    badge.hidden =
+      !state.admission?.accepted ||
+      !dataUpdates.hasUnread({
+        workspaceId: state.workspaceId || null,
+        page: badge.dataset.updates,
+      });
+  for (const button of $$("[data-kind], [data-progress-kind]")) {
+    const page = button.dataset.progressKind ? "progress" : "evidence";
+    const kind = button.dataset.progressKind || button.dataset.kind;
+    const unread = dataUpdates.hasUnread({ workspaceId: state.workspaceId || null, page, kind });
+    button.classList.toggle("has-update", unread);
+    button.title = unread ? "有尚未读取的更新" : "";
+  }
+}
+function dataContext() {
+  const context = { workspaceId: state.workspaceId || null, page: state.page };
+  if (context.page === "progress")
+    context.kind = ["stage", "score-point", "score-hit"].includes(state.recordKind)
+      ? state.recordKind
+      : "stage";
+  if (context.page === "evidence")
+    context.kind = ["stage", "score-point", "score-hit"].includes(state.recordKind)
+      ? "credential"
+      : state.recordKind;
+  return context;
+}
 async function render() {
   if (state.uninstallOutcome) {
     showUninstallOutcome();
@@ -801,39 +846,49 @@ async function render() {
   const serial = ++state.request;
   const content = $("#content");
   content.innerHTML = skeleton();
+  const read = async (...args) => {
+    if (serial !== state.request) throw new Error("页面已切换");
+    const value = await api(...args);
+    if (serial !== state.request) throw new Error("页面已切换");
+    return value;
+  };
+  read.assertCurrent = () => {
+    if (serial !== state.request) throw new Error("页面已切换");
+  };
+  let result;
   try {
-    let result;
-    const protectedPages = [
-      "workspaces",
-      "assets",
-      "findings",
-      "evidence",
-      "files",
-      "graph",
-      "progress",
-      "knowledge",
-      "roles",
-      "reports",
-    ];
-    if (protectedPages.includes(state.page)) state.admission = await api("admission.status");
-    if (protectedPages.includes(state.page) && !state.admission.accepted)
+    const tracked = dataPages.has(state.page);
+    if (tracked) await refreshProjects(read);
+    const context = dataContext();
+    const track = tracked && state.admission?.accepted;
+    const changes = async () => {
+      const snapshot = await read(
+        "workspaces.changes",
+        context.workspaceId ? { workspaceId: context.workspaceId } : {},
+      );
+      if (snapshot.workspaceId !== context.workspaceId)
+        throw new Error("当前项目已变化，请刷新数据");
+      return dataUpdates.observe(snapshot);
+    };
+    const before = track ? await changes() : null;
+    updateDataBadges();
+    if (tracked && state.page !== "overview" && !state.admission.accepted)
       result = await admissionPage({
         api,
         esc,
         panel,
         accepted: async () => {
-          await refreshProjects();
           await render();
         },
         later: () => navigate("control"),
       });
-    else if (schemas[state.page]) result = await collectionPage(state.page);
+    else if (schemas[state.page]) result = await collectionPage(state.page, read);
+    else if (state.page === "evidence") result = await evidencePage(context.kind, false, read);
     else
       result = await {
         overview: overviewPage,
         control: controlPage,
         skills: skillsPage,
-        evidence: evidencePage,
         graph: graphPage,
         files: filesPage,
         progress: progressPage,
@@ -842,13 +897,14 @@ async function render() {
         sessions: sessionsPage,
         environment: environmentPage,
         diagnostics: diagnosticsPage,
-      }[state.page]();
+      }[state.page](read);
+    if (track) await changes();
     if (serial !== state.request) {
       result.dispose?.();
       return;
     }
     content.innerHTML =
-      `<div id="draft-notice"></div>` +
+      `<div id="draft-notice"></div><div id="data-read-status" role="status"></div>` +
       result.html +
       `<div class="footerline"><span>DSH UNLIMIT · 本地工作台</span><span>数据保存在当前本地实例中</span></div>`;
     result.bind?.();
@@ -858,14 +914,25 @@ async function render() {
     const search = $("#search");
     if (search) mountedDrafts.push(bindMemoryDraft(search, draftScope("inline:search")));
     updateDraftNotice();
+    if (track) {
+      if (result.dataReadComplete !== false) dataUpdates.markRead(context, before);
+      const unread = dataUpdates.hasUnread(context);
+      const project = state.workspaces.find((w) => w.id === context.workspaceId);
+      $("#data-read-status").innerHTML =
+        `<div class="data-status"><span>${esc(project?.name || "尚未激活项目")} · ${esc(new Date().toLocaleTimeString())} 读取</span><span>${result.dataReadComplete === false ? "部分读取失败，更新提示保留" : unread ? "读取期间又有更新，请再次刷新" : "当前页已读取"} · 切页或点击“刷新数据”检查更新</span></div>`;
+    }
+    updateDataBadges();
   } catch (e) {
+    result?.dispose?.();
     if (serial !== state.request) return;
+    updateDataBadges();
     content.innerHTML =
       heading() +
       `<div class="error" role="alert">${esc(e.message)}</div><button id="retry">重新读取</button>`;
     $("#retry").onclick = render;
   }
 }
+
 function redactCell(value, key = "") {
   if (
     /pass(word|phrase)?|secret|token|cookie|authorization|private.?key|api.?key|credential/i.test(
@@ -1025,7 +1092,7 @@ function knowledgeEvidenceText(value) {
       .join("\n\n");
   return "";
 }
-async function collectionPage(name) {
+async function collectionPage(name, read = api) {
   const schema = schemas[name];
   const payload = schema.workspace ? workspacePayload() : {};
   const filters = state.knowledgeFilters;
@@ -1044,11 +1111,11 @@ async function collectionPage(name) {
       .filter(Boolean);
     if (filters.verified !== "") listPayload.verified = filters.verified === "true";
   }
-  const response = await api(`${name}.list`, listPayload);
+  const response = await read(`${name}.list`, listPayload);
   const items = response.items;
   let formFields = schema.fields;
   if (name === "findings") {
-    const assets = await api("assets.list", payload);
+    const assets = await read("assets.list", payload);
     formFields = formFields.map((f) =>
       f.name === "assetId"
         ? field("assetId", "关联资产", "select", {
@@ -1470,8 +1537,8 @@ async function collectionPage(name) {
     },
   };
 }
-async function overviewPage() {
-  await refreshStatus();
+async function overviewPage(read = api) {
+  await refreshStatus(read);
   if (!state.admission?.accepted)
     return {
       html:
@@ -1485,10 +1552,10 @@ async function overviewPage() {
     };
   const data = state.workspaceId
     ? await Promise.all([
-        api("assets.list", workspacePayload()),
-        api("findings.list", workspacePayload()),
-        api("records.list", { ...workspacePayload(), kind: "stage" }),
-        api("report.build", workspacePayload()),
+        read("assets.list", workspacePayload()),
+        read("findings.list", workspacePayload()),
+        read("records.list", { ...workspacePayload(), kind: "stage" }),
+        read("report.build", workspacePayload()),
       ])
     : [{ items: [] }, { items: [] }, { items: [] }, { stats: {} }];
   const [assets, findings, stages, report] = data;
@@ -2253,16 +2320,16 @@ async function skillsPage() {
     },
   };
 }
-async function evidencePage(kind = state.recordKind, embedded = false) {
+async function evidencePage(kind = state.recordKind, embedded = false, read = api) {
   if (!embedded && ["stage", "score-point", "score-hit"].includes(kind)) kind = "credential";
   const payload = { ...workspacePayload(), kind };
-  const data = await api("records.list", payload);
+  const data = await read("records.list", payload);
   const items = data.items.map((item) => ({ ...item.data, ...item }));
   const checkable = ["webshell", "tunnel"].includes(kind);
   const page = state.page;
   const serial = state.request;
   const checkStatus = checkable
-    ? await api("connectionChecks.status", { workspaceId: payload.workspaceId })
+    ? await read("connectionChecks.status", { workspaceId: payload.workspaceId })
     : null;
   let checkRoot;
   let checkDialog;
@@ -2332,7 +2399,7 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
     assets = [],
     stages = [];
   if (kind === "credential") {
-    assets = (await api("assets.list", workspacePayload())).items;
+    assets = (await read("assets.list", { workspaceId: payload.workspaceId })).items;
     fields = [
       ...fields,
       field("assetId", "关联本项目资产", "select", {
@@ -2343,11 +2410,11 @@ async function evidencePage(kind = state.recordKind, embedded = false) {
   }
   if (["score-point", "score-hit"].includes(kind)) {
     const requests = await Promise.all([
-      api("records.list", { ...workspacePayload(), kind: "stage" }),
+      read("records.list", { workspaceId: payload.workspaceId, kind: "stage" }),
       ...(kind === "score-hit"
         ? [
-            api("records.list", { ...workspacePayload(), kind: "score-point" }),
-            api("assets.list", workspacePayload()),
+            read("records.list", { workspaceId: payload.workspaceId, kind: "score-point" }),
+            read("assets.list", { workspaceId: payload.workspaceId }),
           ]
         : []),
     ]);
@@ -2728,12 +2795,13 @@ function checkedBitmapSource(item) {
   if (!magic || binary.length !== item.bytes) throw new Error("图片类型或长度不匹配，未生成预览");
   return `data:${item.mediaType};base64,${value}`;
 }
-async function filesPage() {
+async function filesPage(read = api) {
   const payload = workspacePayload();
   const outcomes = await Promise.allSettled([
-    api("files.list", payload),
-    api("files.backups", payload),
+    read("files.list", payload),
+    read("files.backups", payload),
   ]);
+  read.assertCurrent?.();
   const items = outcomes[0].status === "fulfilled" ? outcomes[0].value.items : [];
   const backups = state.fileBackups.get(payload.workspaceId) || new Map();
   if (outcomes[1].status === "fulfilled")
@@ -2746,6 +2814,7 @@ async function filesPage() {
     ? `<div class="${feedback.error ? "error" : "note"}" role="status" style="white-space:pre-wrap">${esc(feedback.message)}${feedback.paths?.length ? `\n${esc(feedback.paths.join(" · "))}` : ""}${feedback.backupIds?.length ? `\n已保留 ${feedback.backupIds.length} 个变更前版本，见下方“备份版本”。` : ""}</div>`
     : "";
   return {
+    dataReadComplete: failures.length === 0,
     html:
       heading(
         `${capabilityButton("files.import", "导入本地文件", 'id="import-files"')}${capabilityButton("files.write", "＋ 新建文本文件", 'id="create-file" class="primary"')}`,
@@ -2976,10 +3045,10 @@ async function filesPage() {
     },
   };
 }
-async function graphPage() {
+async function graphPage(read = api) {
   const payload = workspacePayload();
-  const data = await api("assets.graph", payload);
-  const timeline = await api("assets.timeline", payload);
+  const data = await read("assets.graph", payload);
+  const timeline = await read("assets.timeline", payload);
   const pathState = state.graphPaths.get(payload.workspaceId);
   const pathResult = (value) =>
     !value
@@ -3094,12 +3163,13 @@ async function graphPage() {
     },
   };
 }
-async function progressPage() {
+async function progressPage(read = api) {
   const kind = ["stage", "score-point", "score-hit"].includes(state.recordKind)
     ? state.recordKind
     : "stage";
-  const evidence = await evidencePage(kind, true);
-  const report = await api("report.build", workspacePayload());
+  const payload = workspacePayload();
+  const evidence = await evidencePage(kind, true, read);
+  const report = await read("report.build", payload);
   return {
     html:
       heading() +
@@ -3128,15 +3198,16 @@ async function progressPage() {
     },
   };
 }
-async function rolesPage() {
+async function rolesPage(read = api) {
   const payload = workspacePayload();
-  await refreshStatus();
+  await refreshStatus(read);
   const [rolesResult, flowResult, workflowResult, presetResult] = await Promise.allSettled([
-    api("roles.list", payload),
-    api("flow.status", payload),
-    api("workflow.status", payload),
-    api("workflow.presets", { operation: "status" }),
+    read("roles.list", payload),
+    read("flow.status", payload),
+    read("workflow.status", payload),
+    read("workflow.presets", { operation: "status" }),
   ]);
+  read.assertCurrent?.();
   if (rolesResult.status === "rejected") throw rolesResult.reason;
   const items = rolesResult.value.items;
   const roleNames = {
@@ -3228,6 +3299,9 @@ async function rolesPage() {
       }<p class="info">角色分配按项目与会话保存；活动槽位只在当前本地运行实例内保留。释放槽位不会停止或启动宿主会话。</p>`
     : `<div class="error" role="alert">本地槽位接口不可用：${esc(flowResult.reason.message)}</div><button id="refresh-flow" class="small">重新读取槽位状态</button>`;
   return {
+    dataReadComplete: [flowResult, workflowResult, presetResult].every(
+      (r) => r.status === "fulfilled",
+    ),
     html:
       heading('<button id="reset-roles" class="danger">重置角色提示词</button>') +
       panel("执行任务", workflowBody) +
@@ -3459,25 +3533,25 @@ function download(filename, content, type = "text/markdown;charset=utf-8") {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-async function reportsPage() {
-  const data = await api("report.build", workspacePayload());
-  state.report = data.markdown || "";
+async function reportsPage(read = api) {
+  const project = state.workspaces.find((w) => w.id === state.workspaceId);
+  const data = await read("report.build", workspacePayload());
+  const markdown = data.markdown || "";
   return {
     html:
       heading('<button id="download-report" class="primary">↓ 导出 Markdown</button>') +
       panel(
         "项目报告",
-        state.report
-          ? `<div class="report">${esc(state.report)}</div>`
+        markdown
+          ? `<div class="report">${esc(markdown)}</div>`
           : empty("报告内容为空", "记录资产、发现与证据后重新生成报告。"),
         "本地生成 · Markdown",
       ) +
       `<div class="note">导出文件可能包含敏感证据。保存到合适的本地目录，并按项目保密要求处理。</div>`,
     bind() {
-      $("#download-report").disabled = !state.report;
+      $("#download-report").disabled = !markdown;
       $("#download-report").onclick = () => {
-        const project = state.workspaces.find((w) => w.id === state.workspaceId);
-        download(`${(project?.name || "演练报告").replace(/[\\/:*?"<>|]/g, "_")}.md`, state.report);
+        download(`${(project?.name || "演练报告").replace(/[\\/:*?"<>|]/g, "_")}.md`, markdown);
         toast("已生成本地下载文件");
       };
     },

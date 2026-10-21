@@ -7,6 +7,7 @@ const ASSETS = new Map([
   ["/dsh-unlimit/ui/", ["index.html", "text/html; charset=utf-8"]],
   ["/dsh-unlimit/ui/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/dsh-unlimit/ui/app.js", ["app.js", "text/javascript; charset=utf-8"]],
+  ["/dsh-unlimit/ui/data-updates.js", ["data-updates.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/drafts.js", ["drafts.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/admission.js", ["admission.js", "text/javascript; charset=utf-8"]],
   [

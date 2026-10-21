@@ -542,12 +542,38 @@ export class WorkspaceFiles {
     }
     return { items };
   }
+  recordChange(workspaceId, partial) {
+    try {
+      this.store.touchFiles(workspaceId);
+    } catch {
+      // Files and SQLite have no shared transaction. Never report a successful
+      // write if its counter failed, or roll back already committed file data.
+      const error = new StoreError(
+        "RECOVERY_REQUIRED",
+        "Material files changed but their change counter could not be saved; inspect the files before retrying",
+      );
+      error.partial = {
+        workspaceId,
+        ...partial,
+        filesChanged: true,
+        changeTrackingFailed: true,
+      };
+      throw error;
+    }
+  }
   recoveryError(workspaceId, stagingPath, backups) {
     const error = new StoreError(
       "RECOVERY_REQUIRED",
       "Material operation could not restore every file; recover the preserved versions explicitly",
     );
-    error.partial = { workspaceId, stagingPath, backups };
+    error.partial = {
+      workspaceId,
+      stagingPath,
+      backups,
+      filesChanged: true,
+      changeTrackingFailed: false,
+    };
+    this.recordChange(workspaceId, error.partial);
     return error;
   }
   install(workspaceId, items) {
@@ -586,7 +612,8 @@ export class WorkspaceFiles {
       stagingPath = `${workspaceId}/${stageName}`;
     const stage = this.internal([workspaceId, stageName], true),
       changes = [];
-    let preserve = false;
+    let preserve = false,
+      committed = false;
     try {
       for (let index = 0; index < prepared.length; index++)
         writeFileSync(join(stage, String(index)), prepared[index].bytes, {
@@ -605,11 +632,7 @@ export class WorkspaceFiles {
         change.installed = true;
       }
       this.saveManifest(workspaceId, next);
-      return changes.map((file) => ({
-        workspaceId,
-        ...describe(file.path, file.bytes, file.metadata),
-        ...(file.backup ? { backupId: file.backup.backupId } : {}),
-      }));
+      committed = true;
     } catch (error) {
       const failures = [];
       for (const change of changes.reverse())
@@ -631,8 +654,23 @@ export class WorkspaceFiles {
       }
       throw error;
     } finally {
-      if (!preserve) rmSync(stage, { recursive: true, force: true });
+      try {
+        if (committed)
+          this.recordChange(workspaceId, {
+            stagingPath,
+            backups: changes
+              .filter((change) => change.backup)
+              .map((change) => ({ path: change.path, backupId: change.backup.backupId })),
+          });
+      } finally {
+        if (!preserve) rmSync(stage, { recursive: true, force: true });
+      }
     }
+    return changes.map((file) => ({
+      workspaceId,
+      ...describe(file.path, file.bytes, file.metadata),
+      ...(file.backup ? { backupId: file.backup.backupId } : {}),
+    }));
   }
   dispatch(action, payload = {}) {
     object(payload);
@@ -713,6 +751,7 @@ export class WorkspaceFiles {
         }
         throw error;
       }
+      this.recordChange(workspaceId, { backups: [{ path, backupId: backup.backupId }] });
       return { item: { ...item, deleted: true, backupId: backup.backupId } };
     }
     if (action === "files.preview") {

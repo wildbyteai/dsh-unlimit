@@ -852,6 +852,14 @@ test(
     assert.equal((await f.execute(a, "workspaces.bind", { id: workspaceA.id })).isError, false);
     assert.equal((await f.execute(b, "workspaces.bind", { id: workspaceB.id })).isError, false);
     await f.request({ action: "workspaces.activate", payload: { id: workspaceB.id } });
+    const changes = async (workspaceId) => {
+      const response = await f.request({ action: "workspaces.changes", payload: { workspaceId } });
+      assert.equal(response.status, 200, response.body);
+      assert.equal(response.headers["Cache-Control"], "no-store");
+      return response.json.data;
+    };
+    const beforeA = await changes(workspaceA.id);
+    const beforeB = await changes(workspaceB.id);
     const savedA = await f.execute(a, "assets.save", {
       name: "Synthetic asset A",
       address: "https://a.example.invalid",
@@ -866,6 +874,17 @@ test(
     });
     for (const result of [savedA, savedB, savedChild])
       assert.equal(result.isError, false, JSON.stringify(result));
+    const afterA = await changes(workspaceA.id);
+    const afterB = await changes(workspaceB.id);
+    assert.equal(afterA.workspace.assets, beforeA.workspace.assets + 2);
+    assert.equal(afterB.workspace.assets, beforeB.workspace.assets + 1);
+    assert.equal(afterA.workspaceId, workspaceA.id);
+    assert.equal(afterB.workspaceId, workspaceB.id);
+    assert.equal(afterA.workspace.findings, beforeA.workspace.findings);
+    assert.doesNotMatch(JSON.stringify(afterA), /Synthetic asset|example.invalid/);
+    const uiModule = await f.request({ method: "GET", url: "/dsh-unlimit/ui/data-updates.js" });
+    assert.equal(uiModule.status, 200);
+    assert.match(uiModule.body, /export class DataUpdates/);
     assert.equal(savedA.value.item.workspaceId, workspaceA.id);
     assert.equal(savedB.value.item.workspaceId, workspaceB.id);
     assert.equal(savedChild.value.item.workspaceId, workspaceA.id);

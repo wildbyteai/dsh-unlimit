@@ -163,6 +163,30 @@ export class WorkspaceStore {
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS entries_scope ON entries(domain, workspace, kind);
+      CREATE TABLE IF NOT EXISTS data_changes (
+        workspace TEXT NOT NULL, domain TEXT NOT NULL, kind TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        PRIMARY KEY (workspace, domain, kind)
+      );
+      CREATE TRIGGER IF NOT EXISTS entries_changes_insert AFTER INSERT ON entries BEGIN
+        INSERT INTO data_changes(workspace, domain, kind, revision)
+        VALUES (NEW.workspace, NEW.domain, NEW.kind, 1)
+        ON CONFLICT(workspace, domain, kind) DO UPDATE SET revision = revision + 1;
+      END;
+      CREATE TRIGGER IF NOT EXISTS entries_changes_update AFTER UPDATE ON entries BEGIN
+        INSERT INTO data_changes(workspace, domain, kind, revision)
+        VALUES (NEW.workspace, NEW.domain, NEW.kind, 1)
+        ON CONFLICT(workspace, domain, kind) DO UPDATE SET revision = revision + 1;
+        INSERT INTO data_changes(workspace, domain, kind, revision)
+        SELECT OLD.workspace, OLD.domain, OLD.kind, 1
+        WHERE OLD.workspace != NEW.workspace OR OLD.domain != NEW.domain OR OLD.kind != NEW.kind
+        ON CONFLICT(workspace, domain, kind) DO UPDATE SET revision = revision + 1;
+      END;
+      CREATE TRIGGER IF NOT EXISTS entries_changes_delete AFTER DELETE ON entries BEGIN
+        INSERT INTO data_changes(workspace, domain, kind, revision)
+        VALUES (OLD.workspace, OLD.domain, OLD.kind, 1)
+        ON CONFLICT(workspace, domain, kind) DO UPDATE SET revision = revision + 1;
+      END;
     `);
     this.db
       .prepare("INSERT OR IGNORE INTO metadata(key, value) VALUES (?, ?)")
@@ -182,6 +206,52 @@ export class WorkspaceStore {
         "INSERT INTO metadata(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
       )
       .run(key, JSON.stringify(value));
+  }
+  changes(payload) {
+    const selected =
+      payload.workspaceId === undefined ? this.meta("activeWorkspace") : payload.workspaceId;
+    const workspaceId =
+      payload.workspaceId === undefined && selected === null
+        ? null
+        : this.workspace({ workspaceId: selected });
+    const global = { workspaces: 0, knowledge: 0 };
+    const workspace = {
+      assets: 0,
+      findings: 0,
+      links: 0,
+      events: 0,
+      roles: 0,
+      files: 0,
+      records: Object.fromEntries(RECORD_KINDS.map((kind) => [kind, 0])),
+    };
+    const rows = this.db
+      .prepare(
+        "SELECT workspace, domain, kind, revision FROM data_changes WHERE workspace = '' OR workspace = ?",
+      )
+      .all(workspaceId ?? "");
+    for (const row of rows) {
+      if (row.workspace === "") {
+        if (row.kind === "" && Object.hasOwn(global, row.domain)) global[row.domain] = row.revision;
+      } else if (row.workspace === workspaceId) {
+        if (row.domain === "records" && Object.hasOwn(workspace.records, row.kind))
+          workspace.records[row.kind] = row.revision;
+        else if (
+          row.domain !== "records" &&
+          row.kind === "" &&
+          Object.hasOwn(workspace, row.domain)
+        )
+          workspace[row.domain] = row.revision;
+      }
+    }
+    return { workspaceId, global, workspace };
+  }
+  touchFiles(workspaceId) {
+    this.workspace({ workspaceId });
+    this.db
+      .prepare(
+        "INSERT INTO data_changes(workspace, domain, kind, revision) VALUES (?, 'files', '', 1) ON CONFLICT(workspace, domain, kind) DO UPDATE SET revision = revision + 1",
+      )
+      .run(workspaceId);
   }
   list(domain, workspace = "", kind = "") {
     return this.db
@@ -587,6 +657,8 @@ export class WorkspaceStore {
         return { activeId: null };
       case "workspaces.list":
         return { items: this.list("workspaces"), activeId: this.meta("activeWorkspace") };
+      case "workspaces.changes":
+        return this.changes(payload);
       case "workspaces.save": {
         const item = this.save("workspaces", payload, {
           name: string(payload.name, "name"),

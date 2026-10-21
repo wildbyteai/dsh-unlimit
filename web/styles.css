@@ -994,3 +994,36 @@ dialog::backdrop {
   margin-top: 3px;
   flex-shrink: 0;
 }
+
+.update-badge {
+  margin-left: auto;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 10px;
+  background: #e6f3ee;
+  color: #17634b;
+  white-space: nowrap;
+}
+.update-badge[hidden] {
+  display: none;
+}
+.data-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+.tabs .has-update::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #16815d;
+}
