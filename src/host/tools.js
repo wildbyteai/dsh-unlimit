@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { resolveOfficialPackage } from "./official-package.js";
 
 const DATA_ACTIONS = [
   "workspaces.list",
@@ -70,10 +68,9 @@ export function boundWorkspace(store, agent, agents) {
 }
 
 export async function installTools(ctx, controller, host) {
-  const require = createRequire(join(host.runtimeRoot, "package.json"));
-  const { defineTool } = await import(
-    pathToFileURL(require.resolve("@deepseek-ai/dsh-tools")).href
-  );
+  const resolved = await resolveOfficialPackage(host.runtimeRoot, "@deepseek-ai/dsh-tools");
+  if (!resolved.url) throw new Error(`官方工具接口不可用：${resolved.reason}`);
+  const { defineTool } = await import(resolved.url);
   const disposers = [];
   const output = {
     schema: { type: "json" },

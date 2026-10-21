@@ -1,5 +1,6 @@
+import { SUPPORTED_HOST } from "./desktop.js";
+
 const PACKAGE = "@deepseek-ai/dsh-permission-presets";
-const VERSION = "0.2.1-rc.2";
 // Official Cordis exports symbols.original; traceable service proxies are not stable identities.
 const ORIGINAL = Symbol.for("cordis.original");
 
@@ -18,7 +19,7 @@ function sameDescriptor(left, right) {
   );
 }
 function target(ctx, host) {
-  if (host?.supported !== true || host.version !== VERSION)
+  if (host?.supported !== true || host.version !== SUPPORTED_HOST)
     return { reason: "此宿主版本尚未通过新会话权限预设适配验收" };
   const presets = service(ctx, "permissionPresets");
   if (typeof presets?.catalog !== "function") return { reason: "缺少官方权限预设目录服务" };

@@ -117,27 +117,31 @@ export async function filePermissionsFixture(t, runtimeRoot, cache) {
     terminals: "@deepseek-ai/dsh-terminal",
     terminalTools: "@deepseek-ai/dsh-tool-terminal",
   };
+  const loaded = new Map();
+  const loadOfficial = async (name) => {
+    if (loaded.has(name)) return loaded.get(name);
+    const loadedPath = requireHost.resolve(name);
+    const archived = under(runtime.root, loadedPath);
+    const path = relative(archived ? runtime.root : installedRoot, loadedPath);
+    const digest = sha256(readFileSync(loadedPath));
+    assert.equal(digest, inventory.get(path), `${name} official entry hash`);
+    const result = await runtime.load(name);
+    entryEvidence.push({
+      name,
+      role: "executed-official-entry",
+      path,
+      sha256: digest,
+      inventorySha256: inventory.get(path),
+      matchesInventory: true,
+      source: archived ? "temporary-clean-runtime" : "inventory-verified-installed-dependency",
+      executed: true,
+    });
+    loaded.set(name, result);
+    return result;
+  };
   const api = Object.fromEntries(
     await Promise.all(
-      Object.entries(names).map(async ([key, name]) => {
-        const loadedPath = requireHost.resolve(name);
-        const archived = under(runtime.root, loadedPath);
-        const path = relative(archived ? runtime.root : installedRoot, loadedPath);
-        const digest = sha256(readFileSync(loadedPath));
-        assert.equal(digest, inventory.get(path), `${name} official entry hash`);
-        const result = await runtime.load(name);
-        entryEvidence.push({
-          name,
-          role: "executed-official-entry",
-          path,
-          sha256: digest,
-          inventorySha256: inventory.get(path),
-          matchesInventory: true,
-          source: archived ? "temporary-clean-runtime" : "inventory-verified-installed-dependency",
-          executed: true,
-        });
-        return [key, result];
-      }),
+      Object.entries(names).map(async ([key, name]) => [key, await loadOfficial(name)]),
     ),
   );
   // A /tmp sibling would be writable under workspace-write by design. Keep the
@@ -208,8 +212,9 @@ export async function filePermissionsFixture(t, runtimeRoot, cache) {
     ctx,
     {
       dispatch(action) {
-        assert.equal(action, "settings.get", "only runtime settings are needed by this fixture");
-        return { value: settings };
+        if (action === "settings.get") return { value: settings };
+        if (action === "rules.list") return { items: [], activeId: null };
+        assert.fail(`Unexpected fixture store action: ${action}`);
       },
     },
     runtime.host,
@@ -260,6 +265,8 @@ export async function filePermissionsFixture(t, runtimeRoot, cache) {
     adapter,
     settings,
     api,
+    loadOfficial,
+    mount,
     root,
     workspace,
     outside,

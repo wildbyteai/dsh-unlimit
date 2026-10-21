@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { resolveOfficialPackage } from "./official-package.js";
 
 /**
  * 0.2.1 assembles once per step, outside its retry loop. Refresh only a repeated
@@ -11,14 +9,15 @@ export function connectPromptRefresh(ctx, runtime) {
   const projections = new Map();
   let renderer;
   const loadRenderer = async () => {
-    renderer ??= import(
-      pathToFileURL(
-        createRequire(join(runtime.host.runtimeRoot, "package.json")).resolve(
-          "@deepseek-ai/dsh-system-prompt",
-        ),
-      ).href
-    );
-    return (await renderer).renderPrompt;
+    if (!renderer) {
+      const resolved = await resolveOfficialPackage(
+        runtime.host.runtimeRoot,
+        "@deepseek-ai/dsh-system-prompt",
+      );
+      if (!resolved.url) throw new Error(`官方系统提示渲染接口不可用：${resolved.reason}`);
+      renderer = (await import(resolved.url)).renderPrompt;
+    }
+    return renderer;
   };
   const detach = (agent) => {
     const entry = projections.get(agent);

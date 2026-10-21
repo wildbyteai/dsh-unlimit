@@ -7,3 +7,5 @@
 运行时依赖使用者自行安装的 DeepSeek Harness。宿主、Node.js 和使用者另行安装的工具各自保有原许可证和声明；它们不随本项目的安装包分发。本项目不代表 DeepSeek 官方。
 
 本地国家查询支持使用者导入 DB-IP IP to Country Lite 格式，解析和查询实现由本项目编写，安装包不包含该供应方代码或数据库。若使用其数据，应保留 [DB-IP](https://db-ip.com) 的 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 归属；页面和数据库元数据已提供相应链接。测试与截图中的国家记录为原创合成数据，不代表该供应方的实际分类或来源核验。
+
+开发来源、当前检查能够证明的事项和未覆盖部分见 [来源记录](docs/provenance.md)。

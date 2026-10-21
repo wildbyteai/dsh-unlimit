@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { resolveOfficialPackage } from "./official-package.js";
 import { DEFAULT_SETTINGS, fail, object, string } from "../core/validation.js";
 
 const SOURCE = "dsh-unlimit/continuation";
@@ -87,16 +85,9 @@ export class Continuation {
     )
       return { reason: "缺少官方活动代理目录或事件接口" };
     if (!this.host.runtimeRoot) return { reason: "未提供官方运行时，不能加载消息构造接口" };
-    try {
-      return {
-        agents,
-        path: createRequire(join(this.host.runtimeRoot, "package.json")).resolve(
-          "@deepseek-ai/dsh-llm",
-        ),
-      };
-    } catch {
-      return { reason: "官方消息构造模块不可用" };
-    }
+    const resolved = resolveOfficialPackage(this.host.runtimeRoot, "@deepseek-ai/dsh-llm");
+    if (!resolved.url) return { reason: `官方消息构造模块不可用：${resolved.reason}` };
+    return { agents, url: resolved.url };
   }
 
   capabilities() {
@@ -196,7 +187,7 @@ export class Continuation {
     if (support.reason) fail("UNSUPPORTED", support.reason);
     const generation = this.#generation;
     const loading = (async () => {
-      const { createUserMessage } = await import(pathToFileURL(support.path).href);
+      const { createUserMessage } = await import(support.url);
       if (typeof createUserMessage !== "function") fail("UNSUPPORTED", "官方消息构造接口不兼容");
       if (generation !== this.#generation) fail("CANCELLED", "继续模块加载已撤销");
       this.#createMessage = createUserMessage;

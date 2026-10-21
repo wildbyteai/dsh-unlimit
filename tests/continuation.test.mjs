@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Continuation } from "../src/host/continuation.js";
+import { SUPPORTED_HOST } from "../src/host/desktop.js";
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const code = (expected) => (error) => error.code === expected;
@@ -25,10 +26,20 @@ function fixture(t) {
     JSON.stringify({ type: "module", main: "index.js" }),
   );
   // Explicit synthetic construction boundary; official execution is tested separately.
-  writeFileSync(
-    join(moduleRoot, "index.js"),
-    'import {randomUUID} from "node:crypto"; export const createUserMessage = input => Object.freeze({...input,role:"user",id:randomUUID()});',
-  );
+  const moduleSource =
+    'import {randomUUID} from "node:crypto"; export const createUserMessage = input => Object.freeze({...input,role:"user",id:randomUUID()});';
+  writeFileSync(join(moduleRoot, "index.js"), moduleSource);
+  const manifestPath = join(root, "desktop-runtime.json");
+  const manifest = {
+    release: { version: SUPPORTED_HOST },
+    files: [
+      {
+        path: "node_modules/@deepseek-ai/dsh-llm/index.js",
+        sha256: createHash("sha256").update(moduleSource).digest("hex"),
+      },
+    ],
+  };
+  writeFileSync(manifestPath, JSON.stringify(manifest));
   const value = {
     enabled: true,
     autoContinue: false,
@@ -119,7 +130,7 @@ function fixture(t) {
     continuation.revert();
     rmSync(root, { recursive: true, force: true });
   });
-  return { continuation, value, ctx, listeners, agents, emit, createAgent };
+  return { continuation, value, ctx, listeners, agents, emit, createAgent, manifestPath, manifest };
 }
 
 test("manual continuation is explicit, truncated-only and plugin-attributed rather than a forged human input", async (t) => {
@@ -282,4 +293,38 @@ test("revert restores exact cancel ownership, preserves later replacements and r
   );
   assert.equal(agent.cancel, external);
   assert.ok([...f.listeners.values()].every((entries) => entries.size === 0));
+});
+
+test("revert during module loading cancels installation and permits a fresh apply", async (t) => {
+  const f = fixture(t),
+    agent = f.createAgent();
+  const before = Object.getOwnPropertyDescriptor(agent, "cancel");
+  const loading = f.continuation.apply();
+  f.continuation.revert();
+  await assert.rejects(loading, code("CANCELLED"));
+  assert.deepEqual(Object.getOwnPropertyDescriptor(agent, "cancel"), before);
+  assert.ok([...f.listeners.values()].every((entries) => entries.size === 0));
+  await f.continuation.apply();
+  assert.notEqual(agent.cancel, before.value);
+  agent.finish();
+  assert.equal(f.continuation.status({ sessionId: "root" }).manualAvailable, true);
+});
+
+test("invalid inventory leaves no hooks and a repaired inventory can be applied", async (t) => {
+  const f = fixture(t),
+    agent = f.createAgent();
+  const before = Object.getOwnPropertyDescriptor(agent, "cancel");
+  writeFileSync(f.manifestPath, JSON.stringify({ release: { version: "unsupported" }, files: [] }));
+  assert.ok(f.continuation.capabilities().every((item) => item.state === "unsupported"));
+  await assert.rejects(f.continuation.apply(), (error) => {
+    assert.equal(error.code, "UNSUPPORTED");
+    assert.match(error.message, /发行版本与适配版本不一致/);
+    return true;
+  });
+  assert.deepEqual(Object.getOwnPropertyDescriptor(agent, "cancel"), before);
+  assert.equal(f.listeners.size, 0);
+  writeFileSync(f.manifestPath, JSON.stringify(f.manifest));
+  assert.ok(f.continuation.capabilities().every((item) => item.state === "available"));
+  await f.continuation.apply();
+  assert.notEqual(agent.cancel, before.value);
 });
