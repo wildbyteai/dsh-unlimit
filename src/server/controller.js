@@ -222,7 +222,7 @@ export class Controller {
         mode: "offline",
         version: manifest.version,
         instructions:
-          "在源码目录运行 npm run build 和 npm run pack:local。通过桌面端插件管理器安装生成的本地包；本插件不自动访问发布服务器。",
+          "运行 npm run pack:local 生成本地包。当前宿主接口没有逐次离线执行选项，工作台不执行安装或升级；请在宿主插件管理器核对安装方式。本插件不自动访问发布服务器。",
         uninstall: this.maintenance
           ? await this.maintenance.info()
           : {
@@ -571,7 +571,7 @@ export class Controller {
           })),
         };
       case "maintenance.install":
-        return unavailable("此版尚未验证桌面端的本地包安装接口，请使用宿主插件管理器");
+        return unavailable("当前宿主安装接口没有逐次离线执行选项，本版不提供离线安装或升级");
       default:
         if (action.startsWith("networkScope.")) {
           if (!this.networkScope) return unavailable("范围管理服务未加载");

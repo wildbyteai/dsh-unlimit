@@ -1,5 +1,6 @@
 import { AttachmentBatches } from "./attachment-batches.js";
 import { ChildOrigins } from "./child-origins.js";
+import { planTodoReset, RewindTodos } from "./rewind-todos.js";
 import { latestChildInput, parentBoundary, recordedInputOrigin } from "./child-rewind.js";
 import { StoreError, enumValue, fail, object, string } from "../core/validation.js";
 
@@ -42,6 +43,7 @@ export class DesktopSessions {
     this.store = store;
     this.inFlight = new Set();
     this.origins = options ? new ChildOrigins(ctx, options.host, options.enabled) : undefined;
+    this.todos = new RewindTodos(ctx, options?.host);
     this.attachmentBatches = new AttachmentBatches(() => this.services());
   }
   services() {
@@ -87,7 +89,7 @@ export class DesktopSessions {
         state: "unsupported",
         reason: "Input origin recording is not connected",
       },
-      unsupported: ["unrecorded-subagent-input-origin", "task-state-rewrite"],
+      unsupported: ["unrecorded-subagent-input-origin", "external-task-state-rewrite"],
       attachmentRecovery:
         typeof this.services().attachments?.readImage === "function" &&
         typeof this.services().attachments?.readFileStream === "function",
@@ -363,6 +365,8 @@ export class DesktopSessions {
         );
     }
     const workspace = this.store.dispatch("workspaces.forSession", { sessionId: targetId }).item;
+    const todoReset = planTodoReset(events, atSeq);
+    if (todoReset) this.todos.check();
     const attachmentBatch = removedHuman
       ? this.attachmentBatches.create(targetId, removedHuman, content)
       : undefined;
@@ -384,6 +388,7 @@ export class DesktopSessions {
       mode,
       ...(atSeq >= 0 ? { atSeq } : {}),
       strategy,
+      ...(todoReset ? { todoReset } : {}),
       draft,
       draftStatus: "pending-client",
       ...(attachmentBatch ? { attachmentBatch } : {}),
@@ -461,6 +466,16 @@ export class DesktopSessions {
       if (!continuation || continuation.id !== created.sessionId)
         fail("INVALID_HOST_RESULT", "The new session has no matching observable official agent");
       await this.stopAgents([continuation], progress.newSessionStop);
+      if (plan.todoReset) {
+        stage = "reset-todos";
+        progress.todoReset = {
+          requested: true,
+          plannedCount: plan.todoReset.plannedCount,
+          verified: false,
+          resetCount: 0,
+        };
+        await this.todos.apply(continuation, plan.todoReset, progress.todoReset);
+      }
       if (plan.workspaceId) {
         stage = "bind";
         const result = this.store.dispatch("workspaces.bind", {
@@ -526,6 +541,7 @@ export class DesktopSessions {
     return this.attachmentBatches.release(payload);
   }
   close() {
+    this.todos.close();
     this.origins?.close();
     this.attachmentBatches.close();
   }

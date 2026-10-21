@@ -577,3 +577,28 @@ V-PROCESS：新增后端合成测试 **17 项**、页面交互测试 **13 项**�
 1280×720 回环浏览器预览实际点击继续、确认、停止、刷新并展开执行记录，页面优先展示中文状态和名额，内部标识折叠。使用真实页面代码与明确标注的合成 API 回执，临时 SQLite；没有实际子任务或模型请求。控制台无 warn/error，截图为本地忽略的 `artifacts/manual-child-preview.jpg`。页面预览与官方模块测试是两组隔离证据，不合并声称真实桌面端到端通过；没有安装、重载或修改真实 DSH 配置。
 
 格式、构建与离线打包通过。安装包 **74 个文件、1,016,723 字节解包内容**与当前工作区逐文件字节一致，SHA-256 为 `99a50932753b723595f30aa2763c7098c60160322f12dd58099bdf9605e40467`。打包后原验收基线两项再次通过；临时预览页、进程与合成数据库均已关闭清理。
+
+## 一步回退后的待办恢复（2026-10-21）
+
+本批基于 `03aff1a6eb7e16ef8d6067dfb1213914cdaa4b6a` 工作树，新增 `src/host/rewind-todos.js` 并接入既有 `DesktopSessions.rewind`，没有读取参照插件或修改真实 DSH profile。原 117 项验收前五列未变，`SESSION-VIEW` 仅更新已验证子路径。
+
+行为是：切点保留列表中的进行中任务，若在被切除的同一轮内连续存在且最终完成，则在新分支恢复 pending。较早 completed、原本 pending、列表顺序和正文保留；后缀新增、跨 turn、重命名、删除后重建的同文任务不混入。官方工具执行后通过持久 flush、投影及新增事件共同确认，之后才归档原会话。具体合同与边界见 [会话附件与任务合同](session-attachments-contract.md#原生-todo-语义)。
+
+- 3 项原创合成测试验证选择算法、无须改动路径、歧义与非法快照拒绝。
+- 6 项新增官方隔离场景验证实际 todo_write、仅目标任务 pending、原会话不变、JSONL 读回及派生消息中无内部标记；覆盖执行前拒绝、执行后拒绝但已经写入、PTC 直接工具限制、新分支输入竞争、adapter 关闭取消。没有通过直接写事件替代被测工具。下一轮 turn/start 仍按官方行为清空，未实现跨轮重应用。
+- 6 项界面测试覆盖确认数量、未确认、写入后仍为整体 partial、转义和没有新增字段时的旧显示。1280×720 回环组件预览实际渲染真实 `rewindSummary` 与现有样式，三种合成回执可见，控制台 warning/error 为零。截图保存在忽略目录 `artifacts/rewind-todos-preview.jpg`。这仅是回执组件视觉检查，未接 Electron 会话切换或真实模型。
+
+本机使用 bundled Node `24.21.0`、显式 `DSH_UNLIMIT_RUNTIME` 和已校验的 `artifacts/official-packages`，执行：
+
+```sh
+node --expose-internals --test tests/*.test.mjs
+node scripts/check.mjs
+node scripts/provenance-check.mjs
+node scripts/self-audit.mjs
+node scripts/pack.mjs
+node --test tests/parity-baseline.test.mjs tests/package-contents.test.mjs
+```
+
+完整隔离回归 966 通过、0 失败、0 跳过，日志为 `artifacts/rewind-todos-full.log`；语法检查 180/180，既有有限来源与分层检查通过。文档更新后重新验证 117 项基线与实际 npm 包内容/文档链接，3 项通过。安装包共 75 个发布文件，SHA256 为 `d7d772e4ae4a1f2b0292a26148d7c15869122ba699e8a50476e964a5b2165c76`。这些结果不代表完整 SESSION-VIEW 或真实桌面 1:1 已验收。
+
+同期只读核对官方本地包安装接口，确认无法由当前逐次调用保证离线，工作台安装仍禁用且说明实际原因；详见 [维护合同](maintenance-contract.md#本地包升级接口核查2026-10-21)。没有以包构建测试替代升级测试，没有安装、重载、真实配置变更或模型联网。

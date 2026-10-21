@@ -103,6 +103,7 @@ async function fixture(
     todo: useTodo = false,
     subagents: useSubagents = false,
     subagentControls: useSubagentControls = false,
+    toolMode = "native",
   } = {},
 ) {
   denyExternalExecution(t);
@@ -153,7 +154,7 @@ async function fixture(
         personaPrefix: "",
         personaSuffix: "",
       });
-      new api.tools.ToolRuntime(scope);
+      new api.tools.ToolRuntime(scope, { mode: toolMode });
       // These are explicit inert peripheral substitutes, not SessionController,
       // AgentLoop, Session/Query, Workspace or persistence implementations.
       const unused = (name) => () => {
@@ -231,7 +232,10 @@ async function fixture(
     await mount(api.spawn, { providerName: "spawn" });
     if (useSubagentControls) await mount(api.subagentControls);
   }
-  const adapter = new DesktopSessions(ctx, store);
+  const adapter = new DesktopSessions(ctx, store, {
+    host: { supported: true, version: "0.2.1-rc.2", runtimeRoot },
+    enabled: () => false,
+  });
   t.after(() => adapter.close());
   const create = async () => {
     const created = await ctx.sessionController.create({ cwd: project });
@@ -998,5 +1002,197 @@ test(
         mode === "turn" ? 1 : 2,
       );
     }
+  },
+);
+
+async function completedTodoStep(t, options = {}) {
+  const f = await fixture(t, { todo: true, ...options });
+  const original = await f.create();
+  original.session.append("turn/start", { turn: 1 });
+  original.session.append("step/start", { turn: 1, step: 1 });
+  original.session.append(
+    "user/message",
+    f.api.llm.createUserMessage({
+      source: { kind: "user" },
+      content: [{ type: "text", text: "Synthetic task with two steps" }],
+    }),
+    { surfaceOp: "append" },
+  );
+  const before = [
+    { content: "Earlier complete task", status: "completed" },
+    { content: "Affected task", status: "in_progress" },
+    { content: "Unstarted task", status: "pending" },
+  ];
+  original.session.append("todo/write", { todos: before });
+  original.session.append("step/end", { turn: 1, step: 1, reason: { kind: "completed" } });
+  original.session.append("step/start", { turn: 1, step: 2 });
+  const later = [
+    before[0],
+    { ...before[1], status: "completed" },
+    before[2],
+    { content: "Removed step only task", status: "completed" },
+  ];
+  original.session.append("todo/write", { todos: later });
+  original.session.append("step/end", { turn: 1, step: 2, reason: { kind: "completed" } });
+  original.session.append("turn/end", { turn: 1, reason: { kind: "completed" } });
+  return {
+    ...f,
+    original,
+    before,
+    later,
+    expected: [before[0], { ...before[1], status: "pending" }, before[2]],
+    rewind: () =>
+      f.adapter.rewind({ sessionId: original.id, mode: "step", draftBridgeReady: true }),
+    todos: (id) =>
+      f.ctx.sessionProjections.snapshot(f.ctx.agents.get(id).session, ["todos"]).values.todos,
+  };
+}
+
+test(
+  "step rewind uses native todo_write to reset only a retained task whose completion was cut",
+  optionalHost,
+  async (t) => {
+    const f = await completedTodoStep(t);
+    const result = await f.rewind();
+    assert.deepEqual(result.todoReset, {
+      requested: true,
+      plannedCount: 1,
+      verified: true,
+      resetCount: 1,
+    });
+    assert.deepEqual(f.todos(result.newSessionId), f.expected);
+    assert.deepEqual(f.todos(f.original.id), f.later);
+    const child = f.ctx.agents.get(result.newSessionId);
+    const reader = await f.ctx.sessionPersistence.open(result.newSessionId, "read");
+    try {
+      const log = await reader.read();
+      assert.deepEqual(
+        log.events.filter((event) => event.type === "todo/write").at(-1).data.todos,
+        f.expected,
+      );
+    } finally {
+      await reader.close();
+    }
+    assert.doesNotMatch(
+      JSON.stringify(child.session.deriveMessages()),
+      /dsh-unlimit-rewind-|Removed step only task/,
+    );
+    assert.equal(
+      child.session
+        .snapshotEvents()
+        .some((event) => event.type === "tool/call" || event.type === "tool/result"),
+      false,
+    );
+    child.session.append("turn/start", { turn: 2 });
+    assert.equal(f.todos(child.id), null, "The next native turn still owns its own task list");
+  },
+);
+
+test(
+  "todo tool denial prevents source archiving and reports the created branch",
+  optionalHost,
+  async (t) => {
+    const f = await completedTodoStep(t);
+    f.ctx.on("tools/pre-execute", (exec) =>
+      exec.name === "todo_write" ? { kind: "deny", reason: "Synthetic refusal" } : undefined,
+    );
+    await assert.rejects(f.rewind(), (error) => {
+      assert.equal(error.code, "REWIND_PARTIAL");
+      assert.equal(error.partial.failedAt, "reset-todos");
+      assert.equal(error.partial.todoReset.verified, false);
+      assert.deepEqual(f.todos(error.partial.newSessionId), f.before);
+      assert.equal(error.partial.archived, false);
+      return true;
+    });
+  },
+);
+
+test(
+  "a post-write tool refusal preserves truthful partial todo readback without archiving",
+  optionalHost,
+  async (t) => {
+    const f = await completedTodoStep(t);
+    f.ctx.on("tools/post-execute", (exec) =>
+      exec.name === "todo_write"
+        ? { kind: "block", feedback: [{ type: "text", text: "Synthetic post refusal" }] }
+        : undefined,
+    );
+    await assert.rejects(f.rewind(), (error) => {
+      assert.equal(error.partial.failedAt, "reset-todos");
+      assert.equal(error.partial.todoReset.verified, true);
+      assert.equal(error.partial.todoReset.resetCount, 1);
+      assert.deepEqual(f.todos(error.partial.newSessionId), f.expected);
+      assert.equal(error.partial.archived, false);
+      return true;
+    });
+  },
+);
+
+test(
+  "PTC direct-tool restrictions are retained when a rewind requires todo restoration",
+  optionalHost,
+  async (t) => {
+    const f = await completedTodoStep(t, { toolMode: "ptc" });
+    let executions = 0;
+    f.ctx.on("tools/pre-execute", () => {
+      executions++;
+    });
+    await assert.rejects(f.rewind(), (error) => {
+      assert.equal(error.partial.failedAt, "reset-todos");
+      assert.equal(error.partial.causeCode, "TODO_RESET_UNSUPPORTED");
+      assert.equal(error.partial.archived, false);
+      assert.deepEqual(f.todos(error.partial.newSessionId), f.before);
+      return true;
+    });
+    assert.equal(executions, 0);
+  },
+);
+
+test(
+  "new branch input accepted during todo policy evaluation cancels restoration before write",
+  optionalHost,
+  async (t) => {
+    const f = await completedTodoStep(t);
+    f.ctx.on("tools/pre-execute", (exec) => {
+      if (exec.name !== "todo_write") return;
+      exec.agent.session.append(
+        "user/message",
+        f.api.llm.createUserMessage({
+          source: { kind: "user" },
+          content: [{ type: "text", text: "Synthetic later user input" }],
+        }),
+        { surfaceOp: "append" },
+      );
+      return { kind: "allow" };
+    });
+    await assert.rejects(f.rewind(), (error) => {
+      assert.equal(error.partial.todoReset.verified, false);
+      assert.equal(error.partial.archived, false);
+      assert.deepEqual(f.todos(error.partial.newSessionId), f.before);
+      assert.match(
+        JSON.stringify(f.ctx.agents.get(error.partial.newSessionId).session.deriveMessages()),
+        /Synthetic later user input/,
+      );
+      return true;
+    });
+  },
+);
+
+test(
+  "closing the session adapter cancels a pending todo policy before its write",
+  optionalHost,
+  async (t) => {
+    const f = await completedTodoStep(t);
+    f.ctx.on("tools/pre-execute", (exec) => {
+      if (exec.name !== "todo_write") return;
+      f.adapter.close();
+      return { kind: "allow" };
+    });
+    await assert.rejects(f.rewind(), (error) => {
+      assert.equal(error.partial.todoReset.verified, false);
+      assert.equal(error.partial.archived, false);
+      assert.deepEqual(f.todos(error.partial.newSessionId), f.before);
+      return true;
+    });
   },
 );

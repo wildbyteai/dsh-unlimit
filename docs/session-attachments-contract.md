@@ -63,7 +63,15 @@ bridge 仅接受精确 `event.origin === location.origin`、`event.source === �
 
 ## 原生 todo 语义
 
-不修改或重新写入 todo 状态。官方 `tool-todo` 注册的 `todos` 投影：初始 null，`todo/write` 为全量替换，`turn/start` 重置 null，其余事件保持。官方 fork 复制所选边界的事件前缀并追加原生 seed 事件，因此 turn 回退显示上一轮保留的列表；step 回退显示保留步骤的列表；被移除的后续 todo 不得漏入。该行为只覆盖官方事件投影，不代表恢复任意外部任务系统。
+官方 `tool-todo` 注册的 `todos` 投影：初始 null，`todo/write` 为全量替换，`turn/start` 重置 null，其余事件保持。官方 fork 复制所选边界的事件前缀并追加原生 seed 事件，因此 turn 回退显示上一轮保留的列表；step 回退先取得保留步骤的列表。
+
+`src/host/rewind-todos.js` 只恢复一种可核验的任务关系：任务在保留前缀投影中为 `in_progress`，在切点之后、下一次 `turn/start` 之前的后缀 todo 快照中始终存在，且最后状态为 `completed`，才在新分支改为 `pending`。匹配使用精确 `content`；重命名、删除后重建都不作关联。保留列表的其他任务、顺序与内容不变，仅在被切除后缀新增的任务不带回。无待恢复任务时沿用原生投影，不调用写入工具。官方清单只有 `content/status`，不推断跨轮或外部任务身份。
+
+有实际恢复项时，宿主先完成新分支的取消与队列清理，再通过官方 `tools.execute({name:'todo_write', arguments:{todos}, agent:新分支Agent, callId, signal})` 写入完整列表，保留工具可见性、执行前策略、审批和执行后策略。插件不改原会话事件，不伪造模型消息或 `tool/call`、`tool/result`。写入后调用官方 `sessions.flush`，同时核对 `todos` 投影和新追加的 `todo/write` 事件；三者均确认后才报告 `verified:true`，然后继续原会话归档。
+
+回执仅在有实际恢复项时包含 `todoReset:{requested:true, plannedCount, verified, resetCount}`。`resetCount` 仅在读回确认时为计划数量，否则为 0。PTC 等当前模式不允许直接调用 `todo_write` 时，不绕过限制；新分支已经创建，原会话尚未归档，以 `REWIND_PARTIAL` 和 `failedAt:'reset-todos'` 披露。执行后策略也可能在写入已经落盘后拒绝，此时可同时出现 `verified:true` 和整体回退未完成，必须分别展示。等待工具策略期间若新分支接纳其他输入，或 adapter 关闭，该次恢复信号会取消；后续读回仍报告实际已发生的结果。
+
+下一轮仍由原生 `turn/start` 清空 todo 投影，不注册重应用机制。以上是当前限定的会话任务恢复能力，不代表完整 SESSION-VIEW、真实桌面切换或任意外部任务系统已经验收。新增合成场景见 `tests/rewind-todos.test.mjs`；官方隔离场景见 `tests/sessions-host.test.mjs` 的限定恢复、持久读回、前后策略拒绝、PTC 限制、新输入及关闭取消场景；界面回执见 `tests/rewind-todo-ui.test.mjs`。具体执行结果以对应修订的验证记录为准。
 
 ## 可复验测试与边界
 

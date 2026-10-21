@@ -40,6 +40,17 @@ HTTP 接口为 `maintenance.uninstall`，请求必须为 `{bundle:"dsh-unlimit",
 
 本插件不自动重启桌面。官方管理器返回 `restart-required` 时，回执明确提示用户保存工作后自行重启。已核对的 `fiber.restart()` 只重载插件，`Loader.exit()` 是空钩子；它们都不能充当桌面重启成功证据。尚无已适配的通用桌面 relaunch 公共合同，`LIFE-RESTART` 仍未实现、未实机验证。
 
+## 本地包升级接口核查（2026-10-21）
+
+`0.2.1-rc.2` 的公开 `pluginManager.installBundle(spec, options)` 接受绝对 `.tgz/.tar.gz` 路径，但不能据此声明离线升级已实现。已核对发行清单中插件管理器的 JavaScript/JSON 文件摘要；本次仅阅读程序文件，未调用该接口、包管理器或真实 profile。
+
+- 选项有 `enabled/requestId/approvedBuilds/saveExact/registry`，没有逐次 `offline` 或 `ignore-scripts` 控制。它先查询 registry，再执行普通 `pnpm add`；缺失依赖可能联网，脚本遵循 pnpm/profile 的既有策略。
+- 本地包的官方 `inspect` 只检查路径存在，不提供包名和版本，而且也会调用 pnpm。实际安装之后才从依赖变化识别目标、检查 bundle 与兼容性，不能充当只读包身份预检。
+- 有 HMR 且 spec 已识别为已安装包时会拒绝 `already-installed`。新 tgz 路径未必能在执行前识别包名，这不构成可靠的自身升级合同；本项目不会靠换路径规避已安装检查。
+- 返回的 `application/changed` 需与安装记录和运行状态分别核对；失败快照恢复主要覆盖 manifest/lockfile，不证明下载、node_modules 或脚本副作用已还原。
+
+源码定位为 `@deepseek-ai/dsh-plugin-manager/lib/index.js` 的 `parseInstallSpec`、`inspect`、`installBundle`、`runPnpm` 与 `publishAndReload`。因此 `maintenance.install` 继续明确拒绝，工作台安装按钮保持禁用；LIFE-OFFLINE 的零网络请求、升级保留资料和真实桌面安装仍为缺口，不用包构建或假包管理器结果代替。
+
 ## 证据与复验
 
 运行：
