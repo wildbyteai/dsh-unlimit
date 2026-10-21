@@ -1,5 +1,13 @@
 import { readFileSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import { readWorkspaceRule, workspaceInstructions } from "../core/workspace-rules.js";
+import { fail, object, string } from "../core/validation.js";
+import {
+  selectedInstructions,
+  selectedRule,
+  selectPromptText,
+  usesWorkspaceInstructions,
+} from "../core/prompts.js";
 
 const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
 const unavailable = (message) => {
@@ -355,6 +363,42 @@ export class Controller {
       }
       case "status":
         return this.status();
+      case "prompt.preview": {
+        object(payload);
+        const model = string(payload.model, "model", { optional: true, empty: true }) || undefined;
+        const directory =
+          string(payload.directory, "directory", { optional: true, empty: true }) || undefined;
+        if (directory && !isAbsolute(directory))
+          fail("INVALID_DIRECTORY", "请提供工作区的绝对目录");
+        const saved = this.store.dispatch("settings.get", {});
+        const rule = selectedRule(this.store.dispatch("rules.list", {}), model);
+        const readWorkspace =
+          usesWorkspaceInstructions(saved.value, rule) && saved.value.workspaceFiles.length > 0;
+        if (readWorkspace && !directory)
+          fail("INVALID_DIRECTORY", "所选工作区规则参与正文，需要明确填写工作区目录");
+        const workspaceText = readWorkspace
+          ? selectedInstructions(directory, saved.value.workspaceFiles)
+          : "";
+        const selected = selectPromptText(saved.value, { rule, workspaceText });
+        return {
+          revision: saved.revision,
+          model: model ?? null,
+          directory: directory ?? null,
+          enabled: this.runtime.enabled && saved.value.enabled,
+          mode: saved.value.promptMode,
+          source: selected.source,
+          rule:
+            selected.source === "rule"
+              ? { id: rule.id, name: rule.name, model: rule.model || null }
+              : null,
+          workspace: {
+            policy: saved.value.workspacePolicy,
+            selectedPaths: readWorkspace ? [...saved.value.workspaceFiles] : [],
+            included: selected.workspaceIncluded,
+          },
+          text: selected.text,
+        };
+      }
       case "control.apply": {
         const current = this.store.dispatch("settings.get", {});
         this.runtime.apply();

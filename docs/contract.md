@@ -118,6 +118,10 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 规则选择顺序为：当前模型下明确激活的规则 → 列表中第一条匹配当前模型的规则 → 无模型限定的活动规则。模型限定采用非空 ID 完全匹配；当前模型缺失或不匹配时，该规则不作为全局兜底。原生工作区策略使用同一选择函数，避免无关模型规则误抑制其 fallback。`rules.reset` 只清除 activeId，不删除规则或停用自动模型匹配；停止全部注入仍需还原运行控制。
 
+`prompt.preview` 接收可选 `{model, directory}`，只读取已保存配置、规则库和本次需要参与正文的所选工作区文件。模型 ID 完全匹配，省略或空串按无模型处理；需要读取选定文件时必须明确给出工作区绝对目录，仍遵循祖先链、文件大小和链接边界。`strict` 或已有有效正文的 `fallback` 不读取所选文件。预览不保存、不启用控制、不组装宿主请求，也不调用模型。
+
+结果包含 `revision / model / directory / enabled / mode / source / rule / workspace / text`；`source` 为 `rule / saved / workspace / default`，`rule` 仅在规则正文被采用时包含 ID、名称和限定模型。`workspace` 返回策略、本次读取的 `selectedPaths` 和正文是否包含工作区内容。返回的 `text` 与运行时使用同一个正文选择函数；停用时仍可预览候选正文，`enabled` 为 false。此结果不包含宿主工具说明、会话角色段或未保存的表单草稿，不能当作已经发送的完整系统消息。旧进程缓存回退仍未引入。
+
 `rules.workspace / rules.preview` 浏览明确目录的祖先链和完整正文；扫描不保存选择。`rules.select / rules.policy` 必须带 `revision`，冲突拒绝覆盖。路径、字节、UTF-8 和链接边界见 [工作区规则合同](workspace-rules-contract.md)。Hook 与第三方记忆专用策略尚无已验证目标接口，保存值不代表生效，详见 [接口调查](hooks-memory-contract.md)。
 
 服务器清单只接受 IP、完整主机名或 `username@host`。空行忽略，主机名转小写和 IDNA，IPv6 使用规范化方括号格式，按完整项去重。密码、密钥、URL、端口、网段、通配符和多目标表达式拒绝，错误不回显输入。清单仍是本地库存，不提供 DNS/地区判定或出口授权。

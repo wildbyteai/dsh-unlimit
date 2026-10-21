@@ -39,28 +39,37 @@ export function selectedInstructions(directory, selected) {
   return text;
 }
 
+export function selectPromptText(settings, { rule, workspaceText = "" } = {}) {
+  const selectedWorkspace = settings.workspacePolicy === "strict" ? "" : workspaceText.trim();
+  const candidates = [
+    ["rule", rule?.content?.trim()],
+    ["saved", settings.prompt.trim()],
+    ["workspace", selectedWorkspace],
+    ["default", DEFAULT_PROMPT],
+  ];
+  const [source, chosen] = candidates.find(([, text]) => text);
+  const useWorkspace = usesWorkspaceInstructions(settings, rule);
+  const parts = [chosen];
+  if (useWorkspace && selectedWorkspace && selectedWorkspace !== chosen)
+    parts.push(selectedWorkspace);
+  return {
+    source,
+    text: parts.join("\n\n"),
+    workspaceIncluded: Boolean(useWorkspace && selectedWorkspace),
+  };
+}
+
 export function composePrompt(
   assembly,
   settings,
   { rule, workspaceText = "", completeSectionNames = new Set() } = {},
 ) {
   if (!settings.enabled) return assembly;
-  const selectedWorkspace = settings.workspacePolicy === "strict" ? "" : workspaceText.trim();
-  const chosen = (
-    rule?.content?.trim() ||
-    settings.prompt.trim() ||
-    selectedWorkspace ||
-    DEFAULT_PROMPT
-  ).trim();
-  const useWorkspace = usesWorkspaceInstructions(settings, rule);
-  const parts = [chosen];
-  if (useWorkspace && selectedWorkspace && selectedWorkspace !== chosen)
-    parts.push(selectedWorkspace);
   const operator = {
     name: "dsh-unlimit/operator",
     order: 0,
     interpolate: false,
-    text: parts.join("\n\n"),
+    text: selectPromptText(settings, { rule, workspaceText }).text,
   };
   const retained =
     settings.promptMode === "append"

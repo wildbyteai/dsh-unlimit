@@ -5,6 +5,7 @@ import { admissionPage } from "./admission.js";
 import { environmentSettings } from "./environment-settings.js";
 import { workflowPlans } from "./workflow-plans.js";
 import { openWorkspaceRules } from "./workspace-rules.js";
+import { openPromptPreview } from "./prompt-preview.js";
 import { uninstallSection, uninstallFlow, renderReceipt } from "./maintenance.js";
 import {
   connectionCheckFlow,
@@ -1554,6 +1555,7 @@ async function controlPage() {
   ]);
   let scopeRoot;
   let scopeDialog;
+  let disposePromptPreview;
   const inScopeContext = () =>
     state.page === "control" && state.request === serial && scopeRoot?.isConnected;
   const scope = networkScopeFlow({
@@ -1689,7 +1691,7 @@ async function controlPage() {
             ],
           }),
           v.promptMode,
-        )}</div><div class="field"><label for="prompt-text">提示词内容</label><textarea class="code" name="prompt" id="prompt-text" rows="12" placeholder="编写当前工作方式、任务边界与输出要求…">${esc(v.prompt)}</textarea><small>保存更新本地配置；已启用的能力会在后续步骤读取新值，首次使用需要应用运行控制。</small></div>`,
+        )}<button type="button" id="preview-saved-prompt">预览已保存正文</button></div><div class="field"><label for="prompt-text">提示词内容</label><textarea class="code" name="prompt" id="prompt-text" rows="12" placeholder="编写当前工作方式、任务边界与输出要求…">${esc(v.prompt)}</textarea><small>保存更新本地配置；已启用的能力会在后续步骤读取新值，首次使用需要应用运行控制。</small></div>`,
       )}${panel(
         "工作区规则策略",
         `<div class="fields">${renderField(
@@ -1706,7 +1708,7 @@ async function controlPage() {
             ? "此策略同时处理所选规则与原生规则，在后续步骤生效。原生历史保留原日志；还原仅恢复仍属本插件的节点，其他工具说明保持。"
             : "当前仅处理本插件所选规则；原生规则接口尚未通过检查，宿主原生基线与刷新消息继续保留。"
         }</small></div></div><div class="toolbar" style="margin-bottom:0"><button type="button" id="scan-rules">浏览并选择规则</button><button type="button" id="select-rule-paths">保存路径列表</button></div>`,
-      )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>可填写 IP、完整主机名或 user@host；不要填写密码、URL、网段、端口或通配符。此清单仍不是出口访问控制。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "仅在会话未明确选择权限时请求完整访问；新会话采用下方默认预设。")}${switchRow("autoApprove", "自动审批", "仅处理未明确指定审批策略的会话；显式选择仍由宿主执行。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "设置变更后重新应用", "启用时按运行时生命周期重新注册控制。")}${switchRow("retryOverride", "接管请求重试次数", "关闭时沿用提供方；开启且运行控制已启用后按 0—20 次设置，0 表示不重试。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${sessionDefaults}${panel(
+      )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>可填写 IP、完整主机名或 user@host；不要填写密码、URL、网段、端口或通配符。此清单仍不是出口访问控制。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "仅在会话未明确选择权限时请求完整访问；新会话采用下方默认预设。")}${switchRow("autoApprove", "自动审批", "仅处理未明确指定审批策略的会话；显式选择仍由宿主执行。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "重载后恢复运行控制", "已保存为启用时，插件重新加载后恢复控制；保存设置仍在后续步骤生效。")}${switchRow("retryOverride", "接管请求重试次数", "关闭时沿用提供方；开启且运行控制已启用后按 0—20 次设置，0 表示不重试。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${sessionDefaults}${panel(
         "执行限额",
         `<div class="fields">${[
           field("maxSubagents", "代理树并发子代理数", "number", { min: 1, max: 128 }),
@@ -1749,6 +1751,10 @@ async function controlPage() {
     bind() {
       scopeRoot = $("#network-scope");
       bindScope();
+      $("#preview-saved-prompt").onclick = () => {
+        disposePromptPreview?.();
+        disposePromptPreview = openPromptPreview({ api, esc });
+      };
       const read = () => {
         const form = $("#settings-form");
         const values = { ...v };
@@ -1856,6 +1862,7 @@ async function controlPage() {
     dispose() {
       scope.dispose();
       scopeDialog?.close();
+      disposePromptPreview?.();
     },
   };
 }

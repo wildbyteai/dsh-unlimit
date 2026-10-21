@@ -15,6 +15,7 @@ const ASSETS = new Map([
   ],
   ["/dsh-unlimit/ui/workflow-plans.js", ["workflow-plans.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/workspace-rules.js", ["workspace-rules.js", "text/javascript; charset=utf-8"]],
+  ["/dsh-unlimit/ui/prompt-preview.js", ["prompt-preview.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/rewind.js", ["rewind.js", "text/javascript; charset=utf-8"]],
   ["/dsh-unlimit/ui/maintenance.js", ["maintenance.js", "text/javascript; charset=utf-8"]],
   [
