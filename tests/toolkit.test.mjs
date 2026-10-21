@@ -9,6 +9,8 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  unwatchFile,
+  watchFile,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -316,23 +318,51 @@ test(
   async (t) => {
     const { directory, root, call, tool, toolkit } = fixture(t);
     const pidFile = join(directory, "uninstall-probe-pid");
+    const readyFile = join(directory, "uninstall-probe-ready");
     const path = tool(
       "nmap",
-      `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000);`,
+      `const fs = require('node:fs'); const pidFile = ${JSON.stringify(pidFile)}; fs.writeFileSync(pidFile + '.tmp', String(process.pid)); fs.renameSync(pidFile + '.tmp', pidFile); fs.writeFileSync(${JSON.stringify(readyFile)}, 'ready'); setInterval(() => {}, 1000);`,
     );
     call("toolkit.save", { root });
+    let readyListener;
+    const ready = new Promise((resolve, reject) => {
+      readyListener = (current) => {
+        if (current.nlink === 0) return;
+        try {
+          const value = readFileSync(pidFile, "utf8");
+          assert.match(value, /^[1-9]\d*$/);
+          const pid = Number(value);
+          assert.ok(Number.isSafeInteger(pid));
+          resolve(pid);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      watchFile(readyFile, { interval: 10 }, readyListener).on("error", reject);
+    });
     const probe = call("toolkit.probe", { tool: "nmap" });
-    const cancelled = assert.rejects(probe, code("CANCELLED"));
-    for (let attempt = 0; attempt < 100 && !existsSync(pidFile); attempt++)
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    assert.equal(existsSync(pidFile), true, "synthetic process must have started");
-    assert.deepEqual(await toolkit.cancelProbes(), { stopped: true });
-    await cancelled;
-    assert.throws(() => process.kill(Number(readFileSync(pidFile, "utf8")), 0), code("ESRCH"));
-    assert.equal(toolkit.closed, false);
-    const original = readFileSync(path, "utf8").split("\n")[0];
-    writeFileSync(path, `${original}\nprocess.stdout.write('synthetic next probe');\n`);
-    assert.equal((await call("toolkit.probe", { tool: "nmap" })).stdout, "synthetic next probe");
+    try {
+      const pid = await Promise.race([
+        ready,
+        probe.then(() => assert.fail("synthetic probe completed before readiness")),
+      ]);
+      assert.doesNotThrow(
+        () => process.kill(pid, 0),
+        "synthetic process must be alive before cancellation",
+      );
+      const cancelled = assert.rejects(probe, code("CANCELLED"));
+      assert.deepEqual(await toolkit.cancelProbes(), { stopped: true });
+      await cancelled;
+      assert.throws(() => process.kill(Number(readFileSync(pidFile, "utf8")), 0), code("ESRCH"));
+      assert.equal(toolkit.closed, false);
+      const original = readFileSync(path, "utf8").split("\n")[0];
+      writeFileSync(path, `${original}\nprocess.stdout.write('synthetic next probe');\n`);
+      assert.equal((await call("toolkit.probe", { tool: "nmap" })).stdout, "synthetic next probe");
+    } finally {
+      unwatchFile(readyFile, readyListener);
+      await toolkit.cancelProbes();
+      await probe.catch(() => {});
+    }
   },
 );
 

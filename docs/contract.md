@@ -86,7 +86,7 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 `repeatReminder` 为 `host/off`，默认沿用宿主。关闭仅调整官方建议提醒的排除范围，不更改工具拒绝、反馈或取消。应用、保存生效和撤销都等待官方 noSave 生命周期完成。缺服务且设置为 host 不阻止其他运行控制；显式 off 缺接口则拒绝。外部所有权冲突保留其配置。见 [重复提醒合同](repeat-reminder-contract.md)。
 
-`readLimit` 是官方 read 工具的正文 UTF-8 字节预算，0 沿用宿主；不是实际 I/O 或整个工具结果的字节上限。通过可信唯一条目的 noSave 重挂载调整字节、行数与行长窗口，状态读回真实有效 cap，撤销恢复原配置。当前安装入口摘要不匹配时显示不支持，不执行该入口。见 [读取窗口合同](read-limits-contract.md)。
+`readLimit` 是官方 read 工具的正文 UTF-8 字节预算，0 沿用宿主；不是实际 I/O 或整个工具结果的字节上限。通过可信的活动读取条目逐项 noSave 重挂载调整字节、行数与行长窗口，分别保存和恢复原配置；原本关闭 read 的条目不启用。状态读回真实 cap 与覆盖数量，新加载预设需要明确重新应用。当前安装入口摘要不匹配时显示不支持，不执行该入口。见 [读取窗口合同](read-limits-contract.md)。
 
 运行中保存若已落盘但某个控制未更新，返回 `SETTINGS_APPLIED_PARTIAL` 与 `partial.savedRevision`，仍尝试其他独立控制。首次应用后的目录通知失败返回 `CONTROLS_APPLIED_PARTIAL / {enabled:true}`，不能冒充控制未启用；目录通知本身不承诺每个客户端已刷新。
 

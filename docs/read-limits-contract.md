@@ -11,7 +11,9 @@
 - `async revert()`：仅恢复仍由本实例持有的原配置。
 - `capabilities()`：同步返回单项数组。
 
-能力项为 `{id:'readLimit', label, requested, effective, effectiveCaps, state, owned, detail, code?}`。`requested` 为设置字节数（无效时为 `invalid`）；`effective` 为已确认的字节数、`host` 或 `null`；`effectiveCaps` 为当前真实活动配置中的 `{readMaxBytes, readLimit, readMaxLineLength, readStreamMinSize}`。不可信或所有权冲突时，两个有效读回字段均为 `null`。`state` 为 `available / applying / active / unsupported`，`owned` 表示仍保留本实例恢复责任，并不保证没有冲突。冲突另有 `code:'CONFLICT'`。
+能力项保留 `{id:'readLimit', label, requested, effective, effectiveCaps, state, owned, detail, code?}`。`requested` 为设置字节数（无效时为 `invalid`）；`effective` 只有在当前目标全部确认应用同一预算、且没有退出目标的恢复责任时才返回该字节数，沿用宿主时为 `host`，其余为 `null`。`effectiveCaps` 只在各目标完整 cap 相同时聚合返回 `{readMaxBytes, readLimit, readMaxLineLength, readStreamMinSize}`；例如 stream 阈值不同，则聚合为 `null`，不影响已确认的共同字节预算。`state` 仍为 `available / applying / active / unsupported`，`owned` 表示仍保留本实例恢复责任，并不保证没有冲突。冲突另有 `code:'CONFLICT'`。
+
+多目标状态另提供 `targetCount`（当前活动且启用 read 的条目数）、`appliedTargetCount`（其中已确认应用当前预算的条目数）、`ownedTargetCount`（包含退出或冲突目标的恢复责任）、`coverage` 与 `targets`。`coverage` 为 `host / complete / pending / partial / conflict / unavailable`；每个目标包含本实例分配的身份编号、状态、所有权与实际 cap，不返回宿主内部对象。新目标出现后为待应用或部分覆盖，保持可明确重新应用，不冒称完整生效。
 
 `readLimit=0` 明确沿用宿主：没有持有配置时不挂载更新；有持有配置时恢复原 cap。绝不把 0 传给官方 cap，也不把 0 描述为无限制。正整数 `B` 必须为安全整数，且 `B+1` 仍为安全整数；映射如下：
 
@@ -27,7 +29,7 @@
 
 ## 可信门与可撤销更新
 
-要求桌面版本、`desktop-runtime.json` 发行版本一致，tool-fs、Cordis、Loader 及可用 HMR 的实际入口摘要匹配库存，且目录中只有一个活动 tool-fs 条目。目录合并全局 Loader entries 与 Cordis 公开 registry 内的真实 `fiber.entry`，按 Entry 对象身份去重；后者还须满足 entry/fiber/runtime 的相互身份及模块回调一致。这样可以发现不挂入全局 Loader 树的 standard 预设条目，无需读取预设注册器的私有 generation 或制造代理 Entry。要求活动模块 `apply` 在更新前与经摘要校验的实际 import 身份一致。当前真实安装 tool-fs 入口 SHA256 与库存不符，因此业务能力保持 `unsupported`，不会执行修改后的入口。
+要求桌面版本、`desktop-runtime.json` 发行版本一致，tool-fs、Cordis、Loader 及可用 HMR 的实际入口摘要匹配库存。目录合并全局 Loader entries 与 Cordis 公开 registry 内的真实 `fiber.entry`，按 Entry 对象身份去重；后者还须满足 entry/fiber/runtime 的相互身份及模块回调一致。这样可以发现多个预设及保留 revision 内不挂入全局 Loader 树的条目，无需读取预设注册器的私有 generation 或制造代理 Entry。每个启用 read 的目标均须通过格式及活动模块 `apply` 的实际 import 身份校验；`read:false` 的条目不参与，也不被启用。当前真实安装 tool-fs 入口 SHA256 与库存不符，因此业务能力保持 `unsupported`，不会执行修改后的入口。
 
 变更经 HMR 的 `runExclusive`（存在时）及本实例队列串行，调用官方 `Fiber.update(next, true)`。因为该方法返回 void，适配器仅对准确目标 fiber 透明观察 `internal/update`，原样传递 `config / noSave / next`，等待真实异步链以及 `fiber.await()`，核对活动状态、完整配置和持久 entry 原始配置未变；观察器总在 finally 移除。拒绝或异常不会被转换为成功。
 
@@ -39,7 +41,9 @@
 
 生命周期重挂载会短暂撤下工具和提示段，在途旧调用沿用其原 cap。配置仅进程内，不保存 profile，不保证跨进程生效。不修补已安装文件，不提供对不可信入口的替换加载；干净副本仅用于下述隔离测试。
 
-当前仍是单一目标的所有权合同。若同时存在多个活动 tool-fs 条目，包括多个预设或保留的旧 revision，则明确 `unsupported`，不挑选首项或宣称全局预算已生效。拥有配置后遇此歧义，撤销也保留恢复责任并报冲突；清除歧义后可再次明确撤销。跨多个预设的统一预算与恢复仍是功能差距。
+应用覆盖本次检查所得的全部有效读取条目，各自保存原配置与所有权。一次应用中途失败或取消，会逐项尝试撤销本次已完成的变更；外部修改不会被覆盖，未恢复的责任及错误必须披露。明确撤销也分别处理仍可安全恢复的目标，不能因一项冲突而放弃其他可恢复项。目标集合变化和未完成的退出目标恢复责任不能被部分成功掩盖。
+
+不监听新预设并自动改写配置。新加载预设或新 revision 出现后，状态会显示当前覆盖数量并提示重新应用；用户明确应用后才纳入预算。页面展示数值 `effective` 和覆盖数量，不把聚合 cap 不一致显示成一个虚构的全局值。宿主生命周期、在途调用、当前安装摘要和桌面未验的限制仍保留。
 
 ## 隔离验证
 
@@ -67,6 +71,14 @@ node --expose-internals --test tests/read-limits.test.mjs tests/read-limits-host
 
 同一个真实 AgentLoop 会话跨 3 个 turn 发出 7 次合成模型请求、完成 4 次实际 read。两份含中文与 emoji 的合成材料完整返回；超预算文件只返回可容纳的整行，撤销后同一文件返回全部头尾内容。每个后续请求按非重复 `toolCallId` 与此前 canonical 工具消息逐项深比较，同时验证 assistant 调用一一配对、30 个工具仍在目录中；每轮全部事件经官方 JSONL 读回。撤销本身不改写已有历史。
 
-另注册第二个完整预设，核对两个真实读取条目并存时应用明确拒绝、两份配置均不变；移除该测试拥有的预设后恢复可用。对应 4 个场景及父测试共 5 项，见 [执行证据](evidence/tool-results-acceptance.json)。原子测试另补 5 项目录与所有权边界，原断言继续保留。
+该批单目标实现另注册第二个完整预设，核对两个真实读取条目并存时应用明确拒绝、两份配置均不变；移除该测试拥有的预设后恢复可用。当时对应 4 个场景及父测试共 5 项，记录保留在 `641dda1`。后续多目标实现更新了当前 [执行证据](evidence/tool-results-acceptance.json)，原跨轮历史及单目标生命周期断言继续保留。
 
 本次没有发生上下文压力压缩，不能证明无限上下文或压缩后完整保留。官方分页、上下文压缩和结果剪裁仍由宿主负责，本插件未增加历史删除。模型传输是合成响应，没有真实模型、桌面安装或 profile 读写；当前安装摘要不符的限制也没有被临时干净副本解除。
+
+## 多个预设与保留 revision（2026-10-21）
+
+后续实现将所有权改为按真实 Entry 对象分别记录。两个完整预设共存，以及同一预设保留旧 revision 并发布新 revision，均验证两个独立读取 scope。每个 scope 实际读取合成大文件：应用 1024 字节预算后分页且尾部标记不返回，撤销后重新读取完整头尾内容；原始声明对象与内容保持不变。
+
+真实双预设场景还在官方 `internal/update` 链内分别触发第二目标失败和取消，核对已经更新的目标安全回滚。单元回归补充不同初始 cap/stream 阈值、read:false 排除、新目标明确再应用、目标退出、外部改动与等值对象替换、异步核验/更新期间目录变化、一项恢复被拒绝后其他项继续恢复。外部配置不会因内容相同而被重新认作本插件所有。
+
+当前完整预设测试共 5 个场景及父测试，实际 23 次合成模型请求、11 个 turn、12 次 AgentLoop read，直接 ToolRuntime read 为 0。原会话的 7 次请求、3 轮、4 次 read 完整历史比较保留；另 4 个作用域各经过 2 轮与 2 次 read，逐轮读回全部 JSONL 并核对工具消息配对。预算会改变 read schema 中的默认行数说明，其他 29 个工具 schema 保持原样；撤销后 read schema 精确恢复各作用域原值。公开证据记录这些计数、源码摘要和恢复边界。该验证不意味着新增预设会自动应用，也不改变真实安装摘要不符、压力压缩、真实模型与桌面交互尚未验证的限制。

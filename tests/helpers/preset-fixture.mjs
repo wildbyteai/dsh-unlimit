@@ -21,8 +21,16 @@ const within = (base, path) => {
   return p === "" || (p !== ".." && !p.startsWith(".." + sep) && !isAbsolute(p));
 };
 
-/** A real complete standard declaration; only model responses and human answers are synthetic. */
-export async function presetFixture(t, selectedRoot, cache, { permissionPresets = false } = {}) {
+/** A real complete declaration; only model responses and human answers are synthetic. */
+export async function presetFixture(
+  t,
+  selectedRoot,
+  cache,
+  { permissionPresets = false, presetId = "standard", modelModalities } = {},
+) {
+  assert.ok(["standard", "minimal"].includes(presetId));
+  const marker = presetId.toUpperCase();
+  const provider = `synthetic-${presetId}-offline`;
   const installedRoot = fs.realpathSync(selectedRoot);
   const inventoryBytes = fs.readFileSync(join(installedRoot, "desktop-runtime.json"));
   const inventory = new Map(JSON.parse(inventoryBytes).files.map((row) => [row.path, row.sha256]));
@@ -38,7 +46,7 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
   });
   fs.mkdirSync(join(presetProjectRoot, "artifacts"), { recursive: true });
   const directory = fs.realpathSync(
-    fs.mkdtempSync(join(presetProjectRoot, "artifacts/standard-preset-")),
+    fs.mkdtempSync(join(presetProjectRoot, `artifacts/${presetId}-preset-`)),
   );
   const workspace = join(directory, "workspace");
   const homes = {
@@ -60,17 +68,18 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
   ])
     fs.mkdirSync(path, { recursive: true });
   const sourceFile = join(workspace, "evidence.txt");
-  const content = "SYNTHETIC_COMPLETE_STANDARD_PRESET_CONTENT";
+  const content = `SYNTHETIC_COMPLETE_${marker}_PRESET_CONTENT`;
   fs.writeFileSync(sourceFile, content + "\n");
-  fs.writeFileSync(join(workspace, "AGENTS.md"), "SYNTHETIC_STANDARD_WORKSPACE_RULE\n");
+  fs.writeFileSync(join(workspace, "AGENTS.md"), `SYNTHETIC_${marker}_WORKSPACE_RULE\n`);
   for (const [key, value] of Object.entries(homes)) process.env[key] = value;
   process.chdir(workspace);
   t.mock.method(os, "homedir", () => join(directory, "home"));
 
   const forbidden = [];
+  const directoryFsyncFds = new Set();
   const deny = (name) => () => {
     forbidden.push(name);
-    throw new Error(`Standard preset fixture forbids ${name}`);
+    throw new Error(`${presetId} preset fixture forbids ${name}`);
   };
   t.mock.method(net.Socket.prototype, "connect", deny("socket.connect"));
   t.mock.method(net.Server.prototype, "listen", deny("socket.listen"));
@@ -98,6 +107,8 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
     revisionBindings = [];
   let disposed = false;
   let officialLifecycleDisposed = false;
+  let rootsRemovedUnderGuards = false;
+  let cleaningRuntimeRoot = false;
   const dispose = async () => {
     if (disposed) return;
     disposed = true;
@@ -109,18 +120,28 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
       for (const fiber of fibers.reverse()) if (fiber.uid !== null) await fiber.dispose();
       await ctx?.fiber.dispose();
       officialLifecycleDisposed = true;
+      assert.equal(directoryFsyncFds.size, 0, "All ancestor metadata handles must be closed");
       for (const row of installed)
         assert.equal(digest(fs.readFileSync(join(installedRoot, row.path))), row.sha256);
-      assert.deepEqual(forbidden, [], "No forbidden network, subprocess or filesystem access");
     } finally {
-      t.mock.restoreAll();
-      syncBuiltinESMExports();
-      process.chdir(originalCwd);
-      for (const [key, value] of originalEnvironment)
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      runtime?.dispose();
-      fs.rmSync(directory, { recursive: true, force: true });
+      try {
+        cleaningRuntimeRoot = true;
+        try {
+          runtime?.dispose();
+        } finally {
+          fs.rmSync(directory, { recursive: true, force: true });
+        }
+        rootsRemovedUnderGuards =
+          !fs.existsSync(directory) && !fs.existsSync(runtime?.root ?? directory);
+        assert.deepEqual(forbidden, [], "No forbidden network, subprocess or filesystem access");
+      } finally {
+        t.mock.restoreAll();
+        syncBuiltinESMExports();
+        process.chdir(originalCwd);
+        for (const [key, value] of originalEnvironment)
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = value;
+      }
     }
   };
   t.after(dispose);
@@ -130,17 +151,18 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
     "Shared Loader must record every actual official import",
   );
 
-  // The official filesystem fence compares ancestor identities when an
-  // outside-workspace path is rejected. Permit only that exact directory
-  // metadata, never ancestor contents, enumeration or mutation.
+  // The filesystem fence reads ancestor identities; attachment publication
+  // fsyncs DSH_HOME ancestors. Permit exact metadata operations only.
   const ancestorMetadata = new Set();
   const platformMetadata = new Set();
   const metadataReads = [];
-  if (permissionPresets) {
+  if (permissionPresets || presetId === "minimal") {
     for (let ancestor = dirname(directory); ; ancestor = dirname(ancestor)) {
       ancestorMetadata.add(ancestor);
       if (dirname(ancestor) === ancestor) break;
     }
+  }
+  if (permissionPresets) {
     for (const path of ["/tmp", os.tmpdir()]) {
       platformMetadata.add(path);
       platformMetadata.add(fs.realpathSync(path));
@@ -149,11 +171,29 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
 
   // Keep real filesystem implementations. The guard rejects access instead of synthesizing data.
   const checkPath = (path, writing, operation) => {
-    if (typeof path === "number") return;
+    const fd = typeof path === "number" ? path : path?.fd;
+    if (typeof fd === "number") {
+      if (!directoryFsyncFds.has(fd)) return;
+      if (/^(?:fstat|fsync|close)(?:Sync)?$/.test(operation)) {
+        metadataReads.push({
+          operation: `directory-fd-${operation}`,
+          scope: "synthetic-root-ancestor",
+        });
+        return;
+      }
+      forbidden.push(`filesystem.directory-fd.${operation}`);
+      throw new Error(
+        `Ancestor directory fd permits only fstat, fsync and close, not ${operation}`,
+      );
+    }
     const filename = resolve(path instanceof URL ? fileURLToPath(path) : String(path));
+    if (writing && cleaningRuntimeRoot && operation === "rmSync" && filename === runtime.root)
+      return;
     if (
       !writing &&
-      ((/^stat(?:Sync)?$/.test(operation) && ancestorMetadata.has(filename)) ||
+      (((operation === "open-directory-fsync" ||
+        (permissionPresets && /^stat(?:Sync)?$/.test(operation))) &&
+        ancestorMetadata.has(filename)) ||
         (/^(?:realpath(?:Sync)?(?:\.native)?|stat(?:Sync)?)$/.test(operation) &&
           platformMetadata.has(filename)))
     ) {
@@ -172,7 +212,7 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
       return;
     forbidden.push(`filesystem.${operation}`);
     throw new Error(
-      `Standard preset fixture forbids filesystem.${operation} outside synthetic roots: ${filename}`,
+      `${presetId} preset fixture forbids filesystem.${operation} outside synthetic roots: ${filename}`,
     );
   };
   const writingFlags = (flags) =>
@@ -189,9 +229,69 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
     const original = api[key];
     if (typeof original !== "function") return;
     t.mock.method(api, key, function (path, ...args) {
-      checkPath(path, writing === "open" ? writingFlags(args[0]) : writing, operation);
+      const directoryFsync =
+        presetId === "minimal" &&
+        api === fsPromises &&
+        key === "open" &&
+        args[0] === fs.constants.O_RDONLY &&
+        ancestorMetadata.has(resolve(path instanceof URL ? fileURLToPath(path) : String(path)));
+      checkPath(
+        path,
+        writing === "open" ? writingFlags(args[0]) : writing,
+        directoryFsync ? "open-directory-fsync" : operation,
+      );
       if (/^(rename|copyFile)/.test(key)) checkPath(args[0], true, key);
-      return Reflect.apply(original, this, [path, ...args]);
+      if (/^create(?:Read|Write)Stream$/.test(key) && args[0]?.fd !== undefined)
+        checkPath(args[0].fd, writing, key);
+      const result = Reflect.apply(original, this, [path, ...args]);
+      if (!directoryFsync) return result;
+      return result.then(async (handle) => {
+        const fd = handle.fd;
+        directoryFsyncFds.add(fd);
+        // The real attachment store fsyncs each DSH_HOME ancestor. Its exact
+        // read-only directory handles expose no content or mutation operations.
+        for (const method of [
+          "read",
+          "readv",
+          "readFile",
+          "readLines",
+          "readableWebStream",
+          "createReadStream",
+          "write",
+          "writev",
+          "writeFile",
+          "appendFile",
+          "truncate",
+          "chmod",
+          "chown",
+          "utimes",
+          "createWriteStream",
+          "datasync",
+        ])
+          if (typeof handle[method] === "function")
+            t.mock.method(handle, method, deny(`filesystem.directory-handle.${method}`));
+        const stat = handle.stat;
+        t.mock.method(handle, "stat", function (...args) {
+          metadataReads.push({ operation: "directory-fstat", scope: "synthetic-root-ancestor" });
+          return Reflect.apply(stat, this, args);
+        });
+        assert.ok((await handle.stat()).isDirectory());
+        const sync = handle.sync;
+        t.mock.method(handle, "sync", function (...args) {
+          metadataReads.push({ operation: "directory-fsync", scope: "synthetic-root-ancestor" });
+          return Reflect.apply(sync, this, args);
+        });
+        const close = handle.close;
+        t.mock.method(handle, "close", async function (...args) {
+          try {
+            await Reflect.apply(close, this, args);
+            metadataReads.push({ operation: "directory-close", scope: "synthetic-root-ancestor" });
+          } finally {
+            directoryFsyncFds.delete(fd);
+          }
+        });
+        return handle;
+      });
     });
   };
   for (const key of [
@@ -246,6 +346,22 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
   ])
     guard(fsPromises, key, true);
   guard(fsPromises, "open", "open");
+  if (presetId === "minimal")
+    for (const key of [
+      "read",
+      "readv",
+      "write",
+      "writev",
+      "ftruncate",
+      "fchmod",
+      "fchown",
+      "futimes",
+      "fdatasync",
+      "fsync",
+      "fstat",
+      "close",
+    ])
+      for (const target of [key, `${key}Sync`]) guard(fs, target, false);
   syncBuiltinESMExports();
 
   const modules = {
@@ -312,6 +428,13 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
     return fiber;
   };
   class OfflineAdapter extends api.llm.LlmAdapter {
+    async resolveModel(provider, model, signal) {
+      const info = await super.resolveModel(provider, model, signal);
+      const inputModalities = modelModalities?.[model];
+      return inputModalities === undefined
+        ? info
+        : { ...info, inputModalities: structuredClone(inputModalities) };
+    }
     async *stream(request) {
       const agent = ctx.agents.get(request.sessionId);
       assert.ok(agent);
@@ -324,14 +447,18 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
         step: agent.phase.step,
         messages: structuredClone(request.messages),
         tools: structuredClone(request.tools),
-        plan: structuredClone(ctx.agentPresets.serviceFor(agent, "planMode").get(agent)),
+        plan: structuredClone(
+          presetId === "standard"
+            ? ctx.agentPresets.serviceFor(agent, "planMode").get(agent)
+            : ctx.agentPresets.serviceFor(agent, "planMode")?.get(agent),
+        ),
       });
       const requestOrdinal = requests.length;
       // A held response pauses only this synthetic model transport. The real
       // AgentLoop, activation admission and teardown remain unchanged.
       if (action?.kind === "hold") await action.wait(request);
       if (action === "finish" || (action?.kind === "hold" && action.calls === undefined))
-        yield { type: "text-delta", index: 0, text: "SYNTHETIC_STANDARD_COMPLETE" };
+        yield { type: "text-delta", index: 0, text: `SYNTHETIC_${marker}_COMPLETE` };
       else
         for (const [index, call] of (action?.kind === "hold" ? action.calls : action).entries())
           yield {
@@ -345,7 +472,7 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
     }
   }
   await mount({
-    name: "synthetic-standard-foundation",
+    name: `synthetic-${presetId}-foundation`,
     apply(scope) {
       new api.prompt.SystemPrompt(scope, {
         personaPrefix: "",
@@ -358,7 +485,7 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
       new api.agents.AgentRegistry(scope);
       new api.typert.TypertRegistry(scope);
       new api.llm.LlmRuntime(scope);
-      scope.llm.registerAdapter(["synthetic-standard-offline"], new OfflineAdapter());
+      scope.llm.registerAdapter([provider], new OfflineAdapter());
       scope.on("agent/error", ({ error }) => errors.push(error));
       if (permissionPresets) {
         // An in-memory configuration directory points to the actual official
@@ -410,8 +537,8 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
   await mount(api.loop, { agents: [], maxParallelToolCalls: 1 });
   await mount(api.loader, { baseUrl: pathToFileURL(join(runtime.root, "package.json")).href });
   ctx.loader.builtins.group = api.loader.Group;
-  await mount(api.presets, { default: "standard" });
-  await mount(api.defaults, { provider: "synthetic-standard-offline", model: "synthetic-model" });
+  await mount(api.presets, { default: presetId });
+  await mount(api.defaults, { provider, model: "synthetic-model" });
   await mount(api.attachments, { dshHome: homes.DSH_HOME });
   await mount(api.access);
   await mount(api.credentials, {
@@ -425,7 +552,7 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
   await mount(api.controller, { nativeOpen: false, listWorkSliceMs: 16 });
   await mount(api.schedule);
 
-  const patchPath = "node_modules/@deepseek-ai/dsh-web-app/presets/standard.patch.yml";
+  const patchPath = `node_modules/@deepseek-ai/dsh-web-app/presets/${presetId}.patch.yml`;
   const patchBytes = fs.readFileSync(join(runtime.root, patchPath));
   assert.equal(digest(patchBytes), inventory.get(patchPath));
   const patches = yaml.load(patchBytes.toString("utf8"), { schema: api.include.entryListSchema });
@@ -436,9 +563,9 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
   const definition = structuredClone(rows[0].config);
   await ctx.loader.root.update(rows);
   await ctx.loader.await();
-  assert.deepEqual(await ctx.agentPresets.resolve("standard"), { id: "standard" });
+  assert.deepEqual(await ctx.agentPresets.resolve(presetId), { id: presetId });
   const composition = (await ctx.agentPresets.compositionInventory()).find(
-    (row) => row.id === "standard",
+    (row) => row.id === presetId,
   );
   assert.ok(composition);
   assert.equal(composition.broken, undefined);
@@ -459,9 +586,14 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
     if (row.enabled) assert.equal(row.fiberState, 2, `${row.entryId} must be active`);
   for (const row of composition.rows) {
     const disabled =
-      row.entryId === "tool-plugin-manager" ||
-      row.entryId === "tool-plugin-market" ||
-      row.entryId === (process.platform === "win32" ? "tool-bash" : "tool-pwsh");
+      presetId === "standard"
+        ? row.entryId === "tool-plugin-manager" ||
+          row.entryId === "tool-plugin-market" ||
+          row.entryId === (process.platform === "win32" ? "tool-bash" : "tool-pwsh")
+        : ["terminal", "persistent"].some(
+            (prefix) =>
+              row.entryId === `${prefix}-${process.platform === "win32" ? "bash" : "pwsh"}`,
+          );
     assert.equal(
       row.enabled,
       !disabled,
@@ -471,7 +603,7 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
 
   const settings = {
     enabled: true,
-    prompt: "SYNTHETIC_STANDARD_REPLACE_MARKER",
+    prompt: `SYNTHETIC_${marker}_REPLACE_MARKER`,
     promptMode: "replace",
     workspacePolicy: "strict",
     workspaceFiles: [],
@@ -493,27 +625,27 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
     runtime.host,
   );
   adapter.apply();
-  const create = async (suffix, actions) => {
+  const create = async (suffix, actions, { model = "synthetic-model" } = {}) => {
     const handle = await ctx.agents.create({
-      sessionId: `synthetic-standard-${suffix}`,
-      meta: { cwd: workspace, agentPreset: "standard" },
+      sessionId: `synthetic-${presetId}-${suffix}`,
+      meta: { cwd: workspace, agentPreset: presetId },
       agentOptions: {
-        provider: "synthetic-standard-offline",
-        model: "synthetic-model",
+        provider,
+        model,
         maxTokens: 128,
       },
       setup: async (agentCtx) => {
-        await ctx.agentPresets.mount(agentCtx, "standard");
+        await ctx.agentPresets.mount(agentCtx, presetId);
       },
     });
     handles.push(handle);
     scripts.set(handle.agent.id, actions);
-    assert.equal(ctx.agentPresets.composedPreset(handle.agent.ctx), "standard");
+    assert.equal(ctx.agentPresets.composedPreset(handle.agent.ctx), presetId);
     const joined = ctx.agentPresets.inspectCompositions(handle.agent.ctx);
     assert.equal(joined.length, 1);
-    assert.equal(joined[0].id, "standard");
+    assert.equal(joined[0].id, presetId);
     assert.deepEqual(joined[0].leakedServices, []);
-    const revision = await ctx.agentPresets.acquireScope("standard");
+    const revision = await ctx.agentPresets.acquireScope(presetId);
     try {
       assert.equal(
         api.scope.scopeParentOf(api.scope.scopeOf(handle.agent.ctx)),
@@ -532,7 +664,7 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
     );
     revisionBindings.push({
       sessionId: handle.agent.id,
-      presetId: "standard",
+      presetId,
       exactRetainedScopeIdentity: true,
       modules: joined[0].modules.map(({ moduleName, useHostBase }) => ({
         moduleName,
@@ -631,18 +763,24 @@ export async function presetFixture(t, selectedRoot, cache, { permissionPresets 
         filesystemReadsReal: true,
         filesystemBoundaryGuards: true,
         guardsHeldThroughOfficialLifecycle: officialLifecycleDisposed,
-        ...(permissionPresets
+        guardsHeldThroughTemporaryRootCleanup: rootsRemovedUnderGuards,
+        ...(permissionPresets || presetId === "minimal"
           ? {
               metadataOnlyReads: {
                 purpose:
-                  "Official filesystem containment identity checks and canonical temporary roots",
-                scope: "Exact synthetic-root ancestors and platform temporary-root paths only",
+                  presetId === "minimal"
+                    ? "Actual attachment durability directory fsync"
+                    : "Official filesystem containment identity checks and canonical temporary roots",
+                scope: permissionPresets
+                  ? "Exact synthetic-root ancestors and platform temporary-root paths only"
+                  : "Exact synthetic-root ancestors only; O_RDONLY directory handles deny content and mutation",
                 operations: metadataReads.reduce((counts, row) => {
                   const key = `${row.scope}:${row.operation}`;
                   counts[key] = (counts[key] ?? 0) + 1;
                   return counts;
                 }, {}),
                 ancestorEnumerationContentReadsOrWritesAllowed: false,
+                remainingDirectoryMetadataHandles: directoryFsyncFds.size,
               },
             }
           : {}),

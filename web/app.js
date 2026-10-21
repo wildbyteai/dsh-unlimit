@@ -1619,6 +1619,18 @@ async function controlPage() {
   const v = { ...defaults, ...settings.value };
   const permission = state.status.permissionDefaults;
   const readCapability = state.status.capabilities?.find((item) => item.id === "readLimit");
+  const readBudget = readCapability?.effective;
+  const readBudgetHelp =
+    (typeof readBudget === "number"
+      ? `当前统一预算：${readBudget} B。`
+      : readCapability?.coverage === "host"
+        ? "当前沿用各项宿主预算。"
+        : "保存的预算尚未覆盖全部读取配置。") +
+    (readCapability?.targetCount
+      ? `已应用 ${readCapability.appliedTargetCount}/${readCapability.targetCount} 个启用读取配置。`
+      : "") +
+    (["pending", "partial"].includes(readCapability?.coverage) ? "请重新应用运行控制。" : "") +
+    "0 沿用宿主；新加载的预设需重新应用。仅限制 read 返回正文，行号与封装、实际文件 I/O 另计。";
   const permissionOptions = [
     ["", "跟随宿主默认"],
     ...(permission?.options ?? []).map((option) => [option.value, option.label ?? option.value]),
@@ -1722,7 +1734,7 @@ async function controlPage() {
                   ? `${scopeHelp}${can(id) ? "" : " 当前宿主未提供此能力，保存值暂不生效。"}`
                   : id === "readLimit"
                     ? can(id)
-                      ? `当前有效预算：${readCapability.effectiveCaps?.readMaxBytes ?? "未知"} B。0 沿用宿主；仅限制 read 返回正文，行号与封装、实际文件 I/O 另计。`
+                      ? readBudgetHelp
                       : `${readCapability?.detail ?? "宿主未提供此能力"}；当前保存值暂不生效。0 表示沿用宿主。`
                     : can(id)
                       ? ""

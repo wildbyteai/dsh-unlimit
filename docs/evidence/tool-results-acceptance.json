@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "behaviorId": "CORE-RESULT",
-  "generatedAt": "2026-10-21T05:53:38.691Z",
+  "generatedAt": "2026-10-21T06:29:00.356Z",
   "node": "v24.21.0",
   "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
   "patch": {
@@ -2488,6 +2488,7 @@
     "filesystemReadsReal": true,
     "filesystemBoundaryGuards": true,
     "guardsHeldThroughOfficialLifecycle": true,
+    "guardsHeldThroughTemporaryRootCleanup": true,
     "syntheticModelAdapter": true
   },
   "scenarios": [
@@ -2504,29 +2505,97 @@
       "result": "passed"
     },
     {
-      "id": "MULTIPLE-REAL-PRESET-READ-FIBERS-ARE-REJECTED-WITHOUT-MUTATION",
-      "result": "passed"
+      "id": "MULTIPLE-REAL-PRESET-READ-FIBERS-APPLY-AND-RESTORE-INDEPENDENTLY",
+      "result": "passed",
+      "targets": 2,
+      "actualReadCalls": 4,
+      "agentLoop": true,
+      "actualJsonlReadback": true,
+      "secondTargetFailureRolledBack": true,
+      "duringUpdateCancellationRolledBack": true
+    },
+    {
+      "id": "RETAINED-OLD-AND-CURRENT-PRESET-REVISIONS-ARE-BOTH-COVERED",
+      "result": "passed",
+      "targets": 3,
+      "actualReadCalls": 4,
+      "agentLoop": true,
+      "actualJsonlReadback": true
     }
   ],
   "calls": {
-    "syntheticModelRequests": 7,
-    "actualReadCalls": 4,
-    "turns": 3
+    "syntheticModelRequests": 23,
+    "turns": 11,
+    "actualReadCalls": 12,
+    "agentLoopReadCalls": 12,
+    "directToolRuntimeReadCalls": 0,
+    "retainedHistorySession": {
+      "syntheticModelRequests": 7,
+      "turns": 3,
+      "agentLoopReadCalls": 4,
+      "actualJsonlReadback": true
+    },
+    "additionalScopes": [
+      {
+        "sessionId": "synthetic-read-target-first-preset",
+        "presetId": "standard",
+        "syntheticModelRequests": 4,
+        "turns": 2,
+        "agentLoopReadCalls": 2,
+        "actualJsonlReadback": true,
+        "completeToolCatalog": true,
+        "otherToolSchemasUnchanged": true,
+        "readSchemaRestored": true
+      },
+      {
+        "sessionId": "synthetic-read-target-second-preset",
+        "presetId": "synthetic-second-read-preset",
+        "syntheticModelRequests": 4,
+        "turns": 2,
+        "agentLoopReadCalls": 2,
+        "actualJsonlReadback": true,
+        "completeToolCatalog": true,
+        "otherToolSchemasUnchanged": true,
+        "readSchemaRestored": true
+      },
+      {
+        "sessionId": "synthetic-read-target-retained-old",
+        "presetId": "synthetic-retained-read-preset",
+        "syntheticModelRequests": 4,
+        "turns": 2,
+        "agentLoopReadCalls": 2,
+        "actualJsonlReadback": true,
+        "completeToolCatalog": true,
+        "otherToolSchemasUnchanged": true,
+        "readSchemaRestored": true
+      },
+      {
+        "sessionId": "synthetic-read-target-retained-current",
+        "presetId": "synthetic-retained-read-preset",
+        "syntheticModelRequests": 4,
+        "turns": 2,
+        "agentLoopReadCalls": 2,
+        "actualJsonlReadback": true,
+        "completeToolCatalog": true,
+        "otherToolSchemasUnchanged": true,
+        "readSchemaRestored": true
+      }
+    ]
   },
   "testResult": {
-    "tests": 5,
-    "passed": 5,
+    "tests": 6,
+    "passed": 6,
     "failed": 0,
     "skipped": 0
   },
   "sourceDigests": [
     {
       "path": "tests/tool-results-host.test.mjs",
-      "sha256": "80bc780b1ea8f1a5223878685c838cf72f434749d8fe0dd2c6558445f33b9126"
+      "sha256": "ec4a60d55ee386792e6022f71c00231e26824e77dd0adc74b73645e2841614b4"
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "48d476c23e9b939dc0b6bee817be5b057ac761fe3825909661fff3ef3fbae19e"
+      "sha256": "38f0b1c97c272d8c536437425662d3860ba5e6146eb822fda3196d5150e3df9b"
     },
     {
       "path": "tests/helpers/official-packages.mjs",
@@ -2534,7 +2603,7 @@
     },
     {
       "path": "src/host/read-limits.js",
-      "sha256": "1d57eddb885b1d3fc8f6a76022b9f5a92a53e6a6112b403c4c7d69750f3dc768"
+      "sha256": "e3ce850394f6eb16624de5d39e8d50211cd35ce36819661103e5c4497e3707ab"
     },
     {
       "path": "src/host/runtime.js",
@@ -2548,7 +2617,9 @@
     "canonicalToolMessagesPreserved": true,
     "actualJsonlReadback": true,
     "pressureCompactionExercised": false,
-    "multipleActiveReadFibersSupported": false,
+    "multipleActiveReadFibersSupported": true,
+    "retainedPresetRevisionsCovered": true,
+    "allReadCallsThroughAgentLoop": true,
     "realModelOrDesktopExecuted": false
   }
 }

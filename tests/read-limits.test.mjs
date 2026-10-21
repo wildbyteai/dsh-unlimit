@@ -58,7 +58,7 @@ async function fixture(t) {
         hook(async () => {
           this.config = structuredClone(next);
           this.state = 2;
-        });
+        }, this);
       if (this.state !== 2) {
         this.inertia = continuation();
         return;
@@ -111,6 +111,25 @@ async function fixture(t) {
     updates,
     observers,
     services,
+    extra(overrides = {}) {
+      const config = { ...structuredClone(original), ...overrides };
+      const extraRaw = structuredClone(config);
+      const extraFiber = { ...fiber, config, runtime: fiber.runtime };
+      const extraEntry = {
+        options: { name: entry.options.name, config: extraRaw },
+        fiber: extraFiber,
+        moduleNamespace: namespace,
+      };
+      extraFiber.entry = extraEntry;
+      fiber.runtime.fibers.push(extraFiber);
+      entries.push(extraEntry);
+      return {
+        entry: extraEntry,
+        fiber: extraFiber,
+        raw: extraRaw,
+        original: structuredClone(config),
+      };
+    },
     hook: (value) => {
       hook = value;
     },
@@ -193,19 +212,248 @@ test("Loader and registry catalogs deduplicate the same Entry by identity", asyn
   assert.deepEqual(f.fiber.config, f.original);
 });
 
-test("distinct root and preset entries remain an unsupported ambiguous target", async (t) => {
+test("distinct root and retained preset entries apply and restore independent original caps", async (t) => {
   const f = await fixture(t);
-  const presetFiber = { ...f.fiber };
-  const presetEntry = { ...f.entry, fiber: presetFiber };
-  presetFiber.entry = presetEntry;
-  presetFiber.runtime = { callback: f.entry.moduleNamespace.apply, fibers: [presetFiber] };
-  f.registry([presetFiber.runtime]);
+  const preset = f.extra({ readMaxBytes: 256, readStreamMinSize: 16, edit: false });
+  f.entries([f.entry]);
+  f.registry([f.fiber.runtime]);
   const capability = f.adapter.capabilities()[0];
-  assert.equal(capability.state, "unsupported");
-  assert.match(capability.detail, /未唯一活动/);
+  assert.equal(capability.state, "available");
+  assert.equal(capability.targetCount, 2);
   assert.equal(capability.effectiveCaps, null);
-  await assert.rejects(f.adapter.apply(), { code: "UNSUPPORTED_CAPABILITY" });
-  assert.equal(f.updates.length, 0);
+  const active = (await f.adapter.apply())[0];
+  assert.equal(active.state, "active");
+  assert.equal(active.coverage, "complete");
+  assert.equal(active.effective, 80);
+  assert.equal(active.effectiveCaps, null, "Different stream thresholds are not aggregated");
+  assert.equal(active.appliedTargetCount, 2);
+  assert.equal(active.ownedTargetCount, 2);
+  assert.deepEqual(
+    active.targets.map((target) => target.effectiveCaps.readMaxBytes),
+    [80, 80],
+  );
+  assert.deepEqual(
+    active.targets.map((target) => target.effectiveCaps.readStreamMinSize),
+    [10485760, 16],
+  );
+  assert.equal(preset.fiber.config.edit, false);
+  f.settings.readLimit = 90;
+  await f.adapter.changed();
+  await f.adapter.revert();
+  assert.deepEqual(f.fiber.config, f.original);
+  assert.deepEqual(preset.fiber.config, preset.original);
+  assert.equal(f.entry.options.config, f.raw);
+  assert.equal(preset.entry.options.config, preset.raw);
+  assert.deepEqual(preset.raw, preset.original);
+  assert.ok(f.updates.every((row) => row.noSave === true));
+  assert.equal(f.updates.length, 6);
+});
+
+test("new targets need explicit apply, disabled reads stay disabled, and exited ownership stays visible", async (t) => {
+  const f = await fixture(t);
+  const disabled = f.extra({ read: false, readMaxBytes: 12 });
+  await f.adapter.apply();
+  assert.equal(f.adapter.capabilities()[0].targetCount, 1);
+  assert.deepEqual(disabled.fiber.config, disabled.original);
+  const added = f.extra({ readMaxBytes: 256 });
+  const pending = f.adapter.capabilities()[0];
+  assert.equal(pending.state, "available");
+  assert.equal(pending.coverage, "partial");
+  assert.equal(pending.targetCount, 2);
+  assert.equal(pending.appliedTargetCount, 1);
+  assert.equal(pending.effective, null);
+  assert.equal(pending.effectiveCaps, null);
+  assert.match(pending.detail, /需重新应用/);
+  assert.equal(added.fiber.config.readMaxBytes, 256);
+  assert.equal((await f.adapter.apply())[0].state, "active");
+  assert.equal(f.updates.length, 2, "An unchanged owned target must not be remounted");
+  f.entries([f.entry, disabled.entry]);
+  const exited = f.adapter.capabilities()[0];
+  assert.equal(exited.state, "unsupported");
+  assert.equal(exited.coverage, "conflict");
+  assert.equal(exited.targetCount, 1);
+  assert.equal(exited.ownedTargetCount, 2);
+  assert.equal(exited.effective, null);
+  assert.equal(exited.targets.find((target) => target.state === "missing").owned, true);
+  await assert.rejects(f.adapter.revert(), (error) => {
+    assert.equal(error.code, "CONFLICT");
+    assert.equal(error.partial.targets.length, 2);
+    assert.equal(error.partial.targets.filter((target) => target.restored).length, 1);
+    return error.partial.owned && !error.partial.restored;
+  });
+  assert.deepEqual(
+    f.fiber.config,
+    f.original,
+    "Missing targets do not block independent restoration",
+  );
+  f.entries([f.entry, added.entry, disabled.entry]);
+  await f.adapter.revert();
+  assert.deepEqual(added.fiber.config, added.original);
+  assert.deepEqual(disabled.fiber.config, disabled.original);
+  assert.equal(f.adapter.capabilities()[0].ownedTargetCount, 0);
+});
+
+test("multi-target failure and cancellation roll back each attempted target to its previous budget", async (t) => {
+  for (const cancel of [false, true]) {
+    const f = await fixture(t);
+    const second = f.extra({ readMaxBytes: 128 });
+    await f.adapter.apply();
+    const before = [structuredClone(f.fiber.config), structuredClone(second.fiber.config)];
+    f.settings.readLimit = 90;
+    const abort = new AbortController();
+    let once = true;
+    f.hook(async (next, fiber) => {
+      await next();
+      if (fiber === second.fiber && once) {
+        once = false;
+        if (cancel) abort.abort();
+        else throw new Error("Synthetic second-target failure");
+      }
+    });
+    await assert.rejects(f.adapter.changed({ signal: abort.signal }), (error) => {
+      assert.equal(error.partial.targets.length, 2);
+      assert.ok(error.partial.targets.every((target) => target.restored && target.owned));
+      return error.partial.restored && error.partial.owned;
+    });
+    assert.deepEqual([f.fiber.config, second.fiber.config], before);
+    assert.equal(f.adapter.capabilities()[0].state, "available");
+    f.hook(async (next) => next());
+    await f.adapter.revert();
+    assert.deepEqual(f.fiber.config, f.original);
+    assert.deepEqual(second.fiber.config, second.original);
+  }
+});
+
+test("one conflicting target cannot block other rollback or restoration, and external edits remain exact", async (t) => {
+  const f = await fixture(t);
+  const second = f.extra({ readMaxBytes: 128 });
+  let external;
+  let once = true;
+  f.hook(async (next, fiber) => {
+    await next();
+    if (fiber === second.fiber && once) {
+      once = false;
+      external = { ...f.fiber.config, readMaxBytes: 77 };
+      f.fiber.config = external;
+      throw new Error("Synthetic failure after external first-target change");
+    }
+  });
+  await assert.rejects(f.adapter.apply(), (error) => {
+    assert.equal(error.partial.targets.filter((target) => target.restored).length, 1);
+    return !error.partial.restored && error.partial.owned;
+  });
+  assert.equal(f.fiber.config, external);
+  assert.deepEqual(second.fiber.config, second.original);
+  f.hook(async (next) => next());
+  f.entries([second.entry]);
+  f.registry([]);
+  await assert.rejects(f.adapter.revert(), { code: "CONFLICT" });
+  assert.equal(f.fiber.config, external);
+  assert.equal(f.adapter.capabilities()[0].ownedTargetCount, 1);
+
+  const g = await fixture(t);
+  const other = g.extra({ readMaxBytes: 256 });
+  await g.adapter.apply();
+  other.entry.options.config = { ...other.raw, edit: false };
+  const externalRaw = other.entry.options.config;
+  await assert.rejects(
+    g.adapter.revert(),
+    (error) =>
+      error.code === "CONFLICT" &&
+      error.partial.targets.filter((target) => target.restored).length === 1,
+  );
+  assert.deepEqual(g.fiber.config, g.original);
+  assert.equal(other.entry.options.config, externalRaw);
+  assert.equal(other.fiber.config.readMaxBytes, 80);
+});
+
+test("externally disabling an owned read retains conflict responsibility without counting it as an enabled target", async (t) => {
+  const f = await fixture(t);
+  const second = f.extra();
+  await f.adapter.apply();
+  const external = { ...second.fiber.config, read: false };
+  second.fiber.config = external;
+  const capability = f.adapter.capabilities()[0];
+  assert.equal(capability.targetCount, 1);
+  assert.equal(capability.appliedTargetCount, 1);
+  assert.equal(capability.ownedTargetCount, 2);
+  assert.equal(capability.coverage, "conflict");
+  assert.equal(capability.state, "unsupported");
+  assert.equal(capability.effective, null);
+  await assert.rejects(f.adapter.revert(), { code: "CONFLICT" });
+  assert.deepEqual(f.fiber.config, f.original);
+  assert.equal(second.fiber.config, external);
+});
+
+test("an equal-valued external parsed-config replacement remains a conflict during multi-target rollback", async (t) => {
+  const f = await fixture(t);
+  const second = f.extra({ readMaxBytes: 128 });
+  let external;
+  let once = true;
+  f.hook(async (next, fiber) => {
+    await next();
+    if (fiber === second.fiber && once) {
+      once = false;
+      external = structuredClone(f.fiber.config);
+      f.fiber.config = external;
+      throw new Error("Synthetic equal-valued external replacement");
+    }
+  });
+  await assert.rejects(f.adapter.apply(), (error) => {
+    assert.equal(error.partial.targets.filter((target) => target.restored).length, 1);
+    assert.equal(error.partial.targets.find((target) => !target.restored).error.code, "CONFLICT");
+    return error.partial.owned && !error.partial.restored;
+  });
+  assert.equal(f.fiber.config, external);
+  assert.equal(f.fiber.config.readMaxBytes, 80);
+  assert.deepEqual(second.fiber.config, second.original);
+  assert.equal(f.adapter.capabilities()[0].code, "CONFLICT");
+  const count = f.updates.length;
+  await assert.rejects(f.adapter.revert(), { code: "CONFLICT" });
+  assert.equal(f.updates.length, count);
+});
+
+test("a restoration veto retains only that target and permits an explicit retry", async (t) => {
+  const f = await fixture(t);
+  const second = f.extra({ readMaxBytes: 128 });
+  await f.adapter.apply();
+  f.hook(async (next, fiber) => (fiber === f.fiber ? undefined : next()));
+  await assert.rejects(f.adapter.revert(), (error) => {
+    assert.equal(error.code, "CONFIG_NOT_APPLIED");
+    assert.equal(error.partial.targets.length, 2);
+    assert.equal(error.partial.targets.filter((target) => target.restored).length, 1);
+    return error.partial.owned && !error.partial.restored;
+  });
+  assert.equal(f.fiber.config.readMaxBytes, 80);
+  assert.deepEqual(second.fiber.config, second.original);
+  assert.equal(f.adapter.capabilities()[0].ownedTargetCount, 1);
+  f.hook(async (next) => next());
+  await f.adapter.revert();
+  assert.deepEqual(f.fiber.config, f.original);
+});
+
+test("targets appearing during asynchronous verification or update cannot produce global active", async (t) => {
+  for (const duringUpdate of [false, true]) {
+    const f = await fixture(t);
+    let added;
+    if (duringUpdate)
+      f.hook(async (next) => {
+        await next();
+        added ??= f.extra({ readMaxBytes: 256 });
+      });
+    else {
+      const verify = f.adapter.moduleIdentity.bind(f.adapter);
+      f.adapter.moduleIdentity = async (target) => {
+        await verify(target);
+        added ??= f.extra({ readMaxBytes: 256 });
+      };
+    }
+    await assert.rejects(f.adapter.apply(), { code: "CONFLICT" });
+    assert.deepEqual(f.fiber.config, f.original);
+    assert.deepEqual(added.fiber.config, added.original);
+    assert.equal(f.adapter.capabilities()[0].state, "available");
+    assert.equal(f.adapter.capabilities()[0].appliedTargetCount, 0);
+  }
 });
 
 test("stale or mismatched registry fibers cannot identify an active preset entry", async (t) => {
@@ -249,6 +497,56 @@ test("revert locates the owned inactive preset fiber but does not invent a remov
   await assert.rejects(f.adapter.revert(), { code: "CONFLICT" });
   assert.equal(f.updates.length, count);
   assert.equal(f.adapter.capabilities()[0].owned, true);
+});
+
+test("an owned Loader entry losing its fiber reports conflict without losing restoration responsibility", async (t) => {
+  for (const remove of [
+    (entry) => {
+      delete entry.fiber;
+    },
+    (entry) => {
+      entry.fiber = undefined;
+    },
+  ]) {
+    const f = await fixture(t);
+    await f.adapter.apply();
+    const applied = f.fiber.config;
+    const snapshot = structuredClone(applied);
+    const count = f.updates.length;
+    remove(f.entry);
+    const capability = f.adapter.capabilities()[0];
+    assert.equal(capability.state, "unsupported");
+    assert.equal(capability.code, "CONFLICT");
+    assert.equal(capability.coverage, "conflict");
+    assert.equal(capability.targetCount, 0);
+    assert.equal(capability.appliedTargetCount, 0);
+    assert.equal(capability.ownedTargetCount, 1);
+    assert.equal(capability.effective, null);
+    assert.equal(capability.effectiveCaps, null);
+    assert.deepEqual(
+      capability.targets.map(({ state, owned, effectiveCaps }) => ({
+        state,
+        owned,
+        effectiveCaps,
+      })),
+      [{ state: "conflict", owned: true, effectiveCaps: null }],
+    );
+    for (const operation of ["apply", "revert"])
+      await assert.rejects(
+        f.adapter[operation](),
+        (error) => error.code === "CONFLICT" && !error.partial.restored && error.partial.owned,
+      );
+    assert.equal(f.updates.length, count);
+    assert.equal(f.fiber.config, applied);
+    assert.deepEqual(applied, snapshot);
+    assert.equal(f.entry.options.config, f.raw);
+    assert.deepEqual(f.raw, f.original);
+    assert.equal(f.adapter.capabilities()[0].ownedTargetCount, 1);
+    f.entry.fiber = f.fiber;
+    await f.adapter.revert();
+    assert.deepEqual(f.fiber.config, f.original);
+    assert.equal(f.adapter.capabilities()[0].ownedTargetCount, 0);
+  }
 });
 
 test("unsupported versions, modified modules, duplicate/inactive/disabled targets reject before writes", async (t) => {

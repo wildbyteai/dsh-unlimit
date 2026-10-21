@@ -90,13 +90,27 @@ Host 依赖也使用官方服务，包括调度、存储、会话控制器、子
 
 完整 minimal 声明有 9 个叶子条目，macOS 应启用 7 个。它关闭文本 read/write/edit，只保留 read_image；文本任务使用名为 `bash` 的持久终端工具，输入为必填非空 `command` 字符串。该工具依赖 tools/terminals/workingDirectory；终端后端另依赖 sandboxPolicy/sessionProjections/subprocess，compaction 依赖 llm/tokenMeter/sessions。受限调用按当前 owner.session 解析策略，先经官方 sandbox.confine，再交给真实 spawnTerminal。
 
-当前 standard 夹具禁止进程启动，并假定存在 planMode；minimal 没有这个服务，不能只替换预设名后声称已验。此前真实 PTC 探针在 Seatbelt 的 sandbox_apply 返回 Operation not permitted；本次没有动态重试，因此不将旧失败改写为此次 minimal 已运行失败。后续必须在可运行官方受限后端的环境中，保持原声明验证持久终端状态、实际文件内容、日志与处置；不能用普通 read、伪终端或关闭沙箱代替。
+只读核实时的 standard 夹具禁止进程启动，并假定存在 planMode；minimal 没有这个服务，不能只替换预设名后声称已验。此前真实 PTC 探针在 Seatbelt 的 sandbox_apply 返回 Operation not permitted；本次没有动态重试，因此不将旧失败改写为此次 minimal 已运行失败。后续必须在可运行官方受限后端的环境中，保持原声明验证持久终端状态、实际文件内容、日志与处置；不能用普通 read、伪终端或关闭沙箱代替。
+
+## 完整 minimal 图片路径执行（2026-10-21）
+
+[minimal-host.test.mjs](../tests/minimal-host.test.mjs) 通过参数化的共享预设夹具加载未经删减的 `minimal.patch.yml`。全部 9 个叶子条目保留，macOS 的 7 个启用条目均 active；每个 Agent 仍按对象身份加入实际保留的 revision。官方 terminal 与 compaction 服务留在该 scope 内，无 planMode 或服务泄漏。所有请求只包含官方原生 `bash / read_image` 两个 schema；没有为通过文本测试额外注册 `read`。
+
+3 个场景及父测试共 **4 项**：替换提示词下读图、仅文本模型拒绝、撤销适配后读图。3 次真实 AgentLoop 的 `read_image` 调用中，2 次读取成功，1 次由官方模型输入能力门拒绝。合成 adapter 通过正式模型信息接口声明支持的输入类型；透明观察器调用真实方法，未改写能力判定。仅文本路由被拒绝时，文件 `readBytes` 和附件 `saveImage` 计数均不增加。
+
+输入为本项目按 PNG 字段生成的原创 **108 字节、1×1 RGBA** 图片，带合成 EXIF。官方附件服务实际解码、归一化为 **94 字节 WebP** 并持久化；测试按归一化结果核对媒体类型、尺寸、内容摘要、附件引用、官方 readImage 与物理文件字节，输入文件保持不变。第二个模型请求必须包含实际工具结果和同一图片引用。三个会话各 17 个事件，官方 JSONL reader 与内存事件逐项一致，物理 JSONL 的工具结果亦独立读回。
+
+替换后自写正文进入实际 system 槽，官方 persona 消失；撤销后恢复官方 persona，原工具 schema 一致。公开证据只保留官方正文摘要、合成附件信息与文件摘要，不包括官方正文或本机临时路径，见 [minimal-acceptance.json](evidence/minimal-acceptance.json)。复验沿用两个运行时环境变量，执行 `tests/minimal-host.test.mjs`；仅 `DSH_UNLIMIT_MINIMAL_EVIDENCE=1` 才更新证据。
+
+附件服务为确保持久化，会打开并同步临时 DSH_HOME 的确切祖先目录。夹具仅对 minimal 放行这些 `O_RDONLY` 目录句柄，并限制为 stat/fsync/close；目录内容读取、枚举、写入和句柄内容操作均不允许。网络和子进程入口继续禁止。官方生命周期与临时根清理完成后再检查守卫，实际 9 个祖先目录句柄均关闭。该例外与子代理权限验收的路径 metadata 例外分别记录，不能推导出任意文件读取授权。
+
+本切片没有执行 bash、PTY 或 PTC，也没有触发压力压缩。`CORE-MODES` 要求四模式完成同一合成文本任务，此项仍未完成；图片读取不替代该验收。历史 PTC 失败也未重试，不能据此断言在正式批准的另一执行环境中必然失败或成功。
 
 ## 保留差距
 
-- 完整 standard 声明、读取与计划切换已有隔离证据；其余已注册工具没有在本回归执行。minimal/PTC 完整预设和真实用户默认预设选择仍未验，不能把工具注册视为工具执行验收。
+- 完整 standard 声明、读取与计划切换以及完整 minimal 的图片路径已有隔离证据。极简文本任务、PTC 完整预设执行和真实用户默认预设选择仍未验，不能把工具注册视为工具执行验收。
 - ToolRuntime 的呈现值是 native/ptc；极简是另一份工具组合，其原生配置关闭文本 `read`，依赖持久 shell 读取文本。本次没有启动 shell 或 PTY。
 - PTC 需要实际后端。此前隔离探针被平台 `sandbox-unavailable` 阻断；本回归未重试 PTC、未运行子进程，也未用描述性 runtime 或宿主 eval 代替执行。
-- 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复、极简/PTC 完整预设及桌面计划 UI 仍未验证。
+- 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复、极简文本执行、PTC 完整预设及桌面计划 UI 仍未验证。
 - 合成人答没有执行真实 UI/Gateway 路由或 UI 所拥有的提问审计事件；本证据只声称已读回的 `plan/mode` Session 事件。
 - 本回归没有增加网页抓取或浏览器路径覆盖；`CORE-WEBTOOLS` 的本地页面检索和完整四模式工具能力仍需独立验收。
