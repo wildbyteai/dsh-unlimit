@@ -678,3 +678,28 @@ bundled Node **v24.21.0**、显式 **0.2.1-rc.2** 运行时与固定官方归档
 bundled Node **v24.21.0**、指定 **0.2.1-rc.2** 运行时和固定归档的完整隔离回归 **1041 通过、0 失败、0 跳过**，日志 `artifacts/preview-process-full.log`；语法 **186/186**，有限来源与分层检查通过。117 项原验收前五列未变，仅更新交付路径的实际状态；来源说明、NOTICE、UNLICENSED 和第三方归属保持。没有读取旧插件、安装、重载或修改真实 DSH 配置。
 
 构建、离线打包和包/基线检查 **3 项通过**；本批没有发布文件变化，安装包仍为 **75 个文件、1,042,060 字节**，SHA-256 `f2e74109045aa9e6f7091def5c2de731d4fe30488ff106fd391338af6e3dbde4`，包内字节逐项与工作树一致。
+
+## 目标生成任务草稿（2026-10-21）
+
+本轮基于 `9db7f53b93f3964b6ad87bc19fe8607ec0ac70ef` 的工作区修改，新增 `workflow.plan.propose`、目录候选与结果解析、模型工具/Controller 路由和页面生成/填表入口。对应 `FLOW-DISPATCH`，117 行前五列不变；来源说明、NOTICE 与许可状态保留。本节随功能提交，不能自动代表以后版本。
+
+实际路径：目标和父会话目录 → 普通官方 planner 执行 → 原始结果与临时 JSONL → 校验后的草稿 → 用户检查/编辑 → 既有显式计划执行。生成不会自动启动草稿中的任务。规划者只有提示要求不调用工具，仍继承宿主工具与权限，不是无工具沙箱。目录只提供候选名字与描述，校验不证明模型选择正确或具备执行授权；项目私有技能暂不进入候选。
+
+验证与结果：
+
+- 使用固定 bundled Node `v24.21.0`、官方 `0.2.1-rc.2` 运行时及本地已校验包缓存，完整 `--expose-internals --test tests/*.test.mjs`：**1060 通过、0 失败、0 跳过**。日志为本地忽略目录 `artifacts/plan-draft-full-authorized.log`。首次普通沙箱运行因本机回环 listen 的 EPERM 导致 20 项既有用例失败，不能算通过；获得项目隔离测试所需执行权限后重新运行同一测试集通过，没有改弱断言。
+- 新增规划用例覆盖目录外能力、未知角色、循环/缺失依赖、额外字段/预设选择、非 JSON/非文本/超限输出、停止、失败、关闭/父改绑、等待处置后才产出草稿、另行提交和 UI 过期响应/文本转义。官方 spawn/AgentLoop 用例实际执行规划和后续明确任务，验证收据处置、槽位释放、原始结果持久读回；LLM 传输与任务材料为合成，没有真实模型调用。
+- 回环组件预览使用真实 `workflowPlans` 页面、`DesktopWorkflowPlan/Workflow/Flow/WorkspaceStore`，替代的仅是激活结果与目录。浏览器实际完成输入目标、生成、读取、填表、提交及结果读取；两个合成任务均显示完成、处置和槽位释放。实际预览视口为 **1280×720**，不是历史记录中的 1280×820，也不是 DSH 嵌入验收。页面无 console error；截图 `artifacts/plan-draft-preview.png`。合成服务、浏览器页和临时数据已清理。
+- 语法检查 **187/187**、来源记录有限检查、54 模块分层检查、117 项验收基线检查通过。来源检查不证明法律独立性。
+- 构建与离线打包成功，包含 **76 文件**，每个文件从 tar 中读回与工作区字节比对一致，包含新的 `src/host/workflow-draft.js`；tgz 为 **322968 字节**，SHA-256 `bcbcf0966599dcceec0103b45728f48515cd7db4fe0ca95d8b935b43af2970ae`。包内容仍仅为发布允许列表，不含 profile、临时数据库或测试宿主代码。
+
+完整回归命令：
+
+```sh
+DSH_UNLIMIT_RUNTIME='/Applications/DeepSeek Harness.app/Contents/Resources/app/dsh' \
+DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
+'/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node' \
+--expose-internals --test tests/*.test.mjs
+```
+
+本轮没有安装/重载插件，没有修改真实 DSH 配置、profile 或会话。真实模型拆解/匹配质量、项目技能、自动执行闭环、技能递归依赖和真实桌面仍是差距；不能把本次提交称为完整 1:1。

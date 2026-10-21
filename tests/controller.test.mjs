@@ -606,6 +606,7 @@ test("unknown versions cannot start workflow or continuation mutations", async (
     "continuation.continue",
     "continuation.stop",
     "workflow.plan.create",
+    "workflow.plan.propose",
   ]) {
     await assert.rejects(controller.dispatch(action, { operation: "register" }), {
       code: "UNSUPPORTED",

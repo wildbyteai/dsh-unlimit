@@ -35,6 +35,175 @@ const task = (id, patch = {}) => ({
   ...patch,
 });
 
+const planningCatalog = () => ({
+  list: async () => ({
+    tools: [
+      {
+        name: "synthetic_read",
+        description: "Read a supplied synthetic file",
+        inputSchema: { secret: "NOT_FOR_PLANNER" },
+      },
+    ],
+    skills: [
+      { origin: "host", name: "inventory", description: "Inventory supplied data" },
+      { origin: "project", name: "private-project-skill" },
+    ],
+    toolkit: { tools: [{ id: "unavailable", available: false }] },
+    sources: { tools: { state: "available", complete: true } },
+  }),
+  preflight: async () => ({ status: "ready" }),
+});
+const modelOutput = (value) => ({
+  stopReason: "completed",
+  output: [{ type: "text", text: JSON.stringify(value) }],
+});
+
+test("a goal produces a checked proposal using exact catalog names, without dispatching proposed tasks", async (t) => {
+  const f = fixture(t, planningCatalog());
+  assert.equal(f.plans.capabilities().planDrafting, true);
+  const { item } = await f.plans.dispatch("workflow.plan.propose", {
+    ...f.owner,
+    goal: "盘点提供的合成文件并汇总",
+  });
+  await until(() => f.starts.length === 1);
+  const prompt = f.starts[0].request.prompt[0].text;
+  assert.match(prompt, /synthetic_read/);
+  assert.match(prompt, /inventory/);
+  assert.doesNotMatch(prompt, /NOT_FOR_PLANNER|private-project-skill|unavailable/);
+  const generated = [
+    task("read", { requirements: [{ kind: "tool", name: "synthetic_read" }] }),
+    task("report", { dependsOn: ["read"] }),
+  ];
+  const gate = deferred();
+  f.gates.set(f.starts[0].childId, gate);
+  f.pending.get(f.starts[0].childId).resolve(modelOutput({ tasks: generated }));
+  await until(async () => (await f.status(item.id)).tasks[0].state === "completed");
+  assert.equal((await f.status(item.id)).proposal.state, "pending");
+  gate.resolve();
+  const final = await until(async () => {
+    const current = await f.status(item.id);
+    return current.proposal.state === "ready" && current;
+  });
+  assert.equal(final.state, "completed");
+  assert.equal(final.proposal.source.runId, final.tasks[0].runId);
+  assert.equal(final.proposal.source.independentlyVerified, false);
+  assert.equal(f.starts.length, 1);
+  assert.equal(f.flow.status(f.workspace.id).active.length, 0);
+  assert.deepEqual(
+    final.proposal.tasks.map(({ id }) => id),
+    ["read", "report"],
+  );
+  // A separate explicit submission uses the existing scheduler and current dependency preflight.
+  const run = await f.create(final.proposal.tasks);
+  await until(() => f.starts.length === 2);
+  assert.match(f.starts[1].request.prompt[0].text, /synthetic_read/);
+  await f.stop(run.item.id);
+});
+
+test("invalid model proposals retain raw output and cannot be treated as executable plans", async (t) => {
+  for (const [name, generated] of [
+    ["invented capability", [task("a", { requirements: [{ kind: "tool", name: "invented" }] })]],
+    ["unobserved directory", [task("a", { requirements: [{ kind: "directory", path: "/tmp" }] })]],
+    ["missing dependency", [task("a", { dependsOn: ["missing"] })]],
+    ["cycle", [task("a", { dependsOn: ["b"] }), task("b", { dependsOn: ["a"] })]],
+    ["unknown role", [task("a", { role: "invented" })]],
+    ["preset injection", [task("a", { usePreset: true })]],
+    ["extra action", [task("a", { command: "never-execute" })]],
+  ])
+    await t.test(name, async (t) => {
+      const f = fixture(t, planningCatalog());
+      const { item } = await f.plans.dispatch("workflow.plan.propose", {
+        ...f.owner,
+        goal: "整理合成材料",
+      });
+      await until(() => f.starts.length === 1);
+      const output = modelOutput({ tasks: generated });
+      f.pending.get(f.starts[0].childId).resolve(output);
+      const final = await until(async () => {
+        const current = await f.status(item.id);
+        return current.proposal.state === "invalid" && current;
+      });
+      assert.equal(final.state, "finished-with-errors");
+      assert.equal(final.proposal.tasks, undefined);
+      assert.deepEqual(final.tasks[0].receipt.result, output);
+      assert.equal(f.starts.length, 1);
+    });
+});
+
+test("planning respects close, context limits, failure and stop", async (t) => {
+  const catalog = planningCatalog();
+  const f = fixture(t, catalog);
+  await assert.rejects(
+    f.plans.dispatch("workflow.plan.propose", { ...f.owner, goal: "a".repeat(17 * 1024) }),
+    { code: "INVALID_INPUT" },
+  );
+  const read = catalog.list;
+  catalog.list = async () => {
+    const value = await read();
+    value.tools[0].description = "a".repeat(31 * 1024);
+    return value;
+  };
+  await assert.rejects(f.plans.dispatch("workflow.plan.propose", { ...f.owner, goal: "goal" }), {
+    code: "PLANNING_CONTEXT_LIMIT",
+  });
+  assert.equal(f.starts.length, 0);
+  catalog.list = read;
+  const first = await f.plans.dispatch("workflow.plan.propose", { ...f.owner, goal: "goal" });
+  await until(() => f.starts.length === 1);
+  const stopped = await f.stop(first.item.id);
+  assert.equal(stopped.item.proposal.state, "cancelled");
+  assert.equal(stopped.stopped, true);
+  const second = await f.plans.dispatch("workflow.plan.propose", { ...f.owner, goal: "goal" });
+  await until(() => f.starts.length === 2);
+  f.pending.get(f.starts[1].childId).resolve({ stopReason: "max-tokens", output: [] });
+  await until(async () => (await f.status(second.item.id)).proposal.state === "failed");
+  const wait = deferred();
+  catalog.list = () => wait.promise;
+  const pending = f.plans.dispatch("workflow.plan.propose", { ...f.owner, goal: "goal" });
+  await f.plans.close();
+  wait.resolve(await read());
+  await assert.rejects(pending, { code: "CLOSED" });
+  assert.equal(f.starts.length, 2);
+});
+
+test("malformed, non-text and oversized planner output is rejected without repair or execution", async (t) => {
+  for (const output of [
+    [{ type: "text", text: "not JSON" }],
+    [{ type: "text", text: "x".repeat(33 * 1024) }],
+    [{ type: "image", data: "synthetic" }],
+    [{ type: "text", text: JSON.stringify({ tasks: [task("a")], execute: true }) }],
+  ])
+    await t.test(output[0].type + String(output[0].text?.length), async (t) => {
+      const f = fixture(t, planningCatalog());
+      const { item } = await f.plans.dispatch("workflow.plan.propose", {
+        ...f.owner,
+        goal: "合成目标",
+      });
+      await until(() => f.starts.length === 1);
+      f.pending.get(f.starts[0].childId).resolve({ stopReason: "completed", output });
+      const result = await until(async () => {
+        const current = await f.status(item.id);
+        return current.proposal.state === "invalid" && current;
+      });
+      assert.equal(result.proposal.error.code, "INVALID_PROPOSAL");
+      assert.deepEqual(result.tasks[0].receipt.result.output, output);
+      assert.equal(f.starts.length, 1);
+    });
+});
+
+test("catalog observation cannot carry a planning request across a changed parent binding", async (t) => {
+  const catalog = planningCatalog();
+  const original = catalog.list;
+  const wait = deferred();
+  catalog.list = () => wait.promise;
+  const f = fixture(t, catalog);
+  const pending = f.plans.dispatch("workflow.plan.propose", { ...f.owner, goal: "合成目标" });
+  f.store.dispatch("workspaces.bind", { id: f.other.id, sessionId: f.owner.parentSessionId });
+  wait.resolve(await original());
+  await assert.rejects(pending, { code: "WORKSPACE_MISMATCH" });
+  assert.equal(f.starts.length, 0);
+});
+
 test("optional summary waits for every source and disposal, cites exact unverified results and uses normal lifecycle", async (t) => {
   const f = fixture(t);
   const { item } = await f.plans.dispatch("workflow.plan.create", {

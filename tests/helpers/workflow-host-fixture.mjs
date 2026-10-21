@@ -112,7 +112,7 @@ export async function loadOfficial() {
 // streamBehavior receives a 1-based count for this session and returns
 // "stop" (default), "max-tokens", or "hold". A held request remains cancellable
 // and is exposed in holds with resolve() for tests that explicitly release it.
-export async function fixture(t, { captureAll = false, streamBehavior } = {}) {
+export async function fixture(t, { captureAll = false, streamBehavior, textOutput } = {}) {
   const finishGuard = denyExternalExecution(t);
   let dispose;
   t.after(async () => {
@@ -225,12 +225,14 @@ export async function fixture(t, { captureAll = false, streamBehavior } = {}) {
             });
             if (request.signal.aborted) reject(request.signal.reason);
           });
+        const text = textOutput ? await textOutput(request) : "Synthetic evidence: 1, 2, 3.";
+        assert.equal(typeof text, "string");
         yield { type: "block-start", index: 0, blockType: "text" };
-        yield { type: "text-delta", index: 0, text: "Synthetic evidence: 1, 2, 3." };
+        yield { type: "text-delta", index: 0, text };
         yield {
           type: "block-end",
           index: 0,
-          block: { type: "text", text: "Synthetic evidence: 1, 2, 3." },
+          block: { type: "text", text },
         };
         yield {
           type: "finish",

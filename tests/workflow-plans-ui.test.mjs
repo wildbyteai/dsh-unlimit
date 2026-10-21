@@ -144,6 +144,79 @@ async function setup({ capability = { available: true, evidenceSummary: true }, 
   return { view, host, calls, errors, flush, emit, select };
 }
 
+test("goal planning displays a checked draft, fills JSON only on request and never auto-submits", async () => {
+  const draft = { ...task, dependsOn: [], task: "整理合成材料 <script>never-run</script>" };
+  const ui = await setup({
+    respond(action, payload) {
+      if (action === "workflow.plan.capabilities") return { available: true, planDrafting: true };
+      if (action === "workflow.plan.propose")
+        return { item: plan("draft-one", { proposal: { state: "pending" } }) };
+      if (action === "workflow.plan.status")
+        return { item: plan("draft-one", { proposal: { state: "ready", tasks: [draft] } }) };
+      return { item: plan(payload.id) };
+    },
+  });
+  assert.equal(ui.host.node("propose").disabled, false);
+  assert.equal(ui.host.node("use-draft").disabled, true);
+  ui.host.node("goal").value = "盘点合成材料";
+  await ui.emit("propose", "click");
+  assert.deepEqual(ui.calls.at(-1), {
+    action: "workflow.plan.propose",
+    payload: { workspaceId: "workspace-one", parentSessionId: "parent-one", goal: "盘点合成材料" },
+  });
+  assert.equal(ui.host.node("id").value, "draft-one");
+  assert.equal(ui.host.node("use-draft").disabled, true);
+  await ui.emit("query-form", "submit");
+  assert.match(ui.host.node("result").innerHTML, /生成的任务草稿/);
+  assert.match(ui.host.node("result").innerHTML, /&lt;script&gt;/);
+  assert.doesNotMatch(ui.host.node("result").innerHTML, /<script>/);
+  assert.deepEqual(JSON.parse(ui.host.node("json").value), [task]);
+  assert.equal(ui.host.node("use-draft").disabled, false);
+  await ui.emit("use-draft", "click");
+  assert.deepEqual(JSON.parse(ui.host.node("json").value), [draft]);
+  assert.equal(
+    ui.calls.some(({ action }) => action === "workflow.plan.create"),
+    false,
+  );
+  await ui.emit("create-form", "submit");
+  assert.equal(ui.calls.at(-1).action, "workflow.plan.create");
+  assert.deepEqual(ui.calls.at(-1).payload.tasks, [draft]);
+});
+
+test("unavailable, invalid and late proposals cannot fill an unrelated plan", async () => {
+  const unsupported = await setup();
+  assert.equal(unsupported.host.node("propose").disabled, true);
+  const result = deferred();
+  const ui = await setup({
+    respond(action) {
+      if (action === "workflow.plan.capabilities") return { available: true, planDrafting: true };
+      return result.promise;
+    },
+  });
+  ui.host.node("goal").value = "合成目标";
+  ui.host.emit("propose", "click");
+  await Promise.resolve();
+  ui.select("another-plan");
+  result.resolve({ item: plan("draft", { proposal: { state: "ready", tasks: [task] } }) });
+  await ui.flush();
+  assert.equal(ui.host.node("id").value, "another-plan");
+  assert.equal(ui.host.node("use-draft").disabled, true);
+  const invalid = await setup({
+    respond(action) {
+      if (action === "workflow.plan.capabilities") return { available: true, planDrafting: true };
+      return {
+        item: plan("draft", {
+          proposal: { state: "invalid", error: { message: "Unknown tool <b>bad</b>" } },
+        }),
+      };
+    },
+  });
+  invalid.select("draft");
+  await invalid.emit("query-form", "submit");
+  assert.match(invalid.host.node("result").innerHTML, /Unknown tool &lt;b&gt;bad&lt;\/b&gt;/);
+  assert.equal(invalid.host.node("use-draft").disabled, true);
+});
+
 test("summary is opt-in, discloses the extra model call and never changes the default create payload", async () => {
   const ui = await setup();
   assert.equal(ui.host.node("summarize").checked, false);

@@ -41,6 +41,7 @@ const DATA_ACTIONS = [
   "workflow.status",
   "workflow.stop",
   "workflow.plan.create",
+  "workflow.plan.propose",
   "workflow.plan.status",
   "workflow.plan.stop",
   "files.list",
@@ -82,14 +83,14 @@ export async function installTools(ctx, controller, host) {
         defineTool({
           name: "unlimit_workspace",
           description:
-            "读写本会话绑定的本地演练工作区，需由使用者在工作台完成演练入口确认。先 workspaces.list，再按用户选择 workspaces.bind。台账登记不执行扫描或登录；workflow.dispatch 和 workflow.plan.create 会真正创建执行者，只分派用户明确授权的任务。catalog 可先检查当前会话可见能力。失败不代表操作成功。",
+            "读写本会话绑定的本地演练工作区，需由使用者在工作台完成演练入口确认。先 workspaces.list，再按用户选择 workspaces.bind。台账登记不执行扫描或登录；workflow.dispatch、workflow.plan.create 和 workflow.plan.propose 会真正创建执行者，只分派用户明确授权的任务。catalog 可先检查当前会话可见能力。失败不代表操作成功。",
           parameters: {
             action: { type: "string", required: true, enum: DATA_ACTIONS },
             payload: {
               type: "json",
               required: true,
               description:
-                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id。workflow.plan.create 使用 tasks:[{id,role,task,requirements:[],dependsOn?:[]}]，可选 summarize:true 会额外启动一次 planner 汇总全部已结束任务，默认关闭；汇总是待核实草稿，不自动登记为事实。plan.status/stop 使用计划 id，父会话均强制为调用者。依赖结果保持未验证，超限明确阻断。templates.read 使用相对 path。",
+                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id。workflow.plan.create 使用 tasks:[{id,role,task,requirements:[],dependsOn?:[]}]，可选 summarize:true 会额外启动一次 planner 汇总全部已结束任务，默认关闭；汇总是待核实草稿，不自动登记为事实。workflow.plan.propose 使用 goal，启动规划者生成基于当前目录的任务草稿；plan.status 返回 proposal，只有 ready 草稿可检查后另用 plan.create 提交，生成不自动执行草稿中的任务。规划者仍继承宿主工具与权限。plan.status/stop 使用计划 id，父会话均强制为调用者。依赖结果保持未验证，超限明确阻断。templates.read 使用相对 path。",
             },
           },
           output,

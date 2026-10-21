@@ -3,7 +3,78 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { WORKFLOW_PRESET_ID } from "../src/host/workflow.js";
 import { DesktopWorkflowPlan } from "../src/host/workflow-plan.js";
+import { HostCatalog } from "../src/host/catalog.js";
 import { fixture, optionalHost, waitFor } from "./helpers/workflow-host-fixture.mjs";
+
+test(
+  "official AgentLoop returns a proposal, releases its planner and only executes tasks after separate submission",
+  optionalHost,
+  async (t) => {
+    const generated = [
+      {
+        id: "sort",
+        role: "analyst",
+        task: "将合成输入 3、1、2 升序排列",
+        requirements: [],
+        dependsOn: [],
+      },
+    ];
+    let calls = 0;
+    const f = await fixture(t, {
+      textOutput: () =>
+        ++calls === 1 ? JSON.stringify({ tasks: generated }) : "Synthetic sorted output: 1, 2, 3.",
+    });
+    const parent = await f.create();
+    const plans = new DesktopWorkflowPlan(f.workflow, { catalog: new HostCatalog(f.ctx) });
+    try {
+      const owner = { workspaceId: f.workspaceId, parentSessionId: parent.id };
+      const { item } = await plans.dispatch("workflow.plan.propose", {
+        ...owner,
+        goal: "把已提供的数字 3、1、2 升序整理",
+      });
+      const ready = await waitFor(
+        () => plans.dispatch("workflow.plan.status", { ...owner, id: item.id }),
+        (result) => result.item.proposal.state === "ready",
+      );
+      assert.deepEqual(ready.item.proposal.tasks, generated);
+      assert.equal(ready.item.tasks[0].receipt.disposed, true);
+      assert.equal(f.ctx.agents.get(ready.item.tasks[0].receipt.sessionId), undefined);
+      assert.equal(f.flow.status(f.workspaceId).active.length, 0);
+      assert.equal(f.requests.length, 1, "A ready proposal must not dispatch its generated tasks");
+      assert.equal(ready.item.proposal.source.runId, ready.item.tasks[0].runId);
+      await f.ctx.sessionPersistence.flush();
+      const reader = await f.ctx.sessionPersistence.open(
+        ready.item.tasks[0].receipt.sessionId,
+        "read",
+      );
+      try {
+        const record = await reader.read();
+        assert.ok(
+          JSON.stringify(record.events).includes(
+            JSON.stringify({ tasks: generated }).replaceAll('"', '\\"'),
+          ),
+        );
+      } finally {
+        await reader.close();
+      }
+      const execution = await plans.dispatch("workflow.plan.create", {
+        ...owner,
+        tasks: ready.item.proposal.tasks,
+      });
+      const done = await waitFor(
+        () => plans.dispatch("workflow.plan.status", { ...owner, id: execution.item.id }),
+        (result) => result.item.state === "completed",
+      );
+      assert.equal(f.requests.length, 2);
+      assert.deepEqual(done.item.tasks[0].receipt.result.output, [
+        { type: "text", text: "Synthetic sorted output: 1, 2, 3." },
+      ]);
+      assert.equal(f.flow.status(f.workspaceId).active.length, 0);
+    } finally {
+      await plans.close();
+    }
+  },
+);
 
 test(
   "real official spawn and AgentLoop execute a synthetic stream, dispose the executor and release its workspace slot",

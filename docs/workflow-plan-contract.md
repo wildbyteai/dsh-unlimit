@@ -1,6 +1,6 @@
-# 显式多任务计划合同
+# 多任务规划与执行合同
 
-`DesktopWorkflowPlan` 接收人或指挥模型已拆好的任务，协调现有 `DesktopWorkflow` 的收据。它不自动拆解任务或匹配技能。可选 `summarize:true` 在任务结束后额外启动一次 planner，生成带来源的待核实汇总；默认关闭。协调器本身不运行 shell 或下载依赖。计划、队列和结果均只保存在当前运行期；没有跨重启恢复或 profile 写入。
+`DesktopWorkflowPlan` 接收人或指挥模型已拆好的任务，协调现有 `DesktopWorkflow` 的收据。新增 `workflow.plan.propose` 可从目标和父会话目录生成带角色、依赖及候选能力的任务草稿；只有另行提交 `workflow.plan.create` 才执行草稿中的任务。可选 `summarize:true` 在任务结束后额外启动一次 planner，生成带来源的待核实汇总；默认关闭。协调器本身不运行 shell 或下载依赖。计划、队列和结果均只保存在当前运行期；没有跨重启恢复或 profile 写入。
 
 ## 接入
 
@@ -42,12 +42,12 @@ await plans.dispatch("workflow.plan.stop", {
 
 `workflow` 必须是当前实例的 `DesktopWorkflow`；其 `store`、`flow`、`workspace()`、`service()`、`capabilities()` 和 `dispatch()` 是本模块使用的项目内合同。可选 `catalog` 使用当前 `HostCatalog.preflight(payload, { signal })`，不替代宿主权限或执行授权。调用层必须把模型工具的父会话绑定为真实调用会话，不能信任模型提供的其他会话 ID。
 
-| 动作                         | 输入                                                     | 输出与约束                                                                                                                                      |
-| ---------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `workflow.plan.capabilities` | `{}`                                                     | `{available,preflight,runtimeOnly:true,automaticTaskMatching:false,evidenceSummary:true,reasons}`；实际工作流分派、停止接口缺失时 unavailable。 |
-| `workflow.plan.create`       | `{workspaceId,parentSessionId,tasks,summarize?:boolean}` | `{item}`，初态 `queued`。校验项目、活动父会话、绑定、任务和角色；创建记录不代表已经启动执行者。                                                 |
-| `workflow.plan.status`       | `{workspaceId,parentSessionId,id}`                       | `{item}`；只读本实例、对应父会话及项目的计划。即使入场授权已撤销、父会话已离线或改绑，仍能读取原计划。                                          |
-| `workflow.plan.stop`         | 同 status                                                | `{item,stopped}`；先停止排队，再通过原工作流停止本计划创建的收据。未确认清理时 `stopped:false`，可再次显式停止以重试处置。                      |
+| 动作                         | 输入                                                     | 输出与约束                                                                                                                                                   |
+| ---------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `workflow.plan.capabilities` | `{}`                                                     | `{available,preflight,runtimeOnly:true,automaticTaskMatching:false,planDrafting,evidenceSummary:true,reasons}`；实际工作流分派、停止接口缺失时 unavailable。 |
+| `workflow.plan.create`       | `{workspaceId,parentSessionId,tasks,summarize?:boolean}` | `{item}`，初态 `queued`。校验项目、活动父会话、绑定、任务和角色；创建记录不代表已经启动执行者。                                                              |
+| `workflow.plan.status`       | `{workspaceId,parentSessionId,id}`                       | `{item}`；只读本实例、对应父会话及项目的计划。即使入场授权已撤销、父会话已离线或改绑，仍能读取原计划。                                                       |
+| `workflow.plan.stop`         | 同 status                                                | `{item,stopped}`；先停止排队，再通过原工作流停止本计划创建的收据。未确认清理时 `stopped:false`，可再次显式停止以重试处置。                                   |
 
 `stopAll()` 先同步标记本实例的所有活动队列，再等待逐个收据停止，返回 `{items,stopped}`。它不关闭服务，后续仍可创建新计划。它不停止其他计划服务实例或人工直接分派的工作流。`close()` 禁止新建、停止本实例计划并返回同形结果；调用者必须检查 `stopped`，不能把未确认处置视为卸载成功。停止等待官方启动中的收据返回，以确认其所有权后处置；此时 status 显示 `stopping`，不承诺即时完成。
 
@@ -97,7 +97,7 @@ DSH_NODE='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-
 "$DSH_NODE" --test tests/workflow-plan.test.mjs
 ```
 
-Controller、模型工具、HTTP 和 UI 由宿主集成层接入；这个模块自身不注册外部入口。自动任务匹配、内建模型拆解、跨重启计划恢复和桌面实机验收仍未实现或未验证。
+Controller、模型工具、HTTP 和 UI 由宿主集成层接入；这个模块自身不注册外部入口。模型草稿的目录候选匹配见下节；自动执行生成计划、跨重启计划恢复和桌面实机验收仍未实现或未验证。
 
 ## 首轮角色正文的官方隔离验证（2026-10-21）
 
@@ -106,3 +106,17 @@ Controller、模型工具、HTTP 和 UI 由宿主集成层接入；这个模块�
 明确绑定但未分配角色的新执行者不会因任务正文提到角色名而得到角色注入；普通未绑定会话也不带角色。已有会话明确绑定并分配后，下一次请求出现角色；释放槽并显式 `flow.assign({role:null})` 后下一次请求移除角色。`flow.release` 只释放并发槽，单独调用它不撤销角色分配。撤销运行控制后，原始组装描述符精确恢复，新请求不再注入角色或操作者正文。
 
 工作流还会把角色正文加入 user 任务，因此不能声称角色只出现于 system 槽。两个逻辑工作区共享合成工作目录，本次不证明文件系统隔离。模型传输与功能说明为合成材料，没有实际工具或 MCP 执行，也没有完整 standard 预设或桌面交互验收。[角色证据](evidence/workflow-role-acceptance.json) 记录源码摘要、6 项测试结果和这些边界；开发操作异常另见 [验证记录](verification.md#子代理限额与首轮角色正文2026-10-21)。
+
+## 从目标生成任务草稿（2026-10-21）
+
+`workflow.plan.propose({workspaceId,parentSessionId,goal})` 返回普通计划收据 `{item}`，内部只有一个 `$planner` 任务，使用当前项目 planner 角色、既有准入门、工作流执行器与并发槽。`goal` 最多 16 KiB。需要活动且绑定的父会话、目录 list 和受支持的宿主；目录读取后再次检查准入与父会话。模型工具仍强制使用调用者项目及父会话。capabilities 的 `planDrafting` 表示这个入口可用，`automaticTaskMatching:false` 仍表示没有自主匹配后直接执行的闭环。
+
+规划输入只包含目标、当前角色编号，以及父会话可见工具、宿主技能、已检测可用的 Toolkit 名称与公开描述。技能正文、工具 schema、凭据和环境秘密不进入此输入；项目私有技能暂不作为候选。目录来源状态保存在 `proposal.catalogSources`；来源不完整时仍只能从已观察到的候选选择，不能声称它们涵盖全部能力。完整输入超过 30 KiB 明确拒绝，不截断目标或目录。
+
+规划者被提示只规划、不调用工具，但仍通过普通官方工作流创建，继承宿主工具、权限与审批边界；这不是无工具沙箱，也不保证模型遵循提示。界面明确说明这一点。新增入口不改变权限、不安装工具、不连接作者服务。没有实现自动重试、纠正模型输出或隐式执行草稿。
+
+通过 `plan.status` 查看 `item.proposal`：初态 `pending`，完成且资源处置、槽位释放确认后解析原始文本结果。只接受 JSON 对象 `{tasks:[...]}`；任务沿用既有校验，另拒绝目录外能力、目录外依赖类型、未知角色、缺失/循环依赖、usePreset 和额外字段。输出最多 32 KiB，不截断、不从 Markdown/解释中猜取 JSON。成功为 `ready`，含 `tasks` 及 `source.runId/independentlyVerified:false`；非法输出为 `invalid` 并使计划 `finished-with-errors`，原始结果和诊断保留。未完成为 `failed`，停止为 `cancelled`。所有状态均不自动创建生成的子任务。
+
+`ready` 只表示结构和候选名称检查通过，不代表拆解正确、任务范围获批、依赖可用或事实核验。界面展示任务/角色/正文/匹配能力/前置任务；“将当前草稿填入任务表”仅填表，用户可编辑，再使用既有提交入口。执行时按当前目录重新预检非空 requirements，不能沿用规划时的可见性代替执行检查。已填入并编辑的任务是新显式计划，不声称与原草稿逐字相同。
+
+隔离验证：单元覆盖目录筛选、精确能力名称、格式/大小拒绝、停止、失败、异步目录期间关闭/父改绑、等待清理与另行提交；官方 spawn/AgentLoop 跑通一次规划及另一次执行，规划原始输出写入并读回临时 JSONL，模型传输为合成。UI 测试覆盖填表与提交分离、过期结果和错误转义；回环组件页面跑通完整操作。真实模型的拆解/匹配质量、项目私有技能、技能正文及递归依赖选择、自动执行闭环与真实 DSH 嵌入仍未验证或未实现。

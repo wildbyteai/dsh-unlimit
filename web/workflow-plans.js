@@ -13,7 +13,7 @@ const states = {
   "cleanup-pending": "清理未确认，后续启动暂停",
 };
 
-/** Page-scoped view only: no persistent state, model planning or automatic execution on load. */
+/** Page-scoped view: planning is explicit; loading the page starts no model or executor. */
 export async function workflowPlans({
   api,
   esc,
@@ -64,13 +64,15 @@ export async function workflowPlans({
     )
     .join("");
   const html = panel(
-    "明确任务计划",
+    "任务规划与执行",
     `<div id="workflow-plans-module">
-    <p class="info">由你或指挥模型提供已拆好的任务。这里只负责按项目槽位排队、依赖检查和收据汇总，不会自动拆解任务或匹配工具。提交后可能产生实际子代理模型调用。</p>
+    <p class="info">可以直接填写明确任务，也可以描述目标，让规划者根据当前能力目录拆分草稿。检查草稿后再提交执行；生成草稿和执行任务都会产生模型调用。</p>
     <div id="workflow-plan-capability" class="${capability.available ? "note" : "error"}" role="status">${esc(capability.available ? "当前可提交显式计划；依赖预检不增加执行授权，执行者结果仍须核实。" : `不能提交计划：${unavailable()}`)}</div>
     ${!capability.available && capability.reasons?.length ? `<details><summary>查看接口诊断详情</summary><p class="info">${esc(capability.reasons.join("；"))}</p></details>` : ""}
     <form id="workflow-plan-create-form">
       <div class="field"><label for="workflow-plan-parent">当前项目已绑定的父会话编号</label><input id="workflow-plan-parent" name="parentSessionId" list="workflow-plan-parents" value="${esc(bound[0]?.id || "")}" autocomplete="off" required><datalist id="workflow-plan-parents">${options}</datalist><small>创建需选当前已绑定会话；不替其他会话提交任务。</small></div>
+      <div class="field wide"><label for="workflow-plan-goal">想完成什么</label><textarea id="workflow-plan-goal" rows="3" placeholder="描述目标、允许操作的范围和完成条件；不要填入密钥。"></textarea><small>生成草稿会启动一次规划者。提示要求只规划，但其工具和权限仍由宿主管理，不是无工具沙箱。草稿不会自动启动其中的任务。</small></div>
+      <div class="toolbar"><button type="button" id="workflow-plan-propose" ${capability.available && capability.planDrafting ? "" : "disabled"}>生成任务草稿</button><button type="button" id="workflow-plan-use-draft" disabled>将当前草稿填入任务表</button></div>
       <div class="field wide"><label for="workflow-plan-json">明确任务 JSON（1–32 项）</label><textarea id="workflow-plan-json" name="tasks" rows="14" spellcheck="false" required>${esc(sample)}</textarea><small>每项填写 id、role、task、requirements，可选 dependsOn 与 usePreset。[] 只表示声明无依赖。示例没有附带真实材料，请先改为当前项目的明确任务；不要填入密钥。</small></div>
       <div class="field wide"><label><input type="checkbox" id="workflow-plan-summarize" name="summarize" ${capability.available && capability.evidenceSummary === true ? "" : "disabled"}> 任务结束后生成指挥汇总</label><small>使用当前项目的规划者角色，增加一次模型调用；引用任务结果与失败、未执行状态，不会自动核实事实。</small><small id="workflow-plan-summary-availability">${capability.evidenceSummary === true ? "" : "当前服务不支持指挥汇总。"}</small></div>
       <div class="toolbar"><button type="button" id="workflow-plan-check">检查 JSON</button><button type="submit" class="primary" id="workflow-plan-create" ${capability.available && bound.length ? "" : "disabled"}>提交明确计划</button></div>
@@ -86,7 +88,8 @@ export async function workflowPlans({
   );
   let disposed = false,
     busy = false,
-    selectionRevision = 0;
+    selectionRevision = 0,
+    loadedProposal = null;
   const listeners = new AbortController();
   function parse(value) {
     if (new TextEncoder().encode(value).length > 1024 * 1024)
@@ -143,6 +146,13 @@ export async function workflowPlans({
       if (!attached()) return;
       const selected = bound.some((session) => session.id === get("parent").value.trim());
       get("create").disabled = busy || !capability.available || !selected || roles.length === 0;
+      get("propose").disabled =
+        busy ||
+        !capability.available ||
+        !capability.planDrafting ||
+        !selected ||
+        !roleIds.has("planner");
+      get("use-draft").disabled = busy || !loadedProposal;
       get("create").title = !capability.available
         ? unavailable()
         : !selected
@@ -228,6 +238,33 @@ export async function workflowPlans({
     }
     function show(item) {
       if (!attached()) return;
+      loadedProposal = item.proposal?.state === "ready" ? item.proposal.tasks : null;
+      const proposal = item.proposal;
+      const proposalView = !proposal
+        ? ""
+        : panel(
+            "生成的任务草稿",
+            `<p class="info">${esc({ pending: "正在生成，请读取状态。", ready: "草稿格式与目录名称已检查；任务范围和模型判断仍需检查。尚未启动这些任务。", invalid: "模型输出未通过检查，未生成可提交草稿。", failed: "规划者未完成，未生成可提交草稿。", cancelled: "草稿生成已取消。" }[proposal.state] ?? proposal.state)}</p>${proposal.error ? `<p class="error">${esc(proposal.error.message)}</p>` : ""}${
+              loadedProposal
+                ? table(
+                    loadedProposal.map((task) => ({
+                      ...task,
+                      requirements:
+                        task.requirements.map((item) => `${item.kind}: ${item.name}`).join("；") ||
+                        "未声明",
+                      dependsOn: task.dependsOn.join("、") || "无",
+                    })),
+                    [
+                      ["id", "任务"],
+                      ["role", "角色"],
+                      ["task", "内容与完成条件"],
+                      ["requirements", "匹配能力"],
+                      ["dependsOn", "前置任务"],
+                    ],
+                  )
+                : ""
+            }`,
+          );
       const rows = item.tasks.map((task) => ({
         id: task.id,
         role: task.role,
@@ -251,7 +288,7 @@ export async function workflowPlans({
             ["execution", "实际启动"],
             ["cleanup", "清理与槽位"],
           ],
-        )}${summary(item)}<details><summary>完整计划、逐任务回执与原样结果（未验证）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto">${esc(JSON.stringify(item, null, 2))}</pre></details>`;
+        )}${proposalView}${summary(item)}<details><summary>完整计划、逐任务回执与原样结果（未验证）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto">${esc(JSON.stringify(item, null, 2))}</pre></details>`;
     }
     const scope = () => {
       const id = get("id").value.trim(),
@@ -283,10 +320,46 @@ export async function workflowPlans({
         "input",
         () => {
           selectionRevision++;
+          loadedProposal = null;
           buttons();
         },
         { signal: listeners.signal },
       );
+    get("propose").addEventListener(
+      "click",
+      () =>
+        execute(async (current) => {
+          const goal = get("goal").value.trim(),
+            parentSessionId = get("parent").value.trim();
+          if (!goal) throw new Error("请先描述目标、允许范围和完成条件");
+          if (!bound.some((session) => session.id === parentSessionId))
+            throw new Error("父会话必须已绑定当前项目");
+          capability = await api("workflow.plan.capabilities", { workspaceId });
+          if (!current()) return;
+          if (!capability.available || !capability.planDrafting)
+            throw new Error("当前服务不支持生成草稿");
+          const { item } = await api("workflow.plan.propose", {
+            workspaceId,
+            parentSessionId,
+            goal,
+          });
+          if (!current()) return;
+          get("id").value = item.id;
+          get("query-parent").value = parentSessionId;
+          show(item);
+          feedback("规划请求已登记，请读取状态；生成的任务不会自动执行。");
+        }),
+      { signal: listeners.signal },
+    );
+    get("use-draft").addEventListener(
+      "click",
+      () => {
+        if (busy || !loadedProposal || !attached()) return;
+        get("json").value = JSON.stringify(loadedProposal, null, 2);
+        feedback("草稿已填入任务表。请检查目标范围、角色和能力，再提交明确计划。");
+      },
+      { signal: listeners.signal },
+    );
     get("check").addEventListener(
       "click",
       () => {

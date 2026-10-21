@@ -841,7 +841,12 @@ test(
       calls.push({ action, payload });
       return { item: { id: "synthetic-plan", ...payload } };
     };
-    for (const action of ["workflow.plan.create", "workflow.plan.status", "workflow.plan.stop"]) {
+    for (const action of [
+      "workflow.plan.create",
+      "workflow.plan.propose",
+      "workflow.plan.status",
+      "workflow.plan.stop",
+    ]) {
       const result = await f.execute(parent, action, { id: "synthetic-plan" });
       assert.equal(result.isError, false);
       assert.equal(result.value.item.workspaceId, workspace.id);
@@ -855,7 +860,7 @@ test(
         true,
       );
     }
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 4);
   },
 );
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { fail, object, string } from "../core/validation.js";
 import { normalizeRequirements } from "./catalog.js";
+import { draftInput, draftResult } from "./workflow-draft.js";
 
 const now = () => new Date().toISOString();
 const diagnostic = (error) => ({
@@ -106,7 +107,7 @@ function tasks(value, roles) {
   return result;
 }
 
-/** Coordinates explicitly supplied tasks through DesktopWorkflow receipts, without planning or executing tools itself. */
+/** Coordinates task receipts and optional model proposals; proposals never start their generated tasks. */
 export class DesktopWorkflowPlan {
   constructor(workflow, { catalog } = {}) {
     this.workflow = workflow;
@@ -121,6 +122,8 @@ export class DesktopWorkflowPlan {
       preflight: typeof this.catalog?.preflight === "function",
       runtimeOnly: true,
       automaticTaskMatching: false,
+      planDrafting:
+        !this.closed && caps.dispatch && caps.stop && typeof this.catalog?.list === "function",
       evidenceSummary: true,
       reasons: this.closed ? ["Plan coordinator is closed"] : caps.reasons,
     };
@@ -170,6 +173,7 @@ export class DesktopWorkflowPlan {
     object(payload);
     if (action === "workflow.plan.capabilities") return this.capabilities();
     if (action === "workflow.plan.create") return this.create(payload);
+    if (action === "workflow.plan.propose") return this.propose(payload);
     if (action === "workflow.plan.status" || action === "workflow.plan.stop") {
       fields(payload, ["workspaceId", "parentSessionId", "id"]);
       const plan = this.owned(payload);
@@ -177,7 +181,35 @@ export class DesktopWorkflowPlan {
     }
     fail("UNKNOWN_ACTION", `Unsupported plan action: ${action}`);
   }
-  async create(payload) {
+  async propose(payload) {
+    fields(payload, ["workspaceId", "parentSessionId", "goal"]);
+    if (!this.capabilities().planDrafting)
+      fail("UNSUPPORTED_CAPABILITY", "Planning requires workflow execution and a host catalog");
+    const workspaceId = this.workflow.workspace(payload.workspaceId);
+    const parentSessionId = string(payload.parentSessionId, "parentSessionId");
+    const goal = string(payload.goal, "goal");
+    if (Buffer.byteLength(goal) > 16 * 1024) fail("INVALID_INPUT", "Goal exceeds 16 KiB");
+    this.parent({ workspaceId, parentSessionId });
+    this.workflow.admission?.require();
+    const catalog = await this.catalog.list({ sessionId: parentSessionId });
+    const roles = this.workflow.store.dispatch("roles.list", { workspaceId }).items;
+    const input = draftInput(goal, catalog, roles);
+    this.workflow.admission?.require();
+    return this.create(
+      {
+        workspaceId,
+        parentSessionId,
+        tasks: [{ id: "$planner", role: "planner", task: input.task, requirements: [] }],
+      },
+      {
+        state: "pending",
+        goal,
+        candidates: input.candidates,
+        catalogSources: input.catalogSources,
+      },
+    );
+  }
+  async create(payload, proposal) {
     if (this.closed) fail("CLOSED", "Plan coordinator is closed");
     fields(payload, ["workspaceId", "parentSessionId", "tasks", "summarize"]);
     if (payload.summarize !== undefined && typeof payload.summarize !== "boolean")
@@ -210,6 +242,7 @@ export class DesktopWorkflowPlan {
         createdAt: now(),
         runtimeOnly: true,
         tasks: items,
+        ...(proposal ? { proposal } : {}),
         ...(payload.summarize ? { summaryTaskId: summaryId } : {}),
       },
       abort: new AbortController(),
@@ -257,6 +290,7 @@ export class DesktopWorkflowPlan {
       }
   }
   async cancelRuns(plan) {
+    if (plan.item.proposal?.state === "pending") plan.item.proposal.state = "cancelled";
     let failed = false;
     for (const task of plan.item.tasks) {
       if (!task.runId) {
@@ -435,9 +469,31 @@ export class DesktopWorkflowPlan {
     else if (
       plan.item.tasks.every((task) => done(task) && (!task.runId || released(task.receipt)))
     ) {
+      if (plan.item.proposal?.state === "pending") {
+        const planner = plan.item.tasks[0];
+        const proposal = plan.item.proposal;
+        proposal.source = { runId: planner.runId, independentlyVerified: false };
+        if (planner.state !== "completed") proposal.state = "failed";
+        else {
+          try {
+            const roles = this.workflow.store.dispatch("roles.list", {
+              workspaceId: plan.item.workspaceId,
+            }).items;
+            proposal.tasks = draftResult(planner.receipt.result, proposal.candidates, (value) =>
+              tasks(value, roles),
+            );
+            proposal.state = "ready";
+          } catch (error) {
+            proposal.state = "invalid";
+            proposal.error = diagnostic(error);
+          }
+        }
+      }
       plan.item.state = plan.item.tasks.every((task) => task.state === "completed")
         ? "completed"
         : "finished-with-errors";
+      if (plan.item.proposal && plan.item.proposal.state !== "ready")
+        plan.item.state = "finished-with-errors";
       plan.item.finishedAt = now();
     } else
       plan.item.state = plan.item.tasks.some((task) => task.runId && !released(task.receipt))
