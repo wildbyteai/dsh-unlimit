@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "behaviorId": "CORE-MODES",
   "slice": "complete-minimal-image-path",
-  "generatedAt": "2026-10-21T06:28:57.788Z",
+  "generatedAt": "2026-10-21T07:15:11.960Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2167,6 +2167,7 @@
     "filesystemBoundaryGuards": true,
     "guardsHeldThroughOfficialLifecycle": true,
     "guardsHeldThroughTemporaryRootCleanup": true,
+    "cleanupErrors": [],
     "metadataOnlyReads": {
       "purpose": "Actual attachment durability directory fsync",
       "scope": "Exact synthetic-root ancestors only; O_RDONLY directory handles deny content and mutation",
@@ -2216,7 +2217,7 @@
       "toolCalls": ["read_image"],
       "persistedEvents": 17,
       "physicalJsonlRows": 18,
-      "jsonlSha256": "8c7d4c9af5d82a08fa639a007f87368c787c00234d463ab5d28502c93b2faa66",
+      "jsonlSha256": "4d396d2111b6816c1d56e15a50d0d89ade2ad3f77b78fdd3dbe8f31f72a5ab6e",
       "actualJsonlToolResultsEqual": true,
       "preset": "minimal"
     },
@@ -2226,7 +2227,7 @@
       "toolCalls": ["read_image"],
       "persistedEvents": 17,
       "physicalJsonlRows": 18,
-      "jsonlSha256": "d60a09f777baff5bad94a2d0e2d6a6d4eac1fa306e180453c16cd1f73e4a3639",
+      "jsonlSha256": "59ba15a2cafaf494857bd8ef91fe485c90cc8a63244065ec3bd2a09df4714028",
       "actualJsonlToolResultsEqual": true,
       "preset": "minimal"
     },
@@ -2236,7 +2237,7 @@
       "toolCalls": ["read_image"],
       "persistedEvents": 17,
       "physicalJsonlRows": 18,
-      "jsonlSha256": "cd04f008adefd6f0aabafa2c8e4bb4ea599a8cf551b99036229dc9224aadb0b0",
+      "jsonlSha256": "fd79836bcd78a559f1a1d1e693c5e4388ac0a8f3df8cc6bed02c3d4db9269b2c",
       "actualJsonlToolResultsEqual": true,
       "preset": "minimal"
     }
@@ -2367,7 +2368,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "38f0b1c97c272d8c536437425662d3860ba5e6146eb822fda3196d5150e3df9b"
+      "sha256": "13a89058495dcd9936cc6fa67fa6119aa70dba7c771d571bbe894c4c71281d62"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

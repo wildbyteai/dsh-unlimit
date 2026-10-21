@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "behaviorId": "CORE-SUBAGENTS",
-  "generatedAt": "2026-10-21T06:29:00.421Z",
+  "generatedAt": "2026-10-21T07:15:14.371Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2943,6 +2943,7 @@
     "filesystemBoundaryGuards": true,
     "guardsHeldThroughOfficialLifecycle": true,
     "guardsHeldThroughTemporaryRootCleanup": true,
+    "cleanupErrors": [],
     "syntheticModelAdapter": true
   },
   "scenarios": [
@@ -3528,7 +3529,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "38f0b1c97c272d8c536437425662d3860ba5e6146eb822fda3196d5150e3df9b"
+      "sha256": "13a89058495dcd9936cc6fa67fa6119aa70dba7c771d571bbe894c4c71281d62"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

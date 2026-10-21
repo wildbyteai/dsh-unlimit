@@ -133,11 +133,25 @@ Host 依赖也使用官方服务，包括调度、存储、会话控制器、子
 
 node-pty 的 native `pty.fork` 不经过 `child_process.spawn`，验收不能只解除后者守卫就声称已限制所有进程。官方 macOS 终端检查还会调用确切的 `/bin/ps -o tpgid= -p <owned pid>`，以及 `/bin/ps -axo pid=,ppid=,lstart=` 后再筛选所属树。后一项读取全系统 PID、父 PID 和启动时间元数据，不请求 argv；后续实际验收需要明确纳入该官方路径，不能回传假进程表或保留无关行。本次没有执行这两个命令，也没有据此增加用户的永久权限限制。官方 read-only Seatbelt 仅限制写入，不提供读取或网络白名单；PTC 普通子进程的执行结果不能替代这个持久 PTY 路径。
 
+## 完整 PTC 预设与真实 AgentLoop（2026-10-21）
+
+[独立验收探针](../scripts/probe-ptc-preset.mjs) 将固定发行的原始 `ptc.patch.yml` 交给真实 Loader/Registry，保留全部 **30 个叶条目、25 个 active**。macOS 下 pwsh、两个插件管理工具以及 `workflow-ptc/tool-workflow` 按原声明禁用；没有为了执行读取而改写工具组合。每个 Agent 均以对象身份核对其当前 retained revision，作用域服务没有泄漏。533 个实际导入官方文件通过发行库存摘要校验。
+
+实际运行两个合成会话：replace 后读取原创临时文本，以及 revert 后再次读取。**4 次合成模型请求、2 次 AgentLoop `run_code`、2 次官方 Node/Seatbelt 后端启动、2 次实际 `tools.read`** 全部通过，没有直接调用 ToolRuntime。逐条核对外层调用 ID、内层 parent/root/subCallId、真实返回内容、空子进程环境和无网络/再启动尝试；下一轮模型收到的工具消息与 Session 事件一致。
+
+官方 persona 的替换和恢复同时核对实际请求；`tools:ptc-only`、`tools:sdk` 原段及模型可见的 `run_code` schema 保持一致，公开证据只保留正文摘要。两个会话各有 22 行物理 JSONL；官方 reader 的全部事件与内存一致，独立解析磁盘文件后再次核对 call、PTC start/dispatch 和 result。详见 [ptc-preset-acceptance.json](evidence/ptc-preset-acceptance.json)。
+
+此探针使用专用测试 Host 配置：per-call、64 MiB 堆、1 MiB 消息、单 pending、3 秒期限，bootstrap 是库存校验后复制到临时运行时的官方文件；没有修改原始预设或安装目录。父环境从 `env -i` 建立。只放行两个固定 argv/env/cwd/fd7 的官方进程；Node 与 sandbox-exec 仅额外允许确切路径的元数据检查。JSONL 的官方文件锁 `system.node` 在加载前、实际 dlopen 时及处置后分别核验摘要，其他原生模块加载仍拒绝。正常退出后的 signal-0 只检查本次已登记的 PID/PGID，终止信号限本次存活进程。
+
+实际观察到两个 child close 和控制管道 close，官方 subprocess、controlChannels、PTC live 集合均为 0；两处临时根删除，禁止操作和清理错误均为空。共享夹具的清理改为逐项执行并汇总错误，避免一次持久化失败阻断其余服务处置；失败仍使验收失败，不能生成通过记录。
+
+执行命令与组件探针一致，将末尾脚本改为 `scripts/probe-ptc-preset.mjs`；该脚本独立于普通 `npm test`，需要明确允许实际官方子进程的执行入口。它验证真实 PTC 工具读取和适配撤销，不代表真实模型决策、桌面嵌入、所有工具执行、PTC 计划切换或默认 Host 资源配置完成验收。官方只读 Seatbelt 原样保留，也不声称它提供内核读取/网络白名单或追踪逃离进程组的后代。极简模式的持久终端文本路径仍缺。
+
 ## 保留差距
 
-- 完整 standard 声明、读取与计划切换以及完整 minimal 的图片路径已有隔离证据。极简文本任务、PTC 完整预设执行和真实用户默认预设选择仍未验，不能把工具注册视为工具执行验收。
+- 完整 standard 的读取/计划切换、minimal 图片及完整 PTC 的 AgentLoop 读取/replace/revert 已有隔离证据。极简文本任务、真实用户默认预设选择及桌面仍未验，不能把已执行的读取扩展为全部工具能力。
 - ToolRuntime 的呈现值是 native/ptc；极简是另一份工具组合，其原生配置关闭文本 `read`，依赖持久 shell 读取文本。本次没有启动 shell 或 PTY。
-- PTC 官方 Node 的一次真实受限后端读取已由独立探针验证；完整 PTC 预设、AgentLoop、提示词替换与撤销、持久日志和桌面仍未验证，不再将旧 Node 26 的失败外推为当前环境阻碍。
-- 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复、极简文本执行、PTC 完整预设及桌面计划 UI 仍未验证。
+- PTC 组件探针与完整预设读取已验证真实受限后端；PTC 内的计划切换、其他工具和桌面仍未验证，不再将旧 Node 26 的失败外推为当前环境阻碍。
+- 新增循环证据验证了官方 AgentLoop、同批执行、真实步边界与 JSONL 读回；真实模型选择行为、冷启动恢复、极简文本执行及桌面计划 UI 仍未验证。
 - 合成人答没有执行真实 UI/Gateway 路由或 UI 所拥有的提问审计事件；本证据只声称已读回的 `plan/mode` Session 事件。
 - 本回归没有增加网页抓取或浏览器路径覆盖；`CORE-WEBTOOLS` 的本地页面检索和完整四模式工具能力仍需独立验收。

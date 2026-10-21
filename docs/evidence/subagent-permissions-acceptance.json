@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "behaviorId": "CORE-PERMISSION",
   "status": "partial-official-isolation",
-  "generatedAt": "2026-10-21T06:29:00.241Z",
+  "generatedAt": "2026-10-21T07:15:14.068Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2612,6 +2612,7 @@
     "filesystemBoundaryGuards": true,
     "guardsHeldThroughOfficialLifecycle": true,
     "guardsHeldThroughTemporaryRootCleanup": true,
+    "cleanupErrors": [],
     "metadataOnlyReads": {
       "purpose": "Official filesystem containment identity checks and canonical temporary roots",
       "scope": "Exact synthetic-root ancestors and platform temporary-root paths only",
@@ -3122,7 +3123,7 @@
       "name": "write",
       "path": "outside/full-parent.txt",
       "isError": false,
-      "resultTextSha256": "5fe6cae32972c2ea69371ce885c6bd91a6a01b8f12c9b4bf27279b154b7a8ee8",
+      "resultTextSha256": "8c531d04e8e086c1a928aa235cf3ef11f40e327745ab0ab64f265437a6423995",
       "result": "passed"
     },
     {
@@ -3132,7 +3133,7 @@
       "name": "edit",
       "path": "outside/full-parent.txt",
       "isError": false,
-      "resultTextSha256": "6ed040c797499bc1864f3aeda430ae90f6a0aca460ddcf8bd80a727730c39221",
+      "resultTextSha256": "36ac1d4441497d21bdf64db96416249dc92219031c6cc9848593e60be175d76d",
       "result": "passed"
     },
     {
@@ -3142,7 +3143,7 @@
       "name": "read",
       "path": "outside/full-parent.txt",
       "isError": false,
-      "resultTextSha256": "fc7beb16eb4ef55f98cdfeff8af99367a82b5f2ae34bb65c854763c887191cca",
+      "resultTextSha256": "8ab5aa4c971b3610dcff96d38b8a406f7efedfb89b070180678436db888251ec",
       "result": "passed"
     },
     {
@@ -3152,7 +3153,7 @@
       "name": "write",
       "path": "outside/full-child.txt",
       "isError": false,
-      "resultTextSha256": "be16b73f0244952b88216ada5e7c16cbfde79f09ccbd12cd5ab819b1c2a03ee0",
+      "resultTextSha256": "9f16010638b247aa5b57c73dffefd1f4700f6aa567fb13c242f2f90a9bcf5b21",
       "result": "passed"
     },
     {
@@ -3162,7 +3163,7 @@
       "name": "edit",
       "path": "outside/full-child.txt",
       "isError": false,
-      "resultTextSha256": "291dff5d69b2a31955866c56b951f2b416e970f05ae3b44e866f34d4e7b185f0",
+      "resultTextSha256": "e6c2c60c64e3e00b9c58b7f21c749dd92b51839c3cc0ea1b1cf75485d564681b",
       "result": "passed"
     },
     {
@@ -3172,7 +3173,7 @@
       "name": "read",
       "path": "outside/full-child.txt",
       "isError": false,
-      "resultTextSha256": "7350f192026851d457e68dab404f3d8db9f69198f514c32248198e2f928c7197",
+      "resultTextSha256": "8c085c0b0dab9f26d9f67b878db21ee9fc2c4e18024b1867321ac6a5a59cb9c0",
       "result": "passed"
     },
     {
@@ -3182,7 +3183,7 @@
       "name": "write",
       "path": "outside/full-grandchild.txt",
       "isError": false,
-      "resultTextSha256": "357b5ff441c06b732be4c2fc29622f8eb32f4e72b8fcaa7757ca82f15125d10e",
+      "resultTextSha256": "b885ff317d1569dfb5c4d0382a4528691212bbdd502a52c4048bf39f83278d61",
       "result": "passed"
     },
     {
@@ -3192,7 +3193,7 @@
       "name": "edit",
       "path": "outside/full-grandchild.txt",
       "isError": false,
-      "resultTextSha256": "31358019bebced55c5230c71599124127c98392c20142488b345f910372e4b6d",
+      "resultTextSha256": "3d80ffe23b34a9904eac4e1a2af26c561efdff6bba0f9336a91f972b96171116",
       "result": "passed"
     },
     {
@@ -3202,7 +3203,7 @@
       "name": "read",
       "path": "outside/full-grandchild.txt",
       "isError": false,
-      "resultTextSha256": "37bf2f070cbb529c0af5e17c803907a64ba7074d6e99a755b808ddcaf116d24e",
+      "resultTextSha256": "12aff7ebfe0d947a77da14b34b6e094c19b05be09d7f612c34f614036df59c79",
       "result": "passed"
     },
     {
@@ -3212,7 +3213,7 @@
       "name": "read",
       "path": "outside/observed.txt",
       "isError": false,
-      "resultTextSha256": "b83ff704e711f08e334adbed6b51a1592cfc208c24c4bfb7d1ea0d70f9c1d85d",
+      "resultTextSha256": "070a9a8f0a96e94ce6dd45ede9221d551e49c19cc32606cfc5262dc36ae00bcf",
       "result": "passed"
     },
     {
@@ -3244,7 +3245,7 @@
       "name": "write",
       "path": "outside/existing-child-retained.txt",
       "isError": false,
-      "resultTextSha256": "f05b8641503857c7828c94dd0f74218ad9ad007b07d210fe8af10b2c978494ef",
+      "resultTextSha256": "6f53ac6c0c8557613bc952c70519a4e226f683a5baa63b465a0d79df032eb367",
       "result": "passed"
     },
     {
@@ -3254,7 +3255,7 @@
       "name": "edit",
       "path": "outside/existing-child-retained.txt",
       "isError": false,
-      "resultTextSha256": "40bacca9b5030ce7a08c8b22ab4d27c5d7f1a460d5271e2deae39e8b62598b9f",
+      "resultTextSha256": "959da79b493a01df2cbd6d108c33d480790bfb77555620d708a1b0543cade186",
       "result": "passed"
     },
     {
@@ -3264,7 +3265,7 @@
       "name": "read",
       "path": "outside/existing-child-retained.txt",
       "isError": false,
-      "resultTextSha256": "3a521df50546e54652281190975b51cfd97e6f54867194dc0a24f9b62eb9ecfd",
+      "resultTextSha256": "88da384a1ae3843db3d54bc4ddf41e2fd763d7e849d4776cdff1c337c5f0bc35",
       "result": "passed"
     },
     {
@@ -3274,7 +3275,7 @@
       "name": "read",
       "path": "outside/observed.txt",
       "isError": false,
-      "resultTextSha256": "b83ff704e711f08e334adbed6b51a1592cfc208c24c4bfb7d1ea0d70f9c1d85d",
+      "resultTextSha256": "070a9a8f0a96e94ce6dd45ede9221d551e49c19cc32606cfc5262dc36ae00bcf",
       "result": "passed"
     },
     {
@@ -3306,7 +3307,7 @@
       "name": "write",
       "path": "workspace/workspace-child.txt",
       "isError": false,
-      "resultTextSha256": "2b4eda0661d44a85d462a98780ca86cc9e500c7252c57752f56a5921a13b4366",
+      "resultTextSha256": "feb743f2c88b811fade113bd33a65b4035b1da16691f3f2cd0eb3cf18888c87b",
       "result": "passed"
     },
     {
@@ -3316,7 +3317,7 @@
       "name": "edit",
       "path": "workspace/workspace-child.txt",
       "isError": false,
-      "resultTextSha256": "31d48a27e19b85074241333cfbfac1b65ea823702d1a1dbddae9e636c54a982a",
+      "resultTextSha256": "2f956146a54ce08fffe66d13816fac5a5680854dc5bc7e19c4a5c35d75c99c6a",
       "result": "passed"
     },
     {
@@ -3326,7 +3327,7 @@
       "name": "read",
       "path": "workspace/workspace-child.txt",
       "isError": false,
-      "resultTextSha256": "a06409c1dbe2c9aa09308b69b1fee4936d2ef8f98a3a84bc62cc18f2760319a1",
+      "resultTextSha256": "aeb2bfabd91c3707de78212105728c4d2efc6be438059279520c19d55519e79d",
       "result": "passed"
     },
     {
@@ -3336,7 +3337,7 @@
       "name": "read",
       "path": "outside/observed.txt",
       "isError": false,
-      "resultTextSha256": "b83ff704e711f08e334adbed6b51a1592cfc208c24c4bfb7d1ea0d70f9c1d85d",
+      "resultTextSha256": "070a9a8f0a96e94ce6dd45ede9221d551e49c19cc32606cfc5262dc36ae00bcf",
       "result": "passed"
     },
     {
@@ -3368,7 +3369,7 @@
       "name": "read",
       "path": "outside/observed.txt",
       "isError": false,
-      "resultTextSha256": "b83ff704e711f08e334adbed6b51a1592cfc208c24c4bfb7d1ea0d70f9c1d85d",
+      "resultTextSha256": "070a9a8f0a96e94ce6dd45ede9221d551e49c19cc32606cfc5262dc36ae00bcf",
       "result": "passed"
     },
     {
@@ -3400,7 +3401,7 @@
       "name": "read",
       "path": "workspace/evidence.txt",
       "isError": false,
-      "resultTextSha256": "02d53fd55e3c4742f4641fa2e1a5b53bfb3112e53350b7e2962ae2869ad08f75",
+      "resultTextSha256": "737b140737a709639497671feffef74669d55ff43b29e68b5861ecb64e8e58f4",
       "result": "passed"
     },
     {
@@ -3410,7 +3411,7 @@
       "name": "read",
       "path": "outside/observed.txt",
       "isError": false,
-      "resultTextSha256": "b83ff704e711f08e334adbed6b51a1592cfc208c24c4bfb7d1ea0d70f9c1d85d",
+      "resultTextSha256": "070a9a8f0a96e94ce6dd45ede9221d551e49c19cc32606cfc5262dc36ae00bcf",
       "result": "passed"
     },
     {
@@ -3453,7 +3454,7 @@
       "name": "read",
       "path": "outside/observed.txt",
       "isError": false,
-      "resultTextSha256": "b83ff704e711f08e334adbed6b51a1592cfc208c24c4bfb7d1ea0d70f9c1d85d",
+      "resultTextSha256": "070a9a8f0a96e94ce6dd45ede9221d551e49c19cc32606cfc5262dc36ae00bcf",
       "result": "passed"
     },
     {
@@ -3627,9 +3628,9 @@
     {
       "sessionId": "synthetic-standard-permissions-full-default",
       "events": 76,
-      "eventsSha256": "8999fcdae670ba5a4530b17b28c30f4955adb3f1b591f20fa3e22fa08e448c6c",
+      "eventsSha256": "a8eba0df2043c4207a3eddefe87ce89a4f967991a468dd36b7ddd4b20edee66a",
       "file": "<synthetic-workspace>/synthetic-standard-permissions-full-default/session.v4.jsonl",
-      "fileSha256": "7d1bce67ed968032ed3ec14598284861b9bb9dd6b3886d216f14946e822cc779",
+      "fileSha256": "efce7f646a3c04203f75b77666a116676b063f308f93bdc6c5379f1b70caffc6",
       "physicalRecords": 77,
       "physicalPermissionFactsEqual": true,
       "officialDecodedEventsEqual": true,
@@ -3639,9 +3640,9 @@
     {
       "sessionId": "synthetic-permissions-full-child",
       "events": 69,
-      "eventsSha256": "9c134b52fba556fd06c1cd999a55ccaba409b113157232b582aff5702e4a0740",
+      "eventsSha256": "c058ef864bf6dbc7de348e2dbf78aa013ae543502829de3f5c65d7851c4fb5ed",
       "file": "<synthetic-workspace>/synthetic-permissions-full-child/session.v4.jsonl",
-      "fileSha256": "39d87af58ec0ee373f8d411cd06c38d1cec54e236de28140dd9a5b540b4f73ad",
+      "fileSha256": "0db49f0f5983a9289c5d42ac5462922e612401defc5c9c4c99f38dfefed66d92",
       "physicalRecords": 70,
       "physicalPermissionFactsEqual": true,
       "officialDecodedEventsEqual": true,
@@ -3651,9 +3652,9 @@
     {
       "sessionId": "synthetic-permissions-full-grandchild",
       "events": 34,
-      "eventsSha256": "595e612b19fdf7ab9a412bdc0b58de3e9e8a6d37f1036021068f8861d76d837c",
+      "eventsSha256": "46059dedda813820b824829dd268c9e19ab078f7bfa92c3f9315147c7c58fa68",
       "file": "<synthetic-workspace>/synthetic-permissions-full-grandchild/session.v4.jsonl",
-      "fileSha256": "edc21b602ee81e51048d0d5493a7d77140f0cd745ad2b03c26055623b845b189",
+      "fileSha256": "b56704ab19c831ba7204e667c23f4dba70841ffaa9472f8c1505bf543dd4f3e6",
       "physicalRecords": 35,
       "physicalPermissionFactsEqual": true,
       "officialDecodedEventsEqual": true,
@@ -3663,9 +3664,9 @@
     {
       "sessionId": "synthetic-permissions-workspace-child",
       "events": 55,
-      "eventsSha256": "9b826c2606d0081024e3efd9779a936f4560ef9e3442732f73695e52f57cf182",
+      "eventsSha256": "acfae3459ec5d9736d8665e4d2dbf1b20c3997efca8f4c9adaf22164a835f831",
       "file": "<synthetic-workspace>/synthetic-permissions-workspace-child/session.v4.jsonl",
-      "fileSha256": "11bc32b898e15cca88cb5acbe062fb5329887db02d02bd94c69a118629d2cb9f",
+      "fileSha256": "7a162cb5064b4c4aa6498f6c961f3494d0951c87e07b7aa6ffa444a469bedaba",
       "physicalRecords": 56,
       "physicalPermissionFactsEqual": true,
       "officialDecodedEventsEqual": true,
@@ -3675,9 +3676,9 @@
     {
       "sessionId": "synthetic-standard-permissions-explicit-readonly",
       "events": 34,
-      "eventsSha256": "f51efe717362380077371d3dccbdd06d4394c98b3a614157d59b244fec82420a",
+      "eventsSha256": "3c2f1643b6172aa2597132bdeb363cd67db9902303ad5f5950e016497820ff55",
       "file": "<synthetic-workspace>/synthetic-standard-permissions-explicit-readonly/session.v4.jsonl",
-      "fileSha256": "1efffff2f86818d3396f8ffb414d8db9e967deba285723d13b45c1fe28172254",
+      "fileSha256": "0c2127d7413a606a56fbc3eeb5c81fb9a15c881f944143008da37c38d65d84c2",
       "physicalRecords": 35,
       "physicalPermissionFactsEqual": true,
       "officialDecodedEventsEqual": true,
@@ -3687,9 +3688,9 @@
     {
       "sessionId": "synthetic-permissions-readonly-child",
       "events": 51,
-      "eventsSha256": "57f08228623a12127861243a46dd32f49f98755ce29047d4575cfd81c320a198",
+      "eventsSha256": "266901ab42421726ecc2b1126afd8e92cdb75ffa2979fb4b46b1cdceb72c1634",
       "file": "<synthetic-workspace>/synthetic-permissions-readonly-child/session.v4.jsonl",
-      "fileSha256": "8c7c90a02349f11657ca67aa9f175cf74bee8a0965208b74a39a1120a21ab45c",
+      "fileSha256": "e97bb087816e4d6400a6bd4c40eaa1455531e21bd9b9ae729512becde020ad10",
       "physicalRecords": 52,
       "physicalPermissionFactsEqual": true,
       "officialDecodedEventsEqual": true,
@@ -3699,9 +3700,9 @@
     {
       "sessionId": "synthetic-permissions-readonly-grandchild",
       "events": 28,
-      "eventsSha256": "8bf119446422ecf15dfdece0a612aaee34e391dff0281aab467cb957da42163d",
+      "eventsSha256": "cf36f33d0193889ca470c755ffdd2486b6ad727b3f7f065975c441a50f05478b",
       "file": "<synthetic-workspace>/synthetic-permissions-readonly-grandchild/session.v4.jsonl",
-      "fileSha256": "e6ad0570d3f2d9b008bc833e0fce9b2a32ef9381980a2d072e05efa5384723cf",
+      "fileSha256": "a6bc913d9b200ec85d17819905f2684698a45b48ab9c6162990c3ac5fc5128e6",
       "physicalRecords": 29,
       "physicalPermissionFactsEqual": true,
       "officialDecodedEventsEqual": true,
@@ -3776,7 +3777,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "38f0b1c97c272d8c536437425662d3860ba5e6146eb822fda3196d5150e3df9b"
+      "sha256": "13a89058495dcd9936cc6fa67fa6119aa70dba7c771d571bbe894c4c71281d62"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

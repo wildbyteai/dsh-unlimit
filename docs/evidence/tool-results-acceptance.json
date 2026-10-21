@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "behaviorId": "CORE-RESULT",
-  "generatedAt": "2026-10-21T06:29:00.356Z",
+  "generatedAt": "2026-10-21T07:15:14.310Z",
   "node": "v24.21.0",
   "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
   "patch": {
@@ -2489,6 +2489,7 @@
     "filesystemBoundaryGuards": true,
     "guardsHeldThroughOfficialLifecycle": true,
     "guardsHeldThroughTemporaryRootCleanup": true,
+    "cleanupErrors": [],
     "syntheticModelAdapter": true
   },
   "scenarios": [
@@ -2595,7 +2596,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "38f0b1c97c272d8c536437425662d3860ba5e6146eb822fda3196d5150e3df9b"
+      "sha256": "13a89058495dcd9936cc6fa67fa6119aa70dba7c771d571bbe894c4c71281d62"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

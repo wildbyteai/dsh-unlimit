@@ -13,6 +13,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DesktopRuntime } from "../../src/host/runtime.js";
 import { officialReadRuntime } from "./official-packages.mjs";
+import { createPtcProcessGuard } from "./ptc-process-guard.mjs";
 
 export const presetProjectRoot = fileURLToPath(new URL("../../", import.meta.url));
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -26,9 +27,10 @@ export async function presetFixture(
   t,
   selectedRoot,
   cache,
-  { permissionPresets = false, presetId = "standard", modelModalities } = {},
+  { permissionPresets = false, presetId = "standard", modelModalities, ptcExecution = false } = {},
 ) {
-  assert.ok(["standard", "minimal"].includes(presetId));
+  assert.ok(["standard", "minimal", "ptc"].includes(presetId));
+  assert.equal(ptcExecution, presetId === "ptc", "PTC is an explicit standalone execution probe");
   const marker = presetId.toUpperCase();
   const provider = `synthetic-${presetId}-offline`;
   const installedRoot = fs.realpathSync(selectedRoot);
@@ -76,6 +78,7 @@ export async function presetFixture(
   t.mock.method(os, "homedir", () => join(directory, "home"));
 
   const forbidden = [];
+  const sourceReads = [];
   const directoryFsyncFds = new Set();
   const deny = (name) => () => {
     forbidden.push(name);
@@ -97,7 +100,7 @@ export async function presetFixture(
         t.mock.method(api, key, deny(`${label}.${key}`));
   syncBuiltinESMExports();
 
-  let runtime, ctx, adapter;
+  let runtime, ctx, adapter, ptc;
   const handles = [],
     fibers = [],
     errors = [],
@@ -109,31 +112,47 @@ export async function presetFixture(
   let officialLifecycleDisposed = false;
   let rootsRemovedUnderGuards = false;
   let cleaningRuntimeRoot = false;
+  const cleanupErrors = [];
   const dispose = async () => {
     if (disposed) return;
     disposed = true;
+    const cleanup = async (name, action) => {
+      try {
+        await action();
+      } catch (cause) {
+        cleanupErrors.push(new Error(`Preset fixture cleanup failed: ${name}`, { cause }));
+      }
+    };
     try {
-      adapter?.revert();
-      for (const handle of handles) handle.agent.cancel({ kind: "user" });
-      await Promise.all(handles.map((handle) => handle.agent.whenIdle()));
-      for (const handle of handles.reverse()) await handle.dispose();
-      for (const fiber of fibers.reverse()) if (fiber.uid !== null) await fiber.dispose();
-      await ctx?.fiber.dispose();
-      officialLifecycleDisposed = true;
-      assert.equal(directoryFsyncFds.size, 0, "All ancestor metadata handles must be closed");
-      for (const row of installed)
-        assert.equal(digest(fs.readFileSync(join(installedRoot, row.path))), row.sha256);
+      await cleanup("adapter", () => adapter?.revert());
+      for (const handle of handles)
+        await cleanup("cancel", () => handle.agent.cancel({ kind: "user" }));
+      await cleanup("idle", () => Promise.all(handles.map((handle) => handle.agent.whenIdle())));
+      for (const handle of handles.reverse()) await cleanup("agent handle", () => handle.dispose());
+      for (const fiber of fibers.reverse())
+        if (fiber.uid !== null) await cleanup("fiber", () => fiber.dispose());
+      await cleanup("context", () => ctx?.fiber.dispose());
+      await cleanup("PTC processes", () => ptc?.verifyDisposed());
+      officialLifecycleDisposed = cleanupErrors.length === 0;
+      await cleanup("descriptors and installed entries", () => {
+        assert.equal(directoryFsyncFds.size, 0, "All ancestor metadata handles must be closed");
+        for (const row of installed)
+          assert.equal(digest(fs.readFileSync(join(installedRoot, row.path))), row.sha256);
+      });
     } finally {
       try {
         cleaningRuntimeRoot = true;
-        try {
-          runtime?.dispose();
-        } finally {
-          fs.rmSync(directory, { recursive: true, force: true });
-        }
+        await cleanup("runtime root", () => runtime?.dispose());
+        await cleanup("synthetic root", () =>
+          fs.rmSync(directory, { recursive: true, force: true }),
+        );
+        await cleanup("PTC import hook", () => ptc?.deregister());
         rootsRemovedUnderGuards =
           !fs.existsSync(directory) && !fs.existsSync(runtime?.root ?? directory);
-        assert.deepEqual(forbidden, [], "No forbidden network, subprocess or filesystem access");
+        await cleanup("boundaries", () => {
+          assert.deepEqual(forbidden, [], "No forbidden network, subprocess or filesystem access");
+          assert.equal(rootsRemovedUnderGuards, true);
+        });
       } finally {
         t.mock.restoreAll();
         syncBuiltinESMExports();
@@ -143,9 +162,13 @@ export async function presetFixture(
           else process.env[key] = value;
       }
     }
+    if (cleanupErrors.length)
+      throw new AggregateError(cleanupErrors, "Preset fixture cleanup failed");
   };
   t.after(dispose);
   runtime = officialReadRuntime(installedRoot, cache, { presets: true });
+  if (ptcExecution)
+    ptc = createPtcProcessGuard(t, { installedRoot, runtime, workspace, forbidden });
   assert.ok(
     runtime.verifiedFiles instanceof Map,
     "Shared Loader must record every actual official import",
@@ -187,6 +210,14 @@ export async function presetFixture(
       );
     }
     const filename = resolve(path instanceof URL ? fileURLToPath(path) : String(path));
+    if (
+      !writing &&
+      ptc?.metadataPaths.includes(filename) &&
+      /^(?:stat|lstat|access|exists|realpath)(?:Sync)?(?:\.native)?$/.test(operation)
+    ) {
+      metadataReads.push({ operation, scope: "fixed-ptc-executable" });
+      return;
+    }
     if (writing && cleaningRuntimeRoot && operation === "rmSync" && filename === runtime.root)
       return;
     if (
@@ -243,6 +274,8 @@ export async function presetFixture(
       if (/^(rename|copyFile)/.test(key)) checkPath(args[0], true, key);
       if (/^create(?:Read|Write)Stream$/.test(key) && args[0]?.fd !== undefined)
         checkPath(args[0].fd, writing, key);
+      if (ptcExecution && path === sourceFile && /^readFile/.test(key))
+        sourceReads.push({ operation: key, path: sourceFile });
       const result = Reflect.apply(original, this, [path, ...args]);
       if (!directoryFsync) return result;
       return result.then(async (handle) => {
@@ -527,7 +560,8 @@ export async function presetFixture(
       fiber: permissionFiber,
     });
   }
-  await mount(api.ptc);
+  await mount(api.ptc, ptc?.config);
+  ptc?.bind(ctx);
   await mount(api.subagents);
   await mount(api.spawn, { providerName: "spawn" });
   await mount(api.fork, { providerName: "fork" });
@@ -586,9 +620,10 @@ export async function presetFixture(
     if (row.enabled) assert.equal(row.fiberState, 2, `${row.entryId} must be active`);
   for (const row of composition.rows) {
     const disabled =
-      presetId === "standard"
+      presetId !== "minimal"
         ? row.entryId === "tool-plugin-manager" ||
           row.entryId === "tool-plugin-market" ||
+          (presetId === "ptc" && ["workflow-ptc", "tool-workflow"].includes(row.entryId)) ||
           row.entryId === (process.platform === "win32" ? "tool-bash" : "tool-pwsh")
         : ["terminal", "persistent"].some(
             (prefix) =>
@@ -730,6 +765,7 @@ export async function presetFixture(
     assemble,
     unadaptedAssembly,
     dispose,
+    ptc,
     evidence: () => ({
       inventorySha256: digest(inventoryBytes),
       patch: { path: patchPath, sha256: digest(patchBytes) },
@@ -764,6 +800,7 @@ export async function presetFixture(
         filesystemBoundaryGuards: true,
         guardsHeldThroughOfficialLifecycle: officialLifecycleDisposed,
         guardsHeldThroughTemporaryRootCleanup: rootsRemovedUnderGuards,
+        cleanupErrors: cleanupErrors.map((error) => error.message),
         ...(permissionPresets || presetId === "minimal"
           ? {
               metadataOnlyReads: {
@@ -785,6 +822,13 @@ export async function presetFixture(
             }
           : {}),
         syntheticModelAdapter: true,
+        ...(ptc
+          ? {
+              ptcBackend: ptc.evidence(),
+              syntheticSourceReads: structuredClone(sourceReads),
+              executableMetadataReads: structuredClone(metadataReads),
+            }
+          : {}),
       },
     }),
   };
