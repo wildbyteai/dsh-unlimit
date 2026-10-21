@@ -731,3 +731,14 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 - 构建和离线打包成功；包内 **76 文件**逐项与当前工作区字节一致。tgz **326089 字节**，SHA-256 `d74bdddf67266b56a64140b3052b068dd7c8a0986a271aca677f00c590bf46de`。文档更新后另跑基线与交付检查 **3 通过、0 失败、0 跳过**。
 
 此批证明自动调度和数据传递，不证明真实模型规划、技能选择和执行质量。核心 Hook/记忆策略、终端/内核沙箱链路、技能附属资源和真实桌面等原差距保留；全量回归不等于完整 1:1。未调用真实模型、未安装插件、未更改真实 DSH 配置/profile/会话。NOTICE、开发来源和 UNLICENSED 状态保持。
+
+## 完整 standard/PTC 网页调用（2026-10-21）
+
+基于 `c14f088b6ee9eaaa46deecf39b39f81de05a0672`。这批补齐 `CORE-WEBTOOLS` 的完整模式执行证据，没有发现或修改产品源码缺陷；产品安装包与上一批字节相同。原先组件调用证据继续保留，不将新路径扩大成全部工具或真实桌面通过。
+
+- standard 完整官方预设、Loader/Registry、AgentLoop：replace、计划模式、revert 三次实际 `web_fetch`，八次合成模型请求包含另一次原生回环拒绝。正文、来源、不可信说明进入下一轮，schema 保留，官方 JSONL reader 全量读回。`tests/webtools-preset-host.test.mjs` **5 通过、0 失败、0 跳过**。
+- PTC 显式探针：**3 通过、0 失败、0 跳过**，replace/revert 各一个真实官方 Node/Seatbelt 子进程，四次合成模型请求、两次 run_code 和两次内层 web_fetch；原生 SDK 和工具 schema 保留。调用 ID 因果对应、完整 canonical 正文及 URL、下一轮消息、物理 JSONL 与官方 reader 都已核对。643 个实际官方导入文件摘要验证，来源摘要和清理证据见 [ptc-web-acceptance.json](evidence/ptc-web-acceptance.json)。
+- `--expose-internals --test tests/*.test.mjs` **1090 通过、0 失败、0 跳过**。之后补强拒绝场景，要求运行控制启用时也保留 `WEB_BLOCKED_URL`；定向测试连同 117 项基线复验 **7 通过、0 失败、0 跳过**。PTC 进程探针独立执行，不包含在 1090 中。
+- 语法 **190/190**、有限来源检查和 **54 模块**分层检查通过。构建与离线包成功：**76 文件**，SHA-256 `d74bdddf67266b56a64140b3052b068dd7c8a0986a271aca677f00c590bf46de`，与上一批一致。没有新增发布文件、运行依赖或网络服务。
+
+复验命令、合成边界和调用路径见 [网页合同](webtools-contract.md#完整-standard-与-ptc-执行2026-10-21)。网页/DNS/模型响应均为合成，不证明真实模型能抵抗页面提示注入；原生 resolver 保留，没有真实网络。PTC 子进程和控制管道均关闭，live 集合为零，临时根清理且所有禁止访问记录为空。未安装插件、未更改真实 DSH 配置/profile/会话，未修改来源说明和原验收前五列。

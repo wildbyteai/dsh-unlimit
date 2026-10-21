@@ -249,6 +249,10 @@ Check the tool result, next model request, and persisted synthetic session event
 const value = await tools.exit_plan_mode({ plan: ${JSON.stringify(reviewPlan)} });
 return { value, networkAndSpawnAttempts: attempts, environmentNames: Object.keys(process.env) };
 `;
+  const webProgram = `${childPrelude}\
+const value = await tools.web_fetch({ url: "https://preset-web.invalid/page" });
+return { value, networkAndSpawnAttempts: attempts, environmentNames: Object.keys(process.env) };
+`;
   return {
     metadataPaths: [NODE, "/usr/bin/sandbox-exec"],
     config: {
@@ -265,6 +269,7 @@ return { value, networkAndSpawnAttempts: attempts, environmentNames: Object.keys
     program,
     reviewPlan,
     reviewProgram,
+    webProgram,
     bind(ctx) {
       subprocessProvider = unwrap(ctx.subprocess);
       ptcProvider = unwrap(ctx.ptcRuntime);
@@ -330,6 +335,7 @@ return { value, networkAndSpawnAttempts: attempts, environmentNames: Object.keys
       },
       programSha256: hash(program),
       availableReviewProgramSha256: hash(reviewProgram),
+      availableWebProgramSha256: hash(webProgram),
       reviewPlanSha256: hash(reviewPlan),
       originalReadOnlySeatbeltSha256: hash(SEATBELT),
       cleanup: {
