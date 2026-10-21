@@ -64,20 +64,26 @@ function fixture(t) {
   let holdDeliveries = false;
   const ctx = {
     subagents: {
-      [Symbol.for("dsh.subagent.deliverPrompt")](parent, id, content, source, signal, mode) {
+      async [Symbol.for("dsh.subagent.deliverPrompt")](parent, id, content, source, signal, mode) {
         const child = agents.get(id);
         const delivery = { parent, id, content, source, signal, mode, status: child.status };
         deliveries.push(delivery);
         const accept = () => {
-          if (signal.aborted) return { accepted: false };
+          signal.throwIfAborted();
           const message = { id: randomUUID(), role: "user", source, content };
           child.inbox.splice("next-turn", child.inbox.nextTurn.length, 0, [message]);
           delivery.message = message;
-          return { accepted: true, messageId: message.id };
+          return message.id;
         };
-        if (!holdDeliveries) return Promise.resolve(accept());
-        return new Promise((resolve) => {
-          delivery.release = () => resolve(accept());
+        if (!holdDeliveries) return accept();
+        return new Promise((resolve, reject) => {
+          delivery.release = () => {
+            try {
+              resolve(accept());
+            } catch (error) {
+              reject(error);
+            }
+          };
         });
       },
     },
@@ -307,7 +313,7 @@ test("zero limit, unsupported child sessions and missing capabilities are explic
   await tick();
   assert.equal(agent.followups.length, 0);
   assert.equal(child.followups.length, 0);
-  assert.throws(() => f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
+  await assert.rejects(f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
   assert.match(f.continuation.status({ sessionId: "child" }).unsupportedReason, /手动/);
   f.continuation.continue({ sessionId: "root" });
   assert.equal(agent.followups.length, 1, "manual action is not an automatic quota");
@@ -412,10 +418,11 @@ test("managed child max-tokens synchronously queues official automatic delivery 
   assert.equal(f.child.followups.length, 0, "child input never uses root followup");
   assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 1);
   assert.equal(f.continuation.status({ sessionId: "child" }).manualAvailable, false);
-  assert.throws(() => f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
+  await assert.rejects(f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
   f.emit("session/event", f.child.session, end);
   await tick();
   assert.equal(f.deliveries.length, 1, "same max-tokens trigger is submitted once");
+  assert.equal(f.continuation.status({ sessionId: "child" }).lastError, null);
 });
 
 test("managed child automatically continues only max-tokens and obeys current enable, source and limit", async (t) => {
@@ -449,6 +456,7 @@ test("managed child automatically continues only max-tokens and obeys current en
   assert.equal(f.continuation.status({ sessionId: "child" }).automaticCount, 2);
   await tick();
   assert.equal(f.deliveries.length, 2);
+  assert.equal(f.continuation.status({ sessionId: "child" }).lastError, null);
 });
 
 test("new parent input and a child source input reset a managed child's automatic chain", async (t) => {
@@ -540,6 +548,7 @@ test("accepted child automatic input uses ordinary ownership removal and running
   const f = await managedChild(t);
   f.child.finish();
   await tick();
+  assert.equal(f.continuation.status({ sessionId: "child" }).lastError, null);
   const acceptedSignal = f.deliveries[0].signal;
   const stop = f.continuation.stop({ sessionId: "child" });
   assert.equal(stop.ownedQueuedRemoved, 1);
@@ -578,7 +587,7 @@ test("child automatic delivery requires an observed local start and exact live m
       child.finish();
       await tick();
       assert.equal(f.deliveries.length, 0);
-      assert.throws(() => f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
+      await assert.rejects(f.continuation.continue({ sessionId: "child" }), code("UNSUPPORTED"));
       // Restore the directory for ordinary fixture teardown after the residency probe.
       f.agents.set("root", parent);
       f.agents.set("child", child);

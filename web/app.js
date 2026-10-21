@@ -1063,21 +1063,24 @@ function openForm(title, fields, values, onSave, options = {}) {
     });
   };
 }
-function confirmAction(title, message, onConfirm) {
+function confirmAction(title, message, onConfirm, options = {}) {
   if (!canLeaveEditor()) return;
   const dialog = $("#editor");
   dialog.innerHTML = `<div class="dialoghead"><h2>${esc(title)}</h2></div><p class="info">${esc(message)}</p><p class="inlineerror" id="confirm-error" role="alert"></p><div class="dialogfoot"><button id="cancel-confirm">取消</button><button class="danger" id="accept-confirm">确认${esc(title)}</button></div>`;
   dialog.oncancel = null;
   $("#cancel-confirm").onclick = () => dialog.close();
-  $("#accept-confirm").onclick = (e) =>
+  const accept = $("#accept-confirm");
+  const errorBox = $("#confirm-error");
+  accept.onclick = (e) =>
     run(e.target, async () => {
       try {
-        await onConfirm();
+        const result = await onConfirm();
+        if (!accept.isConnected || (options.keepPage && result === false)) return;
         dialog.close();
         toast("操作完成");
-        await render();
+        if (!options.keepPage) await render();
       } catch (error) {
-        $("#confirm-error").textContent = error.message;
+        if (errorBox.isConnected) errorBox.textContent = error.message;
         throw error;
       }
     });
@@ -1814,7 +1817,7 @@ async function controlPage() {
             );
           })
           .join("")}</div>`,
-      )}${panel("截断后继续", `${switchRow("autoContinue", "自动继续截断输出", "仅处理明确的输出长度截断；支持根会话，以及启用控制后创建的受管本地子代理。用户停止、传输错误和限流不触发续轮。")}<div class="fields">${renderField(field("continueLimit", "每条输入链的自动继续上限", "number", { min: 0, max: 20, step: 1, disabled: !can("continuation.auto") }), v.continueLimit)}${renderField(field("continueText", "继续用语", "textarea", { disabled: !can("continuation.manual") }), v.continueText)}</div><p class="info">默认关闭。根会话可在会话管理中手动继续；子代理暂不支持手动恢复。消息保留本插件来源，停止只处理本模块所属的自动继续。</p>`)}<div class="panel"><div class="panelheading"><h2>保存当前配置</h2><span class="meta" id="settings-revision">revision ${settings.revision}</span></div><p class="info">配置采用版本校验。若其他窗口已修改配置，请刷新后重新编辑。</p><p id="settings-error" class="inlineerror" role="alert"></p><button class="primary" type="submit" style="width:100%">保存配置</button></div></div></div></form>` +
+      )}${panel("截断后继续", `${switchRow("autoContinue", "自动继续截断输出", "仅处理明确的输出长度截断；支持根会话，以及启用控制后创建的受管本地子代理。用户停止、传输错误和限流不触发续轮。")}<div class="fields">${renderField(field("continueLimit", "每条输入链的自动继续上限", "number", { min: 0, max: 20, step: 1, disabled: !can("continuation.auto") }), v.continueLimit)}${renderField(field("continueText", "继续用语", "textarea", { disabled: !can("continuation.manual") }), v.continueText)}</div><p class="info">默认关闭。根会话和符合条件的已结束本地子会话可在会话管理中手动继续；子会话恢复会创建新执行。消息保留本插件来源，停止仅处理本插件所属的自动继续或子会话手动续跑输入。</p>`)}<div class="panel"><div class="panelheading"><h2>保存当前配置</h2><span class="meta" id="settings-revision">revision ${settings.revision}</span></div><p class="info">配置采用版本校验。若其他窗口已修改配置，请刷新后重新编辑。</p><p id="settings-error" class="inlineerror" role="alert"></p><button class="primary" type="submit" style="width:100%">保存配置</button></div></div></div></form>` +
       `<div id="network-scope">${networkScopePanel(scope.view())}</div>`,
     bind() {
       scopeRoot = $("#network-scope");
@@ -3679,9 +3682,95 @@ function openRewind(item) {
   };
   dialog.showModal();
 }
-async function sessionsPage() {
-  await Promise.all([refreshStatus(), probeBridge()]);
+function continuationDetails(result, sessionId) {
+  const row = (label, value) =>
+    `<div class="twocoltext"><span>${esc(label)}</span><span>${esc(value)}</span></div>`;
+  const manual = result.manualRun;
+  const statuses = {
+    starting: "正在启动",
+    running: "运行中",
+    completed: "已完成",
+    truncated: "输出再次截断",
+    failed: "失败",
+    stopped: "已停止",
+    released: "控制权已释放",
+  };
+  const stopReasons = {
+    "max-tokens": "输出达到长度上限",
+    aborted: "已取消",
+    completed: "正常结束",
+  };
+  const manualDetails = manual
+    ? `<div class="note"><strong>子会话手动续跑 · 新执行</strong>${row("执行状态", statuses[manual.status] || manual.status)}${manual.stopReason ? row("结束原因", stopReasons[manual.stopReason] || manual.stopReason) : ""}${row("并发名额", manual.slotHeld ? "占用中" : "未占用")}${manual.status === "released" ? '<p class="info">当前输入已由宿主接管，本插件已释放控制权。</p>' : ""}${manual.error ? `<div class="error" role="alert">${esc(manual.error.message || manual.error)}</div>` : ""}<details><summary>查看执行记录</summary>${row("当前会话", sessionId)}${row("执行标识", manual.id)}${row("宿主运行标识", manual.runId || "尚未分配")}${row("父会话", manual.parentSessionId)}${manual.workspaceId ? row("项目标识", manual.workspaceId) : ""}${manual.messageId ? row("消息标识", manual.messageId) : ""}${manual.stopReason ? row("原始结束原因", manual.stopReason) : ""}</details></div>`
+    : "";
+  return panel(
+    "截断后继续",
+    `<p class="info">${result.child ? "使用当前提示词和角色恢复子任务；新执行单独记录，原任务记录保持不变。" : "根会话可手动或自动继续截断内容。"}</p>${manual ? "" : row("当前会话", sessionId)}${row("最近结束原因", stopReasons[result.eligibleReason] || result.eligibleReason || "无可用结束记录")}${row("本次输入链已自动继续", `${result.automaticCount} / ${result.limit}`)}${manualDetails}${result.unsupportedReason ? `<div class="note">${esc(result.unsupportedReason)}</div>` : ""}${result.lastError ? `<div class="error" role="alert">${esc(result.lastError.message)}</div>` : ""}<div class="toolbar"><button id="manual-continue" ${result.manualAvailable ? "" : "disabled"}>${result.child ? "手动继续子会话（新执行）" : "手动继续截断内容"}</button><button id="stop-continuation" class="danger">停止本插件续跑</button><button id="reload-continuation">刷新状态</button></div><p class="info">${result.autoEnabled ? "自动继续已开启" : "自动继续已关闭"}${result.pending ? " · 等待提交" : ""}${result.stopped ? " · 本次链已停止" : ""}。停止仅控制本插件所属的自动继续或子会话手动续跑输入。</p>`,
+  );
+}
+function continuationView({ api, element, run, confirmAction, isCurrent }) {
+  let disposed = false;
+  let serial = 0;
+  const active = () => !disposed && isCurrent() && element.isConnected;
+  const current = (version) => active() && version === serial;
+  const assertCurrent = (version) => {
+    if (!current(version)) throw new Error("会话或页面已切换，请重新查看继续状态。");
+  };
+  const show = async (sessionId) => {
+    if (!active()) return false;
+    const version = ++serial;
+    element.innerHTML = panel(
+      "截断后继续",
+      `<p class="info">正在读取 ${esc(sessionId)} 的继续状态…</p>`,
+    );
+    let result;
+    try {
+      result = await api("continuation.status", { sessionId });
+    } catch (error) {
+      if (current(version)) throw error;
+      return false;
+    }
+    if (!current(version)) return false;
+    element.innerHTML = continuationDetails(result, sessionId);
+    element.querySelector("#reload-continuation").onclick = (event) =>
+      run(event.target, () => show(sessionId));
+    element.querySelector("#manual-continue").onclick = () => {
+      assertCurrent(version);
+      if (!result.manualAvailable) return;
+      confirmAction(
+        "继续截断内容",
+        result.child
+          ? "将采用当前保存的继续用语、系统提示词和角色恢复子会话并创建新执行，不复用原工作流任务回执；宿主可能通知父会话。消息保留本插件来源，可能产生模型调用费用。"
+          : "将采用当前继续用语和系统提示词提交新一轮，消息保留本插件来源，可能产生模型调用费用。",
+        async () => {
+          assertCurrent(version);
+          await api("continuation.continue", { sessionId });
+          return current(version) ? show(sessionId) : false;
+        },
+        { keepPage: true },
+      );
+    };
+    element.querySelector("#stop-continuation").onclick = (event) =>
+      run(event.target, async () => {
+        assertCurrent(version);
+        await api("continuation.stop", { sessionId });
+        if (current(version)) await show(sessionId);
+      });
+    return true;
+  };
+  return {
+    show,
+    dispose() {
+      disposed = true;
+      serial++;
+    },
+  };
+}
+async function sessionsPage(read = api) {
+  const request = state.request;
+  await Promise.all([refreshStatus(read), probeBridge()]);
   const items = state.status.sessions || [];
+  let continuation;
   return {
     html:
       heading('<button id="refresh-sessions">↻ 刷新会话</button>') +
@@ -3711,32 +3800,16 @@ async function sessionsPage() {
       '<div id="continuation-detail"></div>',
     bind() {
       $("#refresh-sessions").onclick = render;
-      const showContinuation = async (sessionId) => {
-        const result = await api("continuation.status", { sessionId });
-        if (state.page !== "sessions") return;
-        $("#continuation-detail").innerHTML = panel(
-          "截断后继续",
-          `<p class="info">根会话可手动或自动继续截断内容；受管本地子代理支持当前任务内自动继续，已结束的子任务尚不支持手动恢复。</p><div class="twocoltext"><span>最近结束原因</span><span>${esc(result.eligibleReason || "无可用结束记录")}</span></div><div class="twocoltext"><span>本次输入链已自动继续</span><span>${result.automaticCount} / ${result.limit}</span></div>${result.unsupportedReason ? `<div class="note">${esc(result.unsupportedReason)}</div>` : ""}${result.lastError ? `<div class="error">${esc(result.lastError.message)}</div>` : ""}<div class="toolbar"><button id="manual-continue" ${result.manualAvailable ? "" : "disabled"}>手动继续截断内容</button><button id="stop-continuation" class="danger">停止本模块自动继续</button><button id="reload-continuation">刷新状态</button></div><p class="info">${result.autoEnabled ? "自动继续已开启" : "自动继续已关闭"}${result.pending ? " · 等待提交" : ""}${result.stopped ? " · 本次链已停止" : ""}</p>`,
-        );
-        $("#reload-continuation").onclick = (event) =>
-          run(event.target, () => showContinuation(sessionId));
-        $("#manual-continue").onclick = () =>
-          confirmAction(
-            "继续截断内容",
-            "将采用当前继续用语和系统提示词提交新一轮，消息保留本插件来源，可能产生模型调用费用。",
-            async () => {
-              await api("continuation.continue", { sessionId });
-            },
-          );
-        $("#stop-continuation").onclick = (event) =>
-          run(event.target, async () => {
-            await api("continuation.stop", { sessionId });
-            await showContinuation(sessionId);
-          });
-      };
+      continuation = continuationView({
+        api,
+        element: $("#continuation-detail"),
+        run,
+        confirmAction,
+        isCurrent: () => state.page === "sessions" && state.request === request,
+      });
       $$("[data-continuation]").forEach((button) => {
         button.onclick = () =>
-          run(button, () => showContinuation(items[Number(button.dataset.continuation)].id));
+          run(button, () => continuation.show(items[Number(button.dataset.continuation)].id));
       });
       $$("[data-bind-session]").forEach(
         (b) =>
@@ -3755,6 +3828,7 @@ async function sessionsPage() {
         (b) => (b.onclick = () => openRewind(items[Number(b.dataset.rewind)])),
       );
     },
+    dispose: () => continuation?.dispose(),
   };
 }
 async function environmentPage(read = api) {

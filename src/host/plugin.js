@@ -59,7 +59,7 @@ export function mount(ctx, host) {
   const environment = new LocalEnvironment(realpathSync(host.dataRoot));
   const catalog = new HostCatalog(ctx, { library: skills, toolkit, environment });
   const plans = new DesktopWorkflowPlan(workflow, { catalog });
-  const continuation = new Continuation(ctx, store, host);
+  const continuation = new Continuation(ctx, store, host, { flow, workflow, admission });
   const sessions = new DesktopSessions(ctx, store, {
     host,
     enabled: () => runtime.enabled && runtime.settings().enabled,
@@ -138,7 +138,7 @@ export function mount(ctx, host) {
       store.dispatch("workspaces.bind", { id: parent.id, sessionId: agent.session.id });
   });
   const releaseSlot = (sessionId) => {
-    if (workflow.controlsSession(sessionId)) return;
+    if (workflow.controlsSession(sessionId) || continuation.controlsSession(sessionId)) return;
     const workspace = store.dispatch("workspaces.forSession", { sessionId }).item;
     if (workspace) flow.dispatch("flow.release", { workspaceId: workspace.id, sessionId });
   };

@@ -100,6 +100,42 @@ test("uninstall aborts preparing processes before draining accepted tool actions
   assert.equal(f.calls[0], "process.stopAll");
 });
 
+test("uninstall retracts pending manual resumes before waiting for accepted actions", async () => {
+  const f = controlFixture();
+  const pending = Promise.withResolvers();
+  f.controller.continuation = {
+    continue: () => pending.promise,
+    revert() {},
+    async stopAll(options) {
+      assert.deepEqual(options, { revoke: true });
+      pending.reject(new Error("synthetic continuation preparation aborted"));
+    },
+  };
+  const rejected = assert.rejects(
+    f.controller.dispatch("continuation.continue", { sessionId: "child" }),
+    /preparation aborted/,
+  );
+  const receipt = await f.controller.prepareUninstall();
+  await rejected;
+  assert.equal(receipt.steps.find(({ id }) => id === "continuation").status, "completed");
+});
+
+test("admission revoke stops only project manual continuations and reports unconfirmed cleanup", async () => {
+  const f = controlFixture();
+  const seen = [];
+  f.controller.admission = { dispatch: () => ({ accepted: false, revision: 2 }) };
+  f.controller.continuation = {
+    async stopAll(options) {
+      seen.push(options);
+      throw new Error("synthetic owned drain failure");
+    },
+  };
+  await assert.rejects(f.controller.dispatch("admission.revoke"), {
+    code: "ADMISSION_REVOKED_PARTIAL",
+  });
+  assert.deepEqual(seen, [{ projectsOnly: true, revoke: true }]);
+});
+
 test("concurrent applies finish in acceptance order without stale revision rollback", async () => {
   const f = controlFixture();
   const entered = Promise.withResolvers();
@@ -511,11 +547,12 @@ test("unverified desktop versions cannot prepare or perform a destructive sessio
   assert.equal(calls, 1);
 });
 
-test("owned active workflow sessions cannot bypass their execution slots via generic actions", async () => {
+test("owned active workflow and manual continuation sessions cannot bypass their execution slots via generic actions", async () => {
   const calls = [];
   const controller = new Controller({
     host: { supported: true },
     workflow: { controlsSession: (sessionId) => sessionId === "owned-executor" },
+    continuation: { controlsSession: (sessionId) => sessionId === "owned-continuation" },
     store: {
       dispatch: (...args) => {
         calls.push(args);
@@ -530,9 +567,8 @@ test("owned active workflow sessions cannot bypass their execution slots via gen
     },
   });
   for (const action of ["workspaces.bind", "flow.assign", "flow.release"]) {
-    await assert.rejects(controller.dispatch(action, { sessionId: "owned-executor" }), {
-      code: "CONFLICT",
-    });
+    for (const sessionId of ["owned-executor", "owned-continuation"])
+      await assert.rejects(controller.dispatch(action, { sessionId }), { code: "CONFLICT" });
   }
   assert.equal(calls.length, 0);
   await controller.dispatch("flow.release", { sessionId: "ordinary-session" });

@@ -1,5 +1,6 @@
 import { resolveOfficialPackage } from "./official-package.js";
 import { DEFAULT_SETTINGS, fail, object, string } from "../core/validation.js";
+import { ChildContinuation } from "./child-continuation.js";
 
 const SOURCE = "dsh-unlimit/continuation";
 const CHILD_DELIVERY = Symbol.for("dsh.subagent.deliverPrompt");
@@ -83,10 +84,23 @@ export class Continuation {
   #childRuntime;
   #childActivations = new Map();
 
-  constructor(ctx, store, host) {
+  constructor(ctx, store, host, options = {}) {
     this.ctx = ctx;
     this.store = store;
     this.host = host;
+    this.manualChildren = new ChildContinuation(ctx, store, host, {
+      ...options,
+      readSettings: () => settings(store),
+      ready: () => this.#disposers.length > 0,
+    });
+  }
+
+  controlsSession(id) {
+    return this.manualChildren.controlsSession(id);
+  }
+
+  stopAll(options) {
+    return this.manualChildren.stopAll(options);
   }
 
   #support() {
@@ -154,6 +168,7 @@ export class Continuation {
   }
 
   #interruptState(state) {
+    this.manualChildren.abortParent(state.agent.session.id);
     const interrupted = state.interrupted;
     this.#clear(state);
     state.stopped = true;
@@ -166,7 +181,7 @@ export class Continuation {
         if (child) {
           try {
             if (service(this.ctx, "agents")?.get(child.agent.session.id) === child.agent)
-              this.stop({ sessionId: child.agent.session.id });
+              this.#stopAutomatic({ sessionId: child.agent.session.id });
           } catch (error) {
             errors.push(error);
           }
@@ -474,13 +489,13 @@ export class Continuation {
       });
   }
 
-  #agent(payload) {
+  #agent(payload, allowMissing = false) {
     object(payload);
     string(payload.sessionId, "sessionId");
     if (Object.keys(payload).some((key) => key !== "sessionId"))
       fail("INVALID_INPUT", "继续操作不接受任意消息或执行参数");
     const agent = service(this.ctx, "agents")?.get(payload.sessionId);
-    if (!agent) fail("NOT_FOUND", "活动会话不存在");
+    if (!agent && !allowMissing) fail("NOT_FOUND", "活动会话不存在");
     return agent;
   }
 
@@ -540,8 +555,9 @@ export class Continuation {
   }
 
   continue(payload) {
-    const agent = this.#agent(payload),
-      state = this.#state(agent);
+    const agent = this.#agent(payload, true);
+    if (!agent || isChild(agent)) return this.manualChildren.continue(payload.sessionId);
+    const state = this.#state(agent);
     const end = this.#end(agent);
     if (!end) fail("UNSUPPORTED", "会话没有可确认的截断结束记录");
     return this.#submit(state, end.seq, "manual");
@@ -574,6 +590,20 @@ export class Continuation {
   }
 
   stop(payload) {
+    const agent = this.#agent(payload, true);
+    if (this.manualChildren.runs.has(payload.sessionId)) {
+      const automatic = agent ? this.#stopAutomatic(payload) : {};
+      return this.manualChildren.stop(payload.sessionId).then((result) => ({
+        ...automatic,
+        ...result,
+        ownedRunCancelled: Boolean(automatic.ownedRunCancelled || result.ownedRunCancelled),
+        ownedQueuedRemoved: (automatic.ownedQueuedRemoved ?? 0) + result.ownedQueuedRemoved,
+      }));
+    }
+    return this.#stopAutomatic(payload);
+  }
+
+  #stopAutomatic(payload) {
     const state = this.#state(this.#agent(payload));
     const pending =
       state.pending !== null || state.childPending !== null || state.childTrigger !== null;
@@ -624,18 +654,30 @@ export class Continuation {
   changed() {
     const value = settings(this.store);
     if (!value.enabled || !value.autoContinue)
-      for (const state of this.#states.values()) this.stop({ sessionId: state.agent.session.id });
+      for (const state of this.#states.values())
+        this.#stopAutomatic({ sessionId: state.agent.session.id });
     else
       for (const state of this.#states.values())
         if (state.automaticCount >= value.continueLimit) this.#clear(state);
+    if (!value.enabled) return this.manualChildren.stopAll({ revoke: true });
   }
 
   status(payload) {
-    const state = this.#state(this.#agent(payload)),
+    const agent = this.#agent(payload, true);
+    if (!agent) return this.manualChildren.status(payload.sessionId);
+    const state = this.#state(agent),
       end = this.#end(state.agent),
       value = settings(this.store);
     return {
       sessionId: state.agent.session.id,
+      child: isChild(state.agent),
+      ...(this.manualChildren.runs.has(payload.sessionId)
+        ? {
+            manualRun: this.manualChildren.snapshot(
+              this.manualChildren.runs.get(payload.sessionId),
+            ),
+          }
+        : {}),
       automaticCount: state.automaticCount,
       limit: value.continueLimit,
       autoEnabled: Boolean(value.enabled && value.autoContinue),
@@ -646,7 +688,7 @@ export class Continuation {
       unsupportedReason: state.interrupted
         ? "已观察到原生停止或取消，不能当作模型截断继续"
         : isChild(state.agent)
-          ? "子代理目前仅支持当前受管运行中的自动继续；手动恢复尚未接入"
+          ? "请等待当前子任务完整结束后再手动继续；当前任务内仍可使用自动继续"
           : !state.cancel
             ? "该代理没有可撤销取消观察接口"
             : null,
@@ -669,9 +711,12 @@ export class Continuation {
   revert() {
     this.#generation++;
     const errors = [];
+    const childCleanup = [...this.manualChildren.runs.values()].some((run) => !run.finished)
+      ? this.manualChildren.stopAll({ revoke: true })
+      : null;
     for (const state of this.#states.values()) {
       try {
-        this.stop({ sessionId: state.agent.session.id });
+        this.#stopAutomatic({ sessionId: state.agent.session.id });
       } catch (error) {
         errors.push(error);
       }
@@ -692,6 +737,14 @@ export class Continuation {
     this.#createMessage = undefined;
     this.#childRuntime = undefined;
     this.#childActivations.clear();
+    if (childCleanup)
+      return childCleanup
+        .catch((error) => {
+          errors.push(error);
+        })
+        .then(() => {
+          if (errors.length) throw new AggregateError(errors, "继续模块部分清理尚未确认");
+        });
     if (errors.length)
       throw new AggregateError(errors, "继续模块已尝试撤销全部监听与取消观察，部分所有权已改变");
   }

@@ -341,7 +341,7 @@ test(
     sendHuman(childHandle.agent);
     await drain(childHandle.agent);
     assert.equal(requests.get("child").length, 1);
-    assert.throws(() => continuation.continue({ sessionId: "child" }), { code: "UNSUPPORTED" });
+    await assert.rejects(continuation.continue({ sessionId: "child" }), { code: "UNSUPPORTED" });
 
     const snapshots = [...live].map(([id, agent]) => ({
       id,

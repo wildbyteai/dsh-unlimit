@@ -272,6 +272,8 @@ export class Controller {
         const result = await this.processes.stopAll();
         if (!result.stopped) throw new Error("Owned processes remain active");
       });
+    if (typeof this.continuation?.stopAll === "function")
+      await step("continuation", () => this.continuation.stopAll({ revoke: true }));
     // Cancel owned connections before draining accepted actions. No new action
     // enters while maintenance is active; awaited apply/save still finish.
     await Promise.allSettled([...this.#pending]);
@@ -344,7 +346,8 @@ export class Controller {
       this.admission?.require();
     if (
       ["flow.assign", "flow.release", "workspaces.bind"].includes(action) &&
-      this.workflow?.controlsSession(payload.sessionId)
+      (this.workflow?.controlsSession(payload.sessionId) ||
+        this.continuation?.controlsSession?.(payload.sessionId))
     )
       throw Object.assign(
         new Error("该会话由演练执行者管理，请先通过执行者停止操作确认结束，再修改角色、绑定或槽位"),
@@ -355,6 +358,11 @@ export class Controller {
         if (!this.admission) return unavailable("演练入场确认服务未加载");
         const result = this.admission.dispatch(action, payload);
         const errors = [];
+        try {
+          await this.continuation?.stopAll?.({ projectsOnly: true, revoke: true });
+        } catch (error) {
+          errors.push(error);
+        }
         for (const service of [
           this.connectionChecks,
           this.networkScope,
