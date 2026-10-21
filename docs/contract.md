@@ -80,6 +80,8 @@ API 使用 `POST /dsh-unlimit/api`，请求为 `{ "action": "...", "payload": {}
 
 `status` 返回包版本、宿主版本、平台、启用状态、能力列表、当前设置、会话列表和离线更新模式。`control.apply` / `control.revert` 启用与撤销本插件拥有的运行时注册。`sessions.rewind` 使用官方 fork 路径保留原会话。`skills.*` 仅处理本插件明确选定的技能根目录。`toolkit.*` 管理用户指定的本地工具目录与固定版本探测进程。
 
+撤销使本次启用期间尚未完成的提示词组装失效：返回宿主原始组装结果，不再读取规则或追加角色正文。随后重新启用也不会恢复旧任务的注入资格。已撤销的重试刷新监听不能在异步返回后重新挂载投影，也不会通过保留在外部包装中的旧引用读取已关闭存储。此边界不撤回已经发送的请求，也不删除既有对话记录。
+
 回退新分支先通过官方取消与空队列读回，之后才归档原会话；子代理可按可核验的创建来源定位根会话切点，最新激活来源仍未支持。谱系、并发与部分失败字段见 [子代理回退合同](child-rewind-contract.md)。`report.build` 的已有字段报告、统计兼容与凭据隐藏合同见 [工作区报告](report-contract.md)。
 
 `status.permissionDefaults` 读回官方可选默认预设、请求值和实际生效默认；`permissionDefault` 空值跟随宿主，非空值必须属于官方 `defaultOptions`。仅影响未来全新会话，已有、seeded 和显式选择由宿主保留；不会把 `autoApprove` 转换为官方 `never`。见 [权限默认合同](permission-defaults-contract.md)。

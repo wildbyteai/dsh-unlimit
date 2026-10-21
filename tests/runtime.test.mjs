@@ -102,6 +102,62 @@ test("disabled composition preserves the exact original assembly", (t) => {
   assert.equal(composePrompt(assembly, settings, { rule: { content: "Ignored" } }), assembly);
 });
 
+for (const reapply of [false, true])
+  test(`pending assembly stays revoked after revert${reapply ? " and reapply" : ""}`, async (t) => {
+    const f = fixture(t, { enabled: true });
+    t.mock.method(f.runtime.store, "dispatch", (action) => {
+      f.reads.push(action);
+      // Real WorkspaceStore reads deserialize a new settings snapshot each time.
+      if (action === "settings.get") return { value: structuredClone(f.settings) };
+      if (action === "rules.list") return structuredClone(f.library);
+      throw new Error(`Unexpected action ${action}`);
+    });
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    let holding = false;
+    f.ctx.systemPrompt.assemble = async () => {
+      if (holding) await gate;
+      return f.assembly;
+    };
+    const roleCalls = [];
+    f.runtime.rolePrompt = (sessionId) => {
+      roleCalls.push(sessionId);
+      return "SYNTHETIC_ROLE";
+    };
+    const context = { agent: { session: { id: "synthetic-pending-session" } } };
+    f.runtime.apply();
+    const ordinary = await f.ctx.systemPrompt.assemble(context);
+    assert.equal(ordinary.sections[0].text, f.settings.prompt);
+    assert.equal(ordinary.sections.at(-1).text, "SYNTHETIC_ROLE");
+    f.reads.length = 0;
+    roleCalls.length = 0;
+    holding = true;
+    const pending = f.ctx.systemPrompt.assemble(context);
+    f.settings.enabled = false;
+    f.runtime.revert();
+    if (reapply) {
+      f.settings.prompt = "SYNTHETIC_REAPPLIED_PROMPT";
+      f.settings.enabled = true;
+      f.runtime.apply();
+    }
+    release();
+    const output = await pending;
+    assert.deepEqual(
+      {
+        originalAssembly: output === f.assembly,
+        ruleReads: f.reads.filter((action) => action === "rules.list").length,
+        roleCalls,
+      },
+      { originalAssembly: true, ruleReads: 0, roleCalls: [] },
+      "A revoked invocation must finish without composing or consulting rules and roles",
+    );
+    if (reapply) {
+      const current = await f.ctx.systemPrompt.assemble(context);
+      assert.equal(current.sections[0].text, "SYNTHETIC_REAPPLIED_PROMPT");
+      assert.equal(current.sections.at(-1).text, "SYNTHETIC_ROLE");
+    }
+  });
+
 test("disabled runtime leaves original prompt path unaffected even with unavailable selected files", async (t) => {
   const f = fixture(t, { workspaceFiles: ["/not-an-existing-synthetic-file/AGENTS.md"] });
   f.runtime.apply();

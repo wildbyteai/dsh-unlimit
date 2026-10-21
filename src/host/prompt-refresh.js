@@ -7,6 +7,7 @@ import { resolveOfficialPackage } from "./official-package.js";
  */
 export function connectPromptRefresh(ctx, runtime) {
   const projections = new Map();
+  let active = true;
   let renderer;
   const loadRenderer = async () => {
     if (!renderer) {
@@ -32,7 +33,7 @@ export function connectPromptRefresh(ctx, runtime) {
   const disposeRequest = ctx.on("agent/request", async ({ agent, turn, step, signal }, next) => {
     const config = await next();
     signal?.throwIfAborted();
-    if (!runtime.settings().enabled) return config;
+    if (!active || !runtime.settings().enabled) return config;
     let entry = projections.get(agent);
     if (!entry) {
       const target = agent.systemPrompt;
@@ -44,7 +45,7 @@ export function connectPromptRefresh(ctx, runtime) {
       entry.wrapper = function (text, ...args) {
         return original.call(
           this,
-          runtime.settings().enabled && entry.text !== undefined ? entry.text : text,
+          active && runtime.settings().enabled && entry.text !== undefined ? entry.text : text,
           ...args,
         );
       };
@@ -58,10 +59,12 @@ export function connectPromptRefresh(ctx, runtime) {
     }
     if (entry.turn === turn && entry.step === step) {
       const render = await loadRenderer();
+      if (!active) return config;
       const assembly = await runtime
         .service("systemPrompt")
         .assemble({ agent, scope: agent, signal, model: config.model });
       signal?.throwIfAborted();
+      if (!active) return config;
       entry.text = render(assembly);
     } else {
       entry.turn = turn;
@@ -72,6 +75,7 @@ export function connectPromptRefresh(ctx, runtime) {
   });
   const disposeAgent = ctx.on("agent/disposed", ({ agent }) => detach(agent));
   return () => {
+    active = false;
     disposeRequest();
     disposeAgent();
     const errors = [];

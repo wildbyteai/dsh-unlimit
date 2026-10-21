@@ -46,6 +46,7 @@ function completeSectionNames(systemPrompt, scope) {
 
 export class DesktopRuntime {
   #undo = [];
+  #activation = null;
   constructor(ctx, store, host) {
     this.ctx = ctx;
     this.store = store;
@@ -109,6 +110,8 @@ export class DesktopRuntime {
       throw new Error(`缺少核心能力：${required.map((cap) => cap.label).join("、")}`);
     const runtime = this;
     const pending = [];
+    const activation = {};
+    this.#activation = activation;
     try {
       this.permissionDefaults.apply();
       pending.push(() => this.permissionDefaults.revert());
@@ -118,6 +121,7 @@ export class DesktopRuntime {
           "assemble",
           (original) =>
             async function (...args) {
+              if (runtime.#activation !== activation) return original.apply(this, args);
               const config = runtime.settings();
               const context = args[0] ?? {};
               const completeNames =
@@ -125,7 +129,7 @@ export class DesktopRuntime {
                   ? completeSectionNames(this, context.scope)
                   : new Set();
               const output = await original.apply(this, args);
-              if (!config.enabled) return output;
+              if (runtime.#activation !== activation || !config.enabled) return output;
               const library = runtime.store.dispatch("rules.list", {});
               const model = context.model ?? context.agent?.options?.model;
               const rule = selectedRule(library, model);
@@ -205,6 +209,7 @@ export class DesktopRuntime {
       }
       this.#undo = pending;
     } catch (error) {
+      this.#activation = null;
       const cleanup = [];
       for (const undo of pending.reverse()) {
         try {
@@ -219,6 +224,7 @@ export class DesktopRuntime {
     }
   }
   revert() {
+    this.#activation = null;
     // A failed durable restoration remains retryable after other wrappers have
     // already been released by a previous revert attempt.
     if (this.#undo.length === 0) return this.nativeInstructions.revert();
