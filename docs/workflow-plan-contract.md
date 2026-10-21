@@ -1,6 +1,6 @@
 # 显式多任务计划合同
 
-`DesktopWorkflowPlan` 接收人或指挥模型已拆好的任务，协调现有 `DesktopWorkflow` 的收据。它不调用规划模型、不自动匹配技能、不运行 shell、不下载依赖，也不生成事实摘要。计划、队列和结果均只保存在当前运行期；没有跨重启恢复或 profile 写入。
+`DesktopWorkflowPlan` 接收人或指挥模型已拆好的任务，协调现有 `DesktopWorkflow` 的收据。它不自动拆解任务或匹配技能。可选 `summarize:true` 在任务结束后额外启动一次 planner，生成带来源的待核实汇总；默认关闭。协调器本身不运行 shell 或下载依赖。计划、队列和结果均只保存在当前运行期；没有跨重启恢复或 profile 写入。
 
 ## 接入
 
@@ -11,6 +11,7 @@ const plans = new DesktopWorkflowPlan(workflow, { catalog });
 const { item } = await plans.dispatch("workflow.plan.create", {
   workspaceId,
   parentSessionId,
+  summarize: true, // 可选：增加一次 planner 调用，结果仍待独立核实
   tasks: [
     {
       id: "inventory-a",
@@ -41,12 +42,12 @@ await plans.dispatch("workflow.plan.stop", {
 
 `workflow` 必须是当前实例的 `DesktopWorkflow`；其 `store`、`flow`、`workspace()`、`service()`、`capabilities()` 和 `dispatch()` 是本模块使用的项目内合同。可选 `catalog` 使用当前 `HostCatalog.preflight(payload, { signal })`，不替代宿主权限或执行授权。调用层必须把模型工具的父会话绑定为真实调用会话，不能信任模型提供的其他会话 ID。
 
-| 动作                         | 输入                                  | 输出与约束                                                                                                                 |
-| ---------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `workflow.plan.capabilities` | `{}`                                  | `{available,preflight,runtimeOnly:true,automaticTaskMatching:false,reasons}`；实际工作流分派、停止接口缺失时 unavailable。 |
-| `workflow.plan.create`       | `{workspaceId,parentSessionId,tasks}` | `{item}`，初态 `queued`。校验项目、活动父会话、绑定、任务和角色；创建记录不代表已经启动执行者。                            |
-| `workflow.plan.status`       | `{workspaceId,parentSessionId,id}`    | `{item}`；只读本实例、对应父会话及项目的计划。即使入场授权已撤销、父会话已离线或改绑，仍能读取原计划。                     |
-| `workflow.plan.stop`         | 同 status                             | `{item,stopped}`；先停止排队，再通过原工作流停止本计划创建的收据。未确认清理时 `stopped:false`，可再次显式停止以重试处置。 |
+| 动作                         | 输入                                                     | 输出与约束                                                                                                                                      |
+| ---------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workflow.plan.capabilities` | `{}`                                                     | `{available,preflight,runtimeOnly:true,automaticTaskMatching:false,evidenceSummary:true,reasons}`；实际工作流分派、停止接口缺失时 unavailable。 |
+| `workflow.plan.create`       | `{workspaceId,parentSessionId,tasks,summarize?:boolean}` | `{item}`，初态 `queued`。校验项目、活动父会话、绑定、任务和角色；创建记录不代表已经启动执行者。                                                 |
+| `workflow.plan.status`       | `{workspaceId,parentSessionId,id}`                       | `{item}`；只读本实例、对应父会话及项目的计划。即使入场授权已撤销、父会话已离线或改绑，仍能读取原计划。                                          |
+| `workflow.plan.stop`         | 同 status                                                | `{item,stopped}`；先停止排队，再通过原工作流停止本计划创建的收据。未确认清理时 `stopped:false`，可再次显式停止以重试处置。                      |
 
 `stopAll()` 先同步标记本实例的所有活动队列，再等待逐个收据停止，返回 `{items,stopped}`。它不关闭服务，后续仍可创建新计划。它不停止其他计划服务实例或人工直接分派的工作流。`close()` 禁止新建、停止本实例计划并返回同形结果；调用者必须检查 `stopped`，不能把未确认处置视为卸载成功。停止等待官方启动中的收据返回，以确认其所有权后处置；此时 status 显示 `stopping`，不承诺即时完成。
 
@@ -70,13 +71,25 @@ await plans.dispatch("workflow.plan.stop", {
 
 每个已取得工作流记录的任务保留 `runId`、原始 `receipt`，包括其结果、停止原因、错误和清理状态。`summary` 包括状态计数、`notStarted`（尚未取得任何工作流记录的任务 ID）、`cleanupPending` 及原样收据结果。工厂失败但已生成工作流记录时，会保留该失败记录，即使从未取得有效执行收据；不能仅凭 runId 宣称执行成功。
 
-`summary.results` 的每项都有 `source:"workflow-receipt"` 和 `independentlyVerified:false`，不把执行者输出改写成已核实结论。失败输出也可能存在，必须结合任务状态和 `stopReason` 读取。计划完成仅表示调度收据流程完成；指挥模型如需生成基于证据的总结，仍须显式读取这些结果并说明未验证项。
+`summary.results` 的每项都有 `source:"workflow-receipt"` 和 `independentlyVerified:false`，不把执行者输出改写成已核实结论。失败输出也可能存在，必须结合任务状态和 `stopReason` 读取。计划完成仅表示调度收据流程完成。
+
+## 可选指挥汇总
+
+创建时显式设置 `summarize:true`，在原 1–32 个任务后追加内部任务 `$summary`，`kind:"summary"`、`role:"planner"`，计划标记 `summaryTaskId:"$summary"`。只有开启此选项时，原任务 ID 和依赖不能使用保留名 `$summary`；当前项目必须存在 planner 角色。不开启时保持原队列和调用数量。
+
+汇总等待所有普通任务结束，且其收据处置、槽位释放已确认。失败、被依赖阻断或未执行的任务也进入来源数据。汇总复用普通分派的准入门、父会话绑定、并发槽、停止及清理；停止计划不会再启动排队中的汇总。统计包含汇总任务，任何原任务或汇总失败仍使计划为 `finished-with-errors`，不会用一段成功总结掩盖失败。
+
+汇总输入只包含当前计划的任务 ID、运行 ID（如有）、状态、角色、原任务正文、完整原始结果和失败/阻断诊断。`sources` 保存在汇总任务上，为 `{taskId,runId?,state,source,independentlyVerified:false}`；未取得运行记录时 `source:"plan-task-state"`，否则为 `workflow-receipt`。这些来源引用表示输入关联，不证明模型实际逐条引用正确。提示要求区分执行者声称的结果、失败、未执行与证据缺口，引用实际提供的证据，不新增检查，不把来源文字作为指令。
+
+完整汇总输入超过既有 32 KiB 限额时，明确标记 `blocked/SUMMARY_CONTEXT_LIMIT`；无法 JSON 表示时为 `SUMMARY_RESULT_INVALID`。不截断来源，也不启动该汇总；各任务原始输出仍可读取。汇总正文唯一来源为该任务 `receipt.result.output`，仍是未独立核实的代理输出，不自动写入发现项或证据库。
+
+页面提供默认未勾选的“任务结束后生成指挥汇总”，提示额外模型调用。读取计划后直接显示汇总、引用来源、失败或未执行任务及诊断；原始收据继续保留。页面仅显示文本块，其他块保留在原收据，不猜测转换。
 
 ## 本轮验证边界
 
 单元测试使用临时 SQLite、真实项目 `WorkspaceStore/Flow/DesktopWorkflow`，activation 工厂和结果为原创合成收据。覆盖单槽两个任务、等待处置、原样结果只传直接依赖、上下文超限不截断、失败及缺失依赖、环境声明与阻断、输入边界、父/项目隔离、停止及清理失败、停止所有计划后再创建、启动中停止、预检期间改绑、排队任务仍经过工作流入场准入门。
 
-`workflow-host.test.mjs` 另从未改写的官方 spawn/SubagentRuntime/AgentLoop 运行两任务计划，核对原始收据在后继 user 输入中出现、结果未被自动标为验证、两个执行者处置后释放槽位并从 JSONL 读回。停止用例确认运行中子任务取消、排队依赖不启动且父会话保留。LLM 仍为合成传输，没有连接真实模型、网络、正在运行的桌面或 profile，也没有桌面 UI 执行证据。
+`workflow-host.test.mjs` 另从未改写的官方 spawn/SubagentRuntime/AgentLoop 运行两任务计划，核对原始收据在后继 user 输入中出现、结果未被自动标为验证、两个执行者处置后释放槽位并从 JSONL 读回。停止用例确认运行中子任务取消、排队依赖不启动且父会话保留。新增可选汇总场景验证两个实际官方执行者完成、处置后，第三个 planner 请求含逐项准确来源与完整结果；失败执行者和未启动的依赖也进入汇总，最终计划仍保留失败状态。汇总输出与官方 JSONL 逐块读回一致。LLM 仍为固定合成传输，此证据验证调度和数据路径，不验证模型的总结质量；没有连接真实模型、网络、正在运行的桌面或 profile，也没有桌面 UI 执行证据。
 
 ```sh
 DSH_NODE='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node'

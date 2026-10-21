@@ -5,7 +5,7 @@ const states = {
   running: "执行中",
   completed: "执行者报告完成",
   failed: "失败",
-  blocked: "依赖阻断",
+  blocked: "已阻断",
   cancelled: "已取消",
   "finished-with-errors": "已结束，含失败或未执行任务",
   stopping: "停止中，等待收据处置",
@@ -72,6 +72,7 @@ export async function workflowPlans({
     <form id="workflow-plan-create-form">
       <div class="field"><label for="workflow-plan-parent">当前项目已绑定的父会话编号</label><input id="workflow-plan-parent" name="parentSessionId" list="workflow-plan-parents" value="${esc(bound[0]?.id || "")}" autocomplete="off" required><datalist id="workflow-plan-parents">${options}</datalist><small>创建需选当前已绑定会话；不替其他会话提交任务。</small></div>
       <div class="field wide"><label for="workflow-plan-json">明确任务 JSON（1–32 项）</label><textarea id="workflow-plan-json" name="tasks" rows="14" spellcheck="false" required>${esc(sample)}</textarea><small>每项填写 id、role、task、requirements，可选 dependsOn 与 usePreset。[] 只表示声明无依赖。示例没有附带真实材料，请先改为当前项目的明确任务；不要填入密钥。</small></div>
+      <div class="field wide"><label><input type="checkbox" id="workflow-plan-summarize" name="summarize" ${capability.available && capability.evidenceSummary === true ? "" : "disabled"}> 任务结束后生成指挥汇总</label><small>使用当前项目的规划者角色，增加一次模型调用；引用任务结果与失败、未执行状态，不会自动核实事实。</small><small id="workflow-plan-summary-availability">${capability.evidenceSummary === true ? "" : "当前服务不支持指挥汇总。"}</small></div>
       <div class="toolbar"><button type="button" id="workflow-plan-check">检查 JSON</button><button type="submit" class="primary" id="workflow-plan-create" ${capability.available && bound.length ? "" : "disabled"}>提交明确计划</button></div>
     </form>
     <form id="workflow-plan-query-form">
@@ -84,7 +85,8 @@ export async function workflowPlans({
   </div>`,
   );
   let disposed = false,
-    busy = false;
+    busy = false,
+    selectionRevision = 0;
   const listeners = new AbortController();
   function parse(value) {
     if (new TextEncoder().encode(value).length > 1024 * 1024)
@@ -130,14 +132,15 @@ export async function workflowPlans({
   function bind(root = document) {
     const module = root.querySelector("#workflow-plans-module");
     if (!module) return;
+    const attached = () => !disposed && module.isConnected !== false;
     const get = (id) => module.querySelector(`#workflow-plan-${id}`);
     const feedback = (message, error = false) => {
-      if (disposed) return;
+      if (!attached()) return;
       get("feedback").className = error ? "error" : "note";
       get("feedback").textContent = message;
     };
     function buttons() {
-      if (disposed) return;
+      if (!attached()) return;
       const selected = bound.some((session) => session.id === get("parent").value.trim());
       get("create").disabled = busy || !capability.available || !selected || roles.length === 0;
       get("create").title = !capability.available
@@ -146,9 +149,85 @@ export async function workflowPlans({
           ? "请先选择已绑定当前项目的父会话"
           : "";
       for (const id of ["refresh", "stop", "copy", "check"]) get(id).disabled = busy;
+      get("summarize").disabled =
+        busy || !capability.available || capability.evidenceSummary !== true;
+      if (capability.evidenceSummary !== true) get("summarize").checked = false;
+      get("summary-availability").textContent =
+        capability.evidenceSummary === true ? "" : "当前服务不支持指挥汇总。";
+    }
+    function diagnostic(task) {
+      const error = task.error || task.receipt?.error;
+      const stopReason = task.receipt?.result?.stopReason;
+      return [
+        error ? [error.code, error.message].filter(Boolean).join("：") : "",
+        ...(task.blockedBy ?? []).map(
+          (source) => `依赖任务 ${source.id}：${states[source.reason] || source.reason}`,
+        ),
+        stopReason && stopReason !== "completed" ? `结束原因：${stopReason}` : "",
+      ]
+        .filter(Boolean)
+        .join("；");
+    }
+    function summary(item) {
+      const task = item.tasks.find(
+        (task) => task.id === item.summaryTaskId || task.kind === "summary",
+      );
+      if (!task) return "";
+      const output = task.receipt?.result?.output ?? [];
+      const texts = output.filter((block) => block.type === "text").map((block) => block.text);
+      const nonText = output.some((block) => block.type !== "text");
+      const error = diagnostic(task);
+      const cleanup = !task.runId
+        ? "尚未取得运行收据。"
+        : task.receipt?.disposed === true && task.receipt?.slotReleased === true
+          ? "清理完成，执行名额已释放。"
+          : "资源清理尚未确认，执行名额可能仍被占用。";
+      const sources = (task.sources ?? []).map((source) => ({
+        taskId: source.taskId,
+        runId: source.runId || "无运行编号",
+        state: `${states[source.state] || source.state} (${source.state})`,
+        source:
+          {
+            "workflow-receipt": "任务结果（证据待核实）",
+            "plan-task-state": "任务状态（证据待核实）",
+          }[source.source] || source.source,
+      }));
+      const incomplete = item.tasks
+        .filter(
+          (current) =>
+            current !== task && ["failed", "blocked", "cancelled"].includes(current.state),
+        )
+        .map((current) => ({
+          taskId: current.id,
+          runId: current.runId || "未执行，无运行编号",
+          state: `${states[current.state] || current.state} (${current.state})`,
+          error: diagnostic(current) || "—",
+        }));
+      return panel(
+        "任务汇总",
+        `<p><span class="tag">${esc(states[task.state] || task.state)}</span> <span class="mono">${esc(task.id)}</span></p><p class="info">汇总引用以下任务结果，证据待核实。${esc(cleanup)}</p>${task.runId ? `<p class="meta">汇总运行编号：${esc(task.runId)}</p>` : ""}${error ? `<p class="error">${esc(error)}</p>` : ""}${texts.length ? `<pre class="report" style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(texts.join("\n"))}</pre>` : `<p class="info">${["failed", "blocked", "cancelled"].includes(task.state) ? "未生成汇总文本，请查看任务状态与诊断。" : "尚未返回汇总文本。"}</p>`}${nonText ? '<p class="info">非文本输出保留在下方完整计划的原始收据中，此处不转换展示。</p>' : ""}<h3>引用来源</h3>${
+          sources.length
+            ? table(sources, [
+                ["taskId", "任务编号"],
+                ["runId", "运行编号"],
+                ["state", "任务状态"],
+                ["source", "来源与核实状态"],
+              ])
+            : '<p class="info">尚无引用来源；汇总尚未取得任务结果。</p>'
+        }${
+          incomplete.length
+            ? `<h3>失败或未执行任务</h3>${table(incomplete, [
+                ["taskId", "任务编号"],
+                ["runId", "运行编号"],
+                ["state", "状态"],
+                ["error", "诊断"],
+              ])}`
+            : ""
+        }`,
+      );
     }
     function show(item) {
-      if (disposed) return;
+      if (!attached()) return;
       const rows = item.tasks.map((task) => ({
         id: task.id,
         role: task.role,
@@ -172,7 +251,7 @@ export async function workflowPlans({
             ["execution", "实际启动"],
             ["cleanup", "清理与槽位"],
           ],
-        )}<details><summary>完整计划、逐任务回执与原样结果（未验证）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto">${esc(JSON.stringify(item, null, 2))}</pre></details>`;
+        )}${summary(item)}<details><summary>完整计划、逐任务回执与原样结果（未验证）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto">${esc(JSON.stringify(item, null, 2))}</pre></details>`;
     }
     const scope = () => {
       const id = get("id").value.trim(),
@@ -181,13 +260,16 @@ export async function workflowPlans({
       return { workspaceId, parentSessionId, id };
     };
     const execute = (fn) => {
-      if (busy || disposed) return;
+      if (busy || !attached()) return;
+      const revision = selectionRevision;
+      const current = () => attached() && revision === selectionRevision;
       run(null, async () => {
         busy = true;
         buttons();
         try {
-          await fn();
+          await fn(current);
         } catch (error) {
+          if (!current()) return;
           feedback(error.message, true);
           throw error;
         } finally {
@@ -196,7 +278,15 @@ export async function workflowPlans({
         }
       });
     };
-    get("parent").addEventListener("input", buttons, { signal: listeners.signal });
+    for (const id of ["parent", "query-parent", "id"])
+      get(id).addEventListener(
+        "input",
+        () => {
+          selectionRevision++;
+          buttons();
+        },
+        { signal: listeners.signal },
+      );
     get("check").addEventListener(
       "click",
       () => {
@@ -215,20 +305,25 @@ export async function workflowPlans({
       "submit",
       (event) => {
         event.preventDefault();
-        execute(async () => {
+        execute(async (current) => {
           const tasks = parse(get("json").value),
-            parentSessionId = get("parent").value.trim();
+            parentSessionId = get("parent").value.trim(),
+            summarize = get("summarize").checked;
           if (!bound.some((session) => session.id === parentSessionId))
             throw new Error("父会话必须已绑定当前项目");
-          capability = await api("workflow.plan.capabilities", { workspaceId });
+          const latestCapability = await api("workflow.plan.capabilities", { workspaceId });
+          if (!current()) return;
+          capability = latestCapability;
           if (!capability.available) throw new Error(`当前不能创建计划：${unavailable()}`);
-          if (disposed) return;
+          if (summarize && capability.evidenceSummary !== true)
+            throw new Error("当前服务不支持指挥汇总，请重新核对计划选项。");
           const { item } = await api("workflow.plan.create", {
             workspaceId,
             parentSessionId,
             tasks,
+            ...(summarize ? { summarize: true } : {}),
           });
-          if (disposed) return;
+          if (!current()) return;
           get("id").value = item.id;
           get("query-parent").value = parentSessionId;
           show(item);
@@ -246,8 +341,11 @@ export async function workflowPlans({
       "submit",
       (event) => {
         event.preventDefault();
-        execute(async () => {
-          const { item } = await api("workflow.plan.status", scope());
+        execute(async (current) => {
+          const target = scope();
+          const { item } = await api("workflow.plan.status", target);
+          if (!current()) return;
+          if (item.id !== target.id) throw new Error("状态响应与所选计划编号不一致，请重新读取。");
           show(item);
           feedback(`已读回当前计划状态：${states[item.state] || item.state}。`);
         });
@@ -257,8 +355,12 @@ export async function workflowPlans({
     get("stop").addEventListener(
       "click",
       () =>
-        execute(async () => {
-          const result = await api("workflow.plan.stop", scope());
+        execute(async (current) => {
+          const target = scope();
+          const result = await api("workflow.plan.stop", target);
+          if (!current()) return;
+          if (result.item.id !== target.id)
+            throw new Error("停止响应与所选计划编号不一致，请重新读取。");
           show(result.item);
           feedback(
             result.stopped
@@ -272,14 +374,14 @@ export async function workflowPlans({
     get("copy").addEventListener(
       "click",
       () =>
-        execute(async () => {
+        execute(async (current) => {
           const id = get("id").value.trim();
           if (!id) throw new Error("请先填写或创建计划编号");
           try {
             await navigator.clipboard.writeText(id);
-            if (!disposed) toast("计划编号已复制");
+            if (current()) toast("计划编号已复制");
           } catch {
-            if (!disposed) {
+            if (current()) {
               get("id").focus();
               get("id").select();
               feedback("浏览器未提供剪贴板写入，已选中编号，请手动复制。");
@@ -295,6 +397,7 @@ export async function workflowPlans({
     bind,
     dispose() {
       disposed = true;
+      selectionRevision++;
       listeners.abort();
     },
   };

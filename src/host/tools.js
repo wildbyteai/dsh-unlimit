@@ -89,7 +89,7 @@ export async function installTools(ctx, controller, host) {
               type: "json",
               required: true,
               description:
-                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id。workflow.plan.create 使用 tasks:[{id,role,task,requirements:[],dependsOn?:[]}]，plan.status/stop 使用计划 id，父会话均强制为调用者。依赖结果保持未验证，超限明确阻断。templates.read 使用相对 path。",
+                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id。workflow.plan.create 使用 tasks:[{id,role,task,requirements:[],dependsOn?:[]}]，可选 summarize:true 会额外启动一次 planner 汇总全部已结束任务，默认关闭；汇总是待核实草稿，不自动登记为事实。plan.status/stop 使用计划 id，父会话均强制为调用者。依赖结果保持未验证，超限明确阻断。templates.read 使用相对 path。",
             },
           },
           output,

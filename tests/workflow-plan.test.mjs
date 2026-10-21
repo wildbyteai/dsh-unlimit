@@ -35,6 +35,163 @@ const task = (id, patch = {}) => ({
   ...patch,
 });
 
+test("optional summary waits for every source and disposal, cites exact unverified results and uses normal lifecycle", async (t) => {
+  const f = fixture(t);
+  const { item } = await f.plans.dispatch("workflow.plan.create", {
+    ...f.owner,
+    tasks: [task("alpha"), task("beta")],
+    summarize: true,
+  });
+  assert.equal(item.summaryTaskId, "$summary");
+  assert.equal(item.tasks.length, 3);
+  const results = ["alpha.txt (synthetic list A)", "beta.txt (synthetic list B)"].map((text) => ({
+    stopReason: "completed",
+    output: [{ type: "text", text }],
+  }));
+  await until(() => f.starts.length === 1);
+  f.pending.get(f.starts[0].childId).resolve(results[0]);
+  await until(() => f.starts.length === 2);
+  const second = f.starts[1].childId;
+  const gate = deferred();
+  f.gates.set(second, gate);
+  f.pending.get(second).resolve(results[1]);
+  await until(async () => (await f.status(item.id)).tasks[1].state === "completed");
+  await delay(60);
+  assert.equal(f.starts.length, 2, "Summary must wait for confirmed disposal, not just output");
+  gate.resolve();
+  await until(() => f.starts.length === 3);
+  const live = await f.status(item.id);
+  const summary = live.tasks[2];
+  assert.equal(summary.role, "planner");
+  assert.deepEqual(
+    summary.sources,
+    live.tasks.slice(0, 2).map((source) => ({
+      taskId: source.id,
+      runId: source.runId,
+      state: "completed",
+      source: "workflow-receipt",
+      independentlyVerified: false,
+    })),
+  );
+  const prompt = f.starts[2].request.prompt[0].text;
+  for (let i = 0; i < 2; i++) {
+    assert.ok(
+      prompt.includes(
+        JSON.stringify({
+          ...summary.sources[i],
+          role: "analyst",
+          task: live.tasks[i].task,
+          result: results[i],
+        }),
+      ),
+      "Summary must receive each exact result paired with its source metadata",
+    );
+  }
+  const output = {
+    stopReason: "completed",
+    output: [{ type: "text", text: "待核实汇总：alpha / beta，见各来源。" }],
+  };
+  f.pending.get(f.starts[2].childId).resolve(output);
+  const final = await until(async () => {
+    const state = await f.status(item.id);
+    return state.state === "completed" && state;
+  });
+  assert.deepEqual(final.tasks[2].receipt.result, output);
+  assert.equal(final.tasks[2].receipt.disposed, true);
+  assert.equal(final.tasks[2].receipt.slotReleased, true);
+  assert.deepEqual(
+    final.summary.results.map((result) => result.independentlyVerified),
+    [false, false, false],
+  );
+  assert.equal(f.flow.status(f.workspace.id).active.length, 0);
+});
+
+test("summary includes failed and unstarted sources without turning the plan into success", async (t) => {
+  const f = fixture(t);
+  const { item } = await f.plans.dispatch("workflow.plan.create", {
+    ...f.owner,
+    summarize: true,
+    tasks: [task("failed"), task("blocked", { dependsOn: ["failed"] })],
+  });
+  await until(() => f.starts.length === 1);
+  const failed = { stopReason: "max-tokens", output: [{ type: "text", text: "partial evidence" }] };
+  f.pending.get(f.starts[0].childId).resolve(failed);
+  await until(() => f.starts.length === 2);
+  const live = await f.status(item.id);
+  assert.equal(live.tasks[1].state, "blocked");
+  assert.equal(live.tasks[1].runId, undefined);
+  assert.deepEqual(live.tasks[2].sources[1], {
+    taskId: "blocked",
+    state: "blocked",
+    source: "plan-task-state",
+    independentlyVerified: false,
+  });
+  const prompt = f.starts[1].request.prompt[0].text;
+  assert.ok(prompt.includes(JSON.stringify(failed)));
+  assert.ok(prompt.includes('"blockedBy":[{"id":"failed","reason":"failed"}]'));
+  f.pending.get(f.starts[1].childId).resolve({ stopReason: "completed", output: [] });
+  const final = await until(async () => {
+    const state = await f.status(item.id);
+    return state.state === "finished-with-errors" && state;
+  });
+  assert.deepEqual(
+    final.tasks.map((task) => task.state),
+    ["failed", "blocked", "completed"],
+  );
+  assert.equal(f.starts.length, 2);
+});
+
+test("summary refuses oversized or non-JSON sources without truncating or dispatching them", async (t) => {
+  for (const [code, output] of [
+    ["SUMMARY_CONTEXT_LIMIT", [{ type: "text", text: "A".repeat(33 * 1024) }]],
+    ["SUMMARY_RESULT_INVALID", [{ type: "text", text: 1n }]],
+  ])
+    await t.test(code, async (t) => {
+      const f = fixture(t);
+      const { item } = await f.plans.dispatch("workflow.plan.create", {
+        ...f.owner,
+        tasks: [task("source")],
+        summarize: true,
+      });
+      await until(() => f.starts.length === 1);
+      f.pending.get(f.starts[0].childId).resolve({ stopReason: "completed", output });
+      const final = await until(async () => {
+        const state = await f.status(item.id);
+        return state.state === "finished-with-errors" && state;
+      });
+      assert.equal(final.tasks[1].error.code, code);
+      assert.equal(final.tasks[1].state, "blocked");
+      assert.deepEqual(final.tasks[0].receipt.result.output, output);
+      assert.equal(f.starts.length, 1);
+    });
+});
+
+test("summary opt-in validates reserved IDs and stop cancels the extra executor", async (t) => {
+  const f = fixture(t);
+  for (const patch of [
+    { summarize: "true", tasks: [task("source")] },
+    { summarize: true, tasks: [task("$summary")] },
+    { summarize: true, tasks: [task("source", { dependsOn: ["$summary"] })] },
+  ])
+    await assert.rejects(f.plans.dispatch("workflow.plan.create", { ...f.owner, ...patch }), {
+      code: "INVALID_INPUT",
+    });
+  assert.equal(f.starts.length, 0);
+  const { item } = await f.plans.dispatch("workflow.plan.create", {
+    ...f.owner,
+    tasks: [task("source")],
+    summarize: true,
+  });
+  await until(() => f.starts.length === 1);
+  f.pending.get(f.starts[0].childId).resolve({ stopReason: "completed", output: [] });
+  await until(() => f.starts.length === 2);
+  const stopped = await f.stop(item.id);
+  assert.equal(stopped.stopped, true);
+  assert.equal(stopped.item.tasks[1].state, "cancelled");
+  assert.equal(stopped.item.tasks[1].receipt.slotReleased, true);
+  assert.equal(f.flow.status(f.workspace.id).active.length, 0);
+});
+
 function fixture(t, catalog) {
   const directory = mkdtempSync(join(tmpdir(), "dsh-unlimit-plan-"));
   const store = new WorkspaceStore(join(directory, "synthetic.sqlite"));

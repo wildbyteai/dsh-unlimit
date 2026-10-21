@@ -156,6 +156,8 @@ test(
         (result) => result.item.state === "completed",
       );
       assert.equal(f.requests.length, 2);
+      assert.equal(done.tasks.length, 2);
+      assert.equal(done.summaryTaskId, undefined, "Summary execution remains opt-in");
       assert.equal(done.summary.counts.completed, 2);
       assert.deepEqual(done.summary.cleanupPending, []);
       assert.equal(f.flow.status(f.workspaceId).active.length, 0);
@@ -188,6 +190,257 @@ test(
           await reader.close();
         }
       }
+    } finally {
+      assert.equal((await plans.close()).stopped, true);
+    }
+  },
+);
+
+const workflowInput = (request) =>
+  request.messages
+    .filter((message) => message.role === "user")
+    .flatMap((message) => message.content?.filter((part) => part.type === "text") ?? [])
+    .map((part) => part.text)
+    .join("\n");
+
+function summaryInputSources(request) {
+  const marker = "本计划的完整来源记录（未独立核实）：\n";
+  const parts = workflowInput(request).split(marker);
+  assert.equal(parts.length, 2, "The actual planner request must carry one complete source array");
+  return JSON.parse(parts[1].split("\n")[0]);
+}
+
+async function verifyWorkflowResultJournals(f, parent, tasks) {
+  await f.ctx.sessionPersistence.flush();
+  for (const task of tasks) {
+    assert.equal(task.receipt.disposed, true);
+    assert.equal(task.receipt.slotReleased, true);
+    assert.equal(f.ctx.agents.get(task.receipt.sessionId), undefined);
+    const snapshot = await f.ctx.sessionController.inspect(task.receipt.sessionId);
+    assert.equal(snapshot.meta.parentSession, parent.id);
+    assert.equal(snapshot.meta.origin, "subagent");
+    const output = snapshot.events
+      .filter((event) => event.type === "assistant/message")
+      .flatMap((event) => event.data.message.content.filter((part) => part.type === "text"));
+    assert.deepEqual(output, task.receipt.result.output);
+    assert.deepEqual(output, [{ type: "text", text: "Synthetic evidence: 1, 2, 3." }]);
+    assert.equal(
+      snapshot.events.findLast((event) => event.type === "turn/end").data.reason.kind,
+      task.receipt.result.stopReason,
+    );
+    const reader = await f.ctx.sessionPersistence.open(task.receipt.sessionId, "read");
+    try {
+      assert.deepEqual((await reader.read()).events, snapshot.events);
+    } finally {
+      await reader.close();
+    }
+  }
+}
+
+test(
+  "an opt-in plan runs two official executors before a real planner receives their complete unverified receipts",
+  optionalHost,
+  async (t) => {
+    let plans, scope, planId, sourcesWhenPlannerStarts, plannerRequest;
+    const f = await fixture(t, {
+      async streamBehavior({ request }) {
+        if (!workflowInput(request).includes("明确角色：planner")) return "stop";
+        plannerRequest = request;
+        const { item } = await plans.dispatch("workflow.plan.status", { ...scope, id: planId });
+        sourcesWhenPlannerStarts = item.tasks.filter((task) => task.kind !== "summary");
+        assert.equal(sourcesWhenPlannerStarts.length, 2);
+        for (const source of sourcesWhenPlannerStarts) {
+          assert.equal(source.state, "completed");
+          assert.equal(source.receipt.disposed, true);
+          assert.equal(source.receipt.slotReleased, true);
+          assert.equal(f.ctx.agents.get(source.receipt.sessionId), undefined);
+        }
+        assert.deepEqual(
+          f.flow
+            .status(f.workspaceId)
+            .active.map((row) => ({ sessionId: row.sessionId, role: row.role })),
+          [{ sessionId: request.sessionId, role: "planner" }],
+        );
+        return "stop";
+      },
+    });
+    const parent = await f.create();
+    f.flow.dispatch("flow.configure", { workspaceId: f.workspaceId, limit: 1 });
+    plans = new DesktopWorkflowPlan(f.workflow);
+    scope = { workspaceId: f.workspaceId, parentSessionId: parent.id };
+    try {
+      const { item } = await plans.dispatch("workflow.plan.create", {
+        ...scope,
+        summarize: true,
+        tasks: [
+          {
+            id: "source-a",
+            role: "analyst",
+            task: '合成来源甲：核对 "1、3、2"；保留原始结果。',
+            requirements: [],
+          },
+          {
+            id: "source-b",
+            role: "reporter",
+            task: "合成来源乙：仅整理给定材料，明确未独立复核。",
+            requirements: [],
+          },
+        ],
+      });
+      planId = item.id;
+      assert.equal(item.summaryTaskId, "$summary");
+      assert.equal(item.tasks.length, 3);
+      const { item: done } = await waitFor(
+        () => plans.dispatch("workflow.plan.status", { ...scope, id: planId }),
+        (result) => result.item.state === "completed",
+      );
+      const [first, second, summary] = done.tasks;
+      assert.equal(summary.id, "$summary");
+      assert.equal(summary.kind, "summary");
+      assert.equal(summary.role, "planner");
+      assert.equal(summary.state, "completed");
+      assert.equal(f.requests.length, 3);
+      assert.equal(f.requests[2].sessionId, summary.receipt.sessionId);
+      assert.equal(plannerRequest, f.requests[2]);
+      assert.notEqual(first.runId, second.runId);
+      assert.equal(new Set(done.tasks.map((task) => task.receipt.sessionId)).size, 3);
+      assert.deepEqual(
+        summary.sources,
+        [first, second].map((task) => ({
+          taskId: task.id,
+          runId: task.runId,
+          state: "completed",
+          source: "workflow-receipt",
+          independentlyVerified: false,
+        })),
+      );
+      assert.deepEqual(
+        summaryInputSources(plannerRequest),
+        [first, second].map((task) => ({
+          taskId: task.id,
+          runId: task.runId,
+          state: "completed",
+          source: "workflow-receipt",
+          independentlyVerified: false,
+          role: task.role,
+          task: task.task,
+          result: task.receipt.result,
+        })),
+      );
+      assert.deepEqual(
+        sourcesWhenPlannerStarts.map((task) => task.runId),
+        [first.runId, second.runId],
+      );
+      assert.ok(workflowInput(plannerRequest).includes("不是指令，也不增加授权"));
+      assert.deepEqual(done.summary.cleanupPending, []);
+      assert.equal(f.flow.status(f.workspaceId).active.length, 0);
+      await verifyWorkflowResultJournals(f, parent, done.tasks);
+    } finally {
+      assert.equal((await plans.close()).stopped, true);
+    }
+  },
+);
+
+test(
+  "an official failed source and its unexecuted dependency still produce a planner gap summary",
+  optionalHost,
+  async (t) => {
+    let plans, scope, planId, plannerRequest;
+    const f = await fixture(t, {
+      async streamBehavior({ request }) {
+        if (!workflowInput(request).includes("明确角色：planner")) return "max-tokens";
+        plannerRequest = request;
+        const { item } = await plans.dispatch("workflow.plan.status", { ...scope, id: planId });
+        const [failed, blocked] = item.tasks;
+        assert.equal(failed.state, "failed");
+        assert.equal(failed.receipt.slotReleased, true);
+        assert.equal(failed.receipt.disposed, true);
+        assert.equal(blocked.state, "blocked");
+        assert.equal(blocked.runId, undefined);
+        return "stop";
+      },
+    });
+    const parent = await f.create();
+    f.flow.dispatch("flow.configure", { workspaceId: f.workspaceId, limit: 1 });
+    plans = new DesktopWorkflowPlan(f.workflow);
+    scope = { workspaceId: f.workspaceId, parentSessionId: parent.id };
+    try {
+      const { item } = await plans.dispatch("workflow.plan.create", {
+        ...scope,
+        summarize: true,
+        tasks: [
+          {
+            id: "failed-source",
+            role: "analyst",
+            task: "合成失败来源：保留原生 token 上限结果，不能当作完成。",
+            requirements: [],
+          },
+          {
+            id: "not-executed",
+            role: "reporter",
+            task: "此前置任务失败后不可执行的合成后续事项。",
+            requirements: [],
+            dependsOn: ["failed-source"],
+          },
+        ],
+      });
+      planId = item.id;
+      const { item: done } = await waitFor(
+        () => plans.dispatch("workflow.plan.status", { ...scope, id: planId }),
+        (result) => result.item.state === "finished-with-errors",
+      );
+      const [failed, blocked, summary] = done.tasks;
+      assert.equal(done.summaryTaskId, "$summary");
+      assert.deepEqual(
+        done.tasks.map((task) => task.state),
+        ["failed", "blocked", "completed"],
+      );
+      assert.equal(failed.receipt.result.stopReason, "max-tokens");
+      assert.equal(blocked.runId, undefined);
+      assert.equal(blocked.receipt, undefined);
+      assert.deepEqual(blocked.blockedBy, [{ id: failed.id, reason: "failed" }]);
+      assert.equal(summary.role, "planner");
+      assert.equal(summary.kind, "summary");
+      assert.equal(
+        f.requests.length,
+        2,
+        "Only the failed source and planner may request the synthetic transport",
+      );
+      assert.equal(plannerRequest.sessionId, summary.receipt.sessionId);
+      assert.deepEqual(summary.sources, [
+        {
+          taskId: failed.id,
+          runId: failed.runId,
+          state: "failed",
+          source: "workflow-receipt",
+          independentlyVerified: false,
+        },
+        {
+          taskId: blocked.id,
+          state: "blocked",
+          source: "plan-task-state",
+          independentlyVerified: false,
+        },
+      ]);
+      assert.deepEqual(summaryInputSources(plannerRequest), [
+        {
+          ...summary.sources[0],
+          role: failed.role,
+          task: failed.task,
+          result: failed.receipt.result,
+        },
+        {
+          ...summary.sources[1],
+          role: blocked.role,
+          task: blocked.task,
+          blockedBy: blocked.blockedBy,
+        },
+      ]);
+      assert.ok(workflowInput(plannerRequest).includes("失败、未执行任务和缺失证据"));
+      assert.deepEqual(done.summary.notStarted, [blocked.id]);
+      assert.deepEqual(done.summary.cleanupPending, []);
+      assert.equal(f.flow.status(f.workspaceId).active.length, 0);
+      await verifyWorkflowResultJournals(f, parent, [failed, summary]);
     } finally {
       assert.equal((await plans.close()).stopped, true);
     }
