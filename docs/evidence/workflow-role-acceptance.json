@@ -1,0 +1,279 @@
+{
+  "behavior": "FLOW-ROLE-INJECT",
+  "generatedAt": "2026-10-21T05:35:08.965933+00:00",
+  "revision": {
+    "commit": "6fdee8b27ef0f0a34bd52d1e1711e7c6b60bf72a",
+    "state": "Working tree; hashes pin the tested local sources",
+    "sha256": {
+      "src/host/runtime.js": "05b834cca346499ee7f8297d8d7e14ac3a42a8f11eba4f8f73a2f161aabb19bd",
+      "src/core/flow.js": "5a21c2426871fa85387573b5c2c0e734262119d2f876de9bbdec3640c91c6332",
+      "src/core/store.js": "b852c51b488fe7d4cf7d7806f5afc6b36803b5f519111becfa5df5fb3e9afd70",
+      "src/host/workflow.js": "5ef28f303265d0483154d746a766e1b478e3a73e828923a9bef84d0c6015c14a",
+      "src/host/plugin.js": "0e2bd10225d506f6a74825631318ef6d088e4e1311f2e0dd1f3f72021cfbf770",
+      "tests/workflow-host.test.mjs": "6af0a8ad7e5bf10ee658cc99995e2e54ab1dcb7f75d01f93903b2c31e2c30cca"
+    }
+  },
+  "runtime": {
+    "version": "0.2.1-rc.2",
+    "node": "24.21.0",
+    "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
+    "officialEntries": [
+      {
+        "package": "@deepseek-ai/cordis",
+        "entrySha256": "6a9394c0877ff45218818c6e815edd038f8057e1a1deb390a8d43ec81c57691e",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-storage",
+        "entrySha256": "1289574c24ecfa5b134e2750d578c00ae59654de7d00133e117c4cc34095f3a3",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-storage-json",
+        "entrySha256": "0a6b75d5569db3379edd93e863570170e1f4121b6c9fabd856f5b476cffe8df4",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-storage-domain",
+        "entrySha256": "a54f7664d2f64fe04a08c7058ca5bff4fc69ed6a0d30c2bc11561b620698ef16",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-session-persistence-jsonl",
+        "entrySha256": "973dd78679b2661d6f492343bc22b124ae958aa597d3b36c698a2c650f909984",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-session",
+        "entrySha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-session-projection",
+        "entrySha256": "7dc2b212819baf4fc292751054d30b97afcbdee0a4733230abf92c6722e6550c",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-session-query",
+        "entrySha256": "76ce2944e561c12f48b5e240d68cafe54ce6d667b1d20722e6939ed834489939",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-workspace",
+        "entrySha256": "931ca0cb10c5102066c7723690a887f0e6e8e7ab0ffdee1a782686745b0b934f",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-agent",
+        "entrySha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-agent-loop",
+        "entrySha256": "cf57e3ecd487ac5c2553455aaa5cef2c6fb41e6bd61be5aa455675d1d7193033",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-system-prompt",
+        "entrySha256": "7be9f7aafbf345d01ddcc12fd297b16e9a1d41283a6a04073b867becca0bf020",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-tools",
+        "entrySha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-typert-registry",
+        "entrySha256": "ea5e3beb6ddd09a7b77e6fc79933f71ba93382d0ec1caa70bd1f92c904caccdd",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-api-session-controller",
+        "entrySha256": "a9801acb577b03053c5d5a3191ff555c5f1d791d0acddec113bea4511e33b386",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-llm",
+        "entrySha256": "d18d8ae4c8d961e628708c1e4698e09716a0ebb80e55a672e0bde1029bec1155",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-subagent",
+        "entrySha256": "9a9572e70fffdb100deb63326167f32bbf63016ce49c0017495dabcb95b44168",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-subagent-spawn-in-process",
+        "entrySha256": "249df2c7bdc046c1dd7149acbb40e604eabcba28a7e07ffa4226c2a03f0a3aaa",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-working-directory",
+        "entrySha256": "af5bb7f33c52efe018da19c39c54e07b5a3ac804fff83f8a68e341f411ecf703",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/cordis-plugin-loader",
+        "entrySha256": "638b9ad360e01236120772323f80a65570c4f3f42f4cfc6243330241025b6d72",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-agent-preset-registry",
+        "entrySha256": "95edcc66175a87091ba90fe0809246821df470bf960e1cfd725b5ca6baaf4f07",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-user-approval",
+        "entrySha256": "6a5ad1ba3c3dc3abbbae52e6c8c4463970ee0c1c8988cebb0d5cf2acd17ee90b",
+        "inventoryMatch": true
+      },
+      {
+        "package": "@deepseek-ai/dsh-sandbox-policy",
+        "entrySha256": "772ca58f0f786d6cb4d839deb621634c31097c13228d81b14e3f3153d0524924",
+        "inventoryMatch": true
+      }
+    ],
+    "sourceContracts": [
+      {
+        "package": "@deepseek-ai/dsh-system-prompt",
+        "lines": "356-398",
+        "summary": "assemble resolves the scoped section and native tool schema registries; renderPrompt renders returned sections"
+      },
+      {
+        "package": "@deepseek-ai/dsh-agent-loop",
+        "lines": "902-907,1043-1084",
+        "summary": "first preStep assembles SystemPrompt; step projects and journals the rendered system slot before invoking the transport"
+      },
+      {
+        "package": "@deepseek-ai/dsh-subagent-spawn-in-process",
+        "lines": "19-36",
+        "summary": "official spawn provider creates a child with no parent conversation inheritance; uses official subagent activation lifecycle"
+      }
+    ]
+  },
+  "validation": {
+    "command": "DSH_UNLIMIT_RUNTIME=<official-runtime> DSH_UNLIMIT_OFFICIAL_PACKAGES=<verified-archives> <bundledNode24> --expose-internals --test tests/*.test.mjs",
+    "node": "v24.21.0",
+    "tests": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "format": "prettier --write tests/workflow-host.test.mjs",
+    "existingTestsRetained": 5,
+    "newAcceptanceTests": 1,
+    "syntheticProviderRequestsInNewTest": 7,
+    "absentRuntime": {
+      "tests": 6,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 6,
+      "result": "Explicit skip; no implicit runtime discovery"
+    },
+    "resultScope": "The six tests in tests/workflow-host.test.mjs, retained within the full suite below",
+    "fullSuite": {
+      "tests": 704,
+      "passed": 704,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "wiring": {
+    "store": "Real project WorkspaceStore in a disposable temporary SQLite file",
+    "flow": "Real project Flow with per-workspace role overrides and explicit assignments",
+    "adapter": "Real DesktopRuntime, rolePrompt = (sessionId) => flow.rolePrompt(sessionId), matching production plugin wiring",
+    "workflow": "Real DesktopWorkflow dispatch; binding, assignment and slot acquisition precede official startActivation",
+    "controls": {
+      "enabled": true,
+      "promptMode": "replace",
+      "workspacePolicy": "strict",
+      "autoApprove": false,
+      "fullAccess": false
+    }
+  },
+  "scenarios": [
+    {
+      "id": "workspace-alpha-first-step",
+      "result": "passed",
+      "checks": [
+        "Real workflow official spawn first provider request has only alpha role marker in system slot",
+        "Official system/message journal content equals canonical request system content",
+        "Native ToolRuntime schema name, description, properties and required fields retained",
+        "Registered synthetic functional guidance retained",
+        "Completed child disposed; workspace slot released; parent survives"
+      ]
+    },
+    {
+      "id": "workspace-beta-first-step",
+      "result": "passed",
+      "checks": [
+        "Same role name in a different workspace resolves only beta marker in system slot",
+        "No alpha marker in beta system slot",
+        "First system journal matches canonical request; native schema and functional guidance retained",
+        "Child disposed; workspace slot released; parent survives"
+      ]
+    },
+    {
+      "id": "unassigned-spawn-after-release",
+      "result": "passed",
+      "checks": [
+        "Fresh official spawn explicitly bound to alpha workspace has no Flow assignment",
+        "Role-like task prose does not cause inferred role injection",
+        "First request has neither role marker; native schema and guidance retained",
+        "Activation receipt disposed"
+      ]
+    },
+    {
+      "id": "ordinary-nondrill-first-step",
+      "result": "passed",
+      "checks": [
+        "Real SessionController creates ordinary unbound session",
+        "First actual AgentLoop request contains neither workspace role marker",
+        "Native schema and functional guidance retained"
+      ]
+    },
+    {
+      "id": "resident-explicit-revoke",
+      "result": "passed",
+      "checks": [
+        "Existing resident Agent receives alpha assignment and slot, then actual next request contains alpha role",
+        "Release confirms slot removal; explicit assign(null) clears assignment",
+        "Following actual request has neither alpha nor beta role marker"
+      ]
+    },
+    {
+      "id": "runtime-revert",
+      "result": "passed",
+      "checks": [
+        "SystemPrompt assemble property descriptor restored exactly",
+        "New session with explicit beta assignment has no injected role or operator after runtime.revert",
+        "Native schema and registered functional guidance remain"
+      ]
+    }
+  ],
+  "isolation": {
+    "data": "Only original harmless markers, disposable local project directories, plugin database, storage and session JSONL",
+    "externalAttempts": {
+      "socketConnect": 0,
+      "socketListen": 0,
+      "datagramBindOrSend": 0,
+      "dnsLookupResolveReverse": 0,
+      "fetch": 0,
+      "childProcess": 0
+    },
+    "realProfileConfigured": false,
+    "realBusinessData": false,
+    "toolExecution": false,
+    "liveDesktopInteraction": false,
+    "guardLifetime": "Fixture initialization, test execution and awaited cleanup; call counts are asserted and mocks restored only after cleanup"
+  },
+  "boundaries": [
+    "The provider transport is explicitly synthetic and returns original harmless text; no real model endpoint, account, billing, tool execution or full standard preset is exercised.",
+    "Official SystemPrompt, ToolRuntime, AgentLoop, SessionController, subagent runtime, spawn, sessions, projection, storage and JSONL persistence use inventory-matching entries. This is an entry inventory check, not an audit of every transitive dependency or publisher signature.",
+    "System-slot role isolation is verified separately. Workflow also includes role content in the user task message; this evidence does not claim role text occurs exclusively in the system slot.",
+    "flow.release releases only the concurrency slot. Role assignment persists until assign(null); normal Workflow completion preserves closed child metadata. A new child does not inherit that assignment.",
+    "Role injection depends on globally applied controls and settings.enabled=true. The unchanged disabled/reverted behavior is preserved; reversion removes the runtime role injection wrapper.",
+    "Synthetic functional section registration proves retained assembly behavior; it is not a connected MCP execution or a complete shipped preset acceptance.",
+    "No real profile, real session, desktop configuration, DNS, network endpoint or subprocess is used by the acceptance fixture. Hashes contain no official prompt bodies, installation paths or secrets."
+  ]
+}

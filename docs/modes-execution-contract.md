@@ -84,6 +84,14 @@ Host 依赖也使用官方服务，包括调度、存储、会话控制器、子
 
 执行证据见 [presets-acceptance.json](evidence/presets-acceptance.json)，记录 535 个实际加载文件的发行摘要、原始预设摘要、源码摘要、三类越界尝试为空及临时根清理结果。复验沿用上面的两个环境变量，测试路径换为 `tests/presets-host.test.mjs`；增加 `DSH_UNLIMIT_PRESETS_EVIDENCE=1` 才生成证据。所需五个固定公开归档及校验边界见[维护流程](maintenance.md)。
 
+## 极简模式执行前提的只读核实（2026-10-21）
+
+固定公开 npm 归档补齐了 `dsh-tool-bash-persistent`、`dsh-terminal-bash` 与 `dsh-compaction-basic` 的接口元数据。三份归档通过 SRI、SHA1 及共 24 个发行清单成员的 SHA-256 校验；本机三个 PTY/系统后端文件也仅核对摘要，未加载或执行。来源、接口与边界见[静态证据](evidence/minimal-contract-discovery.json)，它不是执行通过记录。
+
+完整 minimal 声明有 9 个叶子条目，macOS 应启用 7 个。它关闭文本 read/write/edit，只保留 read_image；文本任务使用名为 `bash` 的持久终端工具，输入为必填非空 `command` 字符串。该工具依赖 tools/terminals/workingDirectory；终端后端另依赖 sandboxPolicy/sessionProjections/subprocess，compaction 依赖 llm/tokenMeter/sessions。受限调用按当前 owner.session 解析策略，先经官方 sandbox.confine，再交给真实 spawnTerminal。
+
+当前 standard 夹具禁止进程启动，并假定存在 planMode；minimal 没有这个服务，不能只替换预设名后声称已验。此前真实 PTC 探针在 Seatbelt 的 sandbox_apply 返回 Operation not permitted；本次没有动态重试，因此不将旧失败改写为此次 minimal 已运行失败。后续必须在可运行官方受限后端的环境中，保持原声明验证持久终端状态、实际文件内容、日志与处置；不能用普通 read、伪终端或关闭沙箱代替。
+
 ## 保留差距
 
 - 完整 standard 声明、读取与计划切换已有隔离证据；其余已注册工具没有在本回归执行。minimal/PTC 完整预设和真实用户默认预设选择仍未验，不能把工具注册视为工具执行验收。

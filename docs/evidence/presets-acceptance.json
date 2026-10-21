@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "behaviorId": "CORE-MODES",
-  "generatedAt": "2026-10-21T05:11:30.126Z",
+  "generatedAt": "2026-10-21T05:31:47.551Z",
   "node": "v24.21.0",
   "platform": {
     "os": "darwin",
@@ -2833,7 +2833,7 @@
     },
     {
       "path": "tests/helpers/preset-fixture.mjs",
-      "sha256": "15c76461f481956a3b3c152def2733c6222f9d8f405c1bcb294709e16b8562fd"
+      "sha256": "adbd80bf460a592c908cd799758336951bce16f3586e7478b14a20b55a54aed3"
     },
     {
       "path": "tests/helpers/official-packages.mjs",

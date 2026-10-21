@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync, readFileSync, realpathSync, rmSync, mkdirSync, statSync } from "node:fs";
 import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
@@ -8,11 +8,14 @@ import { join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import net from "node:net";
 import dgram from "node:dgram";
+import dns from "node:dns";
+import dnsPromises from "node:dns/promises";
 import childProcess from "node:child_process";
 import { DesktopWorkflow, WORKFLOW_PRESET_ID } from "../src/host/workflow.js";
 import { DesktopWorkflowPlan } from "../src/host/workflow-plan.js";
 import { Flow } from "../src/core/flow.js";
 import { WorkspaceStore } from "../src/core/store.js";
+import { DesktopRuntime } from "../src/host/runtime.js";
 
 const runtimeRoot = process.env.DSH_UNLIMIT_RUNTIME;
 const optionalHost = {
@@ -37,16 +40,26 @@ function denyExternalExecution(t) {
   for (const name of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"])
     t.mock.method(childProcess, name, deny(`child_process.${name}`));
   t.mock.method(globalThis, "fetch", deny("fetch"));
+  for (const [label, api] of [
+    ["dns", dns],
+    ["dns/promises", dnsPromises],
+  ])
+    for (const key of Object.keys(api))
+      if (/^(lookup|resolve|reverse)/.test(key) && typeof api[key] === "function")
+        t.mock.method(api, key, deny(`${label}.${key}`));
   syncBuiltinESMExports();
-  t.after(() => {
-    assert.deepEqual(
-      calls,
-      [],
-      "The official-service fixture must never attempt a socket or child process",
-    );
-    t.mock.restoreAll();
-    syncBuiltinESMExports();
-  });
+  return () => {
+    try {
+      assert.deepEqual(
+        calls,
+        [],
+        "The official-service fixture must never attempt DNS, network or child process calls, including cleanup",
+      );
+    } finally {
+      t.mock.restoreAll();
+      syncBuiltinESMExports();
+    }
+  };
 }
 
 async function loadOfficial() {
@@ -88,6 +101,8 @@ async function loadOfficial() {
       directories: "@deepseek-ai/dsh-working-directory",
       loader: "@deepseek-ai/cordis-plugin-loader",
       presets: "@deepseek-ai/dsh-agent-preset-registry",
+      approval: "@deepseek-ai/dsh-user-approval",
+      sandboxPolicy: "@deepseek-ai/dsh-sandbox-policy",
     };
     return Object.fromEntries(
       await Promise.all(Object.entries(names).map(async ([key, name]) => [key, await load(name)])),
@@ -96,16 +111,26 @@ async function loadOfficial() {
   return official;
 }
 
-async function fixture(t) {
-  denyExternalExecution(t);
+async function fixture(t, { captureAll = false } = {}) {
+  const finishGuard = denyExternalExecution(t);
+  let dispose;
+  t.after(async () => {
+    try {
+      await dispose?.();
+    } finally {
+      finishGuard();
+    }
+  });
   const api = await loadOfficial();
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "dsh-unlimit-real-workflow-")));
   const ctx = new api.cordis.Context();
   const fibers = [];
+  const disposers = [];
   const unusedCalls = [];
   const requests = [];
   let pause;
   let workflow;
+  let runtime;
   const store = new WorkspaceStore(join(directory, "plugin-synthetic.sqlite"));
   const flow = new Flow(store);
   const project = join(directory, "project");
@@ -120,9 +145,11 @@ async function fixture(t) {
     assert.equal(fiber.state, 2, "Every required official service must be active");
     return fiber;
   };
-  t.after(async () => {
+  dispose = async () => {
     try {
       await workflow?.close();
+      runtime?.revert();
+      for (const cleanup of disposers.reverse()) await cleanup();
       for (const fiber of fibers.reverse()) if (fiber.uid !== null) await fiber.dispose();
       assert.deepEqual(
         unusedCalls,
@@ -134,7 +161,7 @@ async function fixture(t) {
       store.close();
       rmSync(directory, { recursive: true, force: true });
     }
-  });
+  };
 
   await mount({
     name: "isolated-official-session-foundation",
@@ -150,7 +177,7 @@ async function fixture(t) {
         personaPrefix: "",
         personaSuffix: "",
       });
-      new api.tools.ToolRuntime(scope);
+      new api.tools.ToolRuntime(scope, { mode: "native" });
       // These are explicit inert peripheral substitutes, not SessionController,
       // AgentLoop, Session/Query, Workspace or persistence implementations.
       const unused = (name) => () => {
@@ -165,13 +192,18 @@ async function fixture(t) {
       llm.prepareCall = async (config) => ({ config, stream: (request) => llm.stream(request) });
       llm.stream = async function* (request) {
         requests.push(request);
-        assert.equal(
-          store.dispatch("workspaces.forSession", { sessionId: request.sessionId }).item.id,
-          workspaceId,
-        );
-        assert.ok(
-          flow.status(workspaceId).active.some((row) => row.sessionId === request.sessionId),
-        );
+        const agent = ctx.agents.get(request.sessionId);
+        assert.ok(agent, "The transport receives a real resident official Agent");
+        assert.deepEqual(request.messages, agent.session.deriveMessages());
+        if (!captureAll) {
+          assert.equal(
+            store.dispatch("workspaces.forSession", { sessionId: request.sessionId }).item.id,
+            workspaceId,
+          );
+          assert.ok(
+            flow.status(workspaceId).active.some((row) => row.sessionId === request.sessionId),
+          );
+        }
         if (pause)
           await new Promise((resolve, reject) => {
             pause.resolve = resolve;
@@ -244,10 +276,40 @@ async function fixture(t) {
   await mount(api.subagents.SubagentRuntime, { maxDepth: 1, maxActiveSubagents: 8 });
   await mount(api.spawn, { providerName: "spawn" });
   workflow = new DesktopWorkflow(ctx, store, flow);
-  const create = async () => {
+  const create = async (workspace = workspaceId) => {
     const created = await ctx.sessionController.create({ cwd: join(directory, "project") });
-    store.dispatch("workspaces.bind", { id: workspaceId, sessionId: created.sessionId });
+    if (workspace)
+      store.dispatch("workspaces.bind", { id: workspace, sessionId: created.sessionId });
     return ctx.agents.get(created.sessionId);
+  };
+  const mountDesktopRuntime = async () => {
+    assert.equal(runtime, undefined, "Only one adapter owns this fixture");
+    await mount(api.approval.default, { policy: "ask" });
+    await mount(api.sandboxPolicy.default, { mode: "read-only", workspaceRoot: project });
+    const current = store.dispatch("settings.get");
+    store.dispatch("settings.save", {
+      revision: current.revision,
+      value: {
+        ...current.value,
+        enabled: true,
+        prompt: "SYNTHETIC_WORKFLOW_OPERATOR",
+        promptMode: "replace",
+        workspacePolicy: "strict",
+        workspaceFiles: [],
+        autoApprove: false,
+        fullAccess: false,
+      },
+    });
+    runtime = new DesktopRuntime(ctx, store, {
+      kind: "desktop",
+      supported: true,
+      version: "0.2.1-rc.2",
+      runtimeRoot,
+    });
+    // Exact production plugin.js wiring, not a substitute role resolver.
+    runtime.rolePrompt = (sessionId) => flow.rolePrompt(sessionId);
+    runtime.apply();
+    return runtime;
   };
   return {
     api,
@@ -259,6 +321,8 @@ async function fixture(t) {
     directory,
     create,
     requests,
+    mountDesktopRuntime,
+    onDispose: (cleanup) => disposers.push(cleanup),
     pause: () => {
       pause = {};
       return pause;
@@ -508,5 +572,209 @@ test(
     } finally {
       assert.equal((await plans.close()).stopped, true);
     }
+  },
+);
+
+const firstSystemText = (request) => {
+  const system = request.messages.find((message) => message.role === "system");
+  assert.ok(system, "The first provider request must contain the real projected system slot");
+  return system.content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
+};
+
+test(
+  "real first-step SystemPrompt and spawn isolate explicit workspace roles while retaining native tools and functional guidance",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t, { captureAll: true });
+    const service = f.ctx.systemPrompt[Symbol.for("cordis.original")] ?? f.ctx.systemPrompt;
+    const beforeAssemble = Object.getOwnPropertyDescriptor(service, "assemble");
+    const runtime = await f.mountDesktopRuntime();
+    const workspaces = [
+      f.workspaceId,
+      f.store.dispatch("workspaces.save", { name: "Synthetic second role workspace" }).item.id,
+    ];
+    const markers = ["SYNTHETIC_ROLE_ALPHA_ONLY", "SYNTHETIC_ROLE_BETA_ONLY"];
+    for (const [index, workspaceId] of workspaces.entries())
+      f.store.dispatch("roles.save", { workspaceId, role: "analyst", content: markers[index] });
+    const disposeSection = f.ctx.systemPrompt.section({
+      name: "mcp:synthetic-workflow-function",
+      order: 4000,
+      interpolate: false,
+      text: "SYNTHETIC_WORKFLOW_FUNCTION_GUIDANCE",
+    });
+    const disposeTool = f.ctx.tools.register(
+      f.api.tools.defineTool({
+        name: "workflow_synthetic_evidence",
+        description: "SYNTHETIC_WORKFLOW_NATIVE_TOOL_DESCRIPTION",
+        parameters: { reference: { type: "string", required: true } },
+        output: {
+          schema: { type: "json" },
+          render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }],
+        },
+        execute() {
+          assert.fail("The role acceptance only renders native schemas; it never executes a tool");
+        },
+      }),
+    );
+    f.onDispose(() => {
+      disposeTool();
+      disposeSection();
+    });
+    const parents = await Promise.all(workspaces.map((workspaceId) => f.create(workspaceId)));
+    const assertRequest = (sessionId, marker = null) => {
+      const requests = f.requests.filter((request) => request.sessionId === sessionId);
+      assert.equal(
+        requests.length,
+        1,
+        "The assertion targets the executor's first real model request",
+      );
+      const text = firstSystemText(requests[0]);
+      for (const candidate of markers)
+        assert.equal(text.split(candidate).length - 1, candidate === marker ? 1 : 0);
+      assert.ok(text.includes("SYNTHETIC_WORKFLOW_OPERATOR"));
+      assert.ok(text.includes("SYNTHETIC_WORKFLOW_FUNCTION_GUIDANCE"));
+      const tool = requests[0].tools.find((item) => item.name === "workflow_synthetic_evidence");
+      assert.ok(tool, "Official ToolRuntime's native schema survives role injection");
+      assert.equal(tool.description, "SYNTHETIC_WORKFLOW_NATIVE_TOOL_DESCRIPTION");
+      assert.ok(tool.parameters.properties.reference);
+      assert.ok(tool.parameters.required.includes("reference"));
+      return requests[0];
+    };
+    for (const [index, workspaceId] of workspaces.entries()) {
+      const { item } = await f.workflow.dispatch("workflow.dispatch", {
+        workspaceId,
+        parentSessionId: parents[index].id,
+        role: "analyst",
+        task: "只将合成数字 2、1 升序整理，不调用工具。",
+      });
+      const { item: done } = await waitFor(
+        () => f.workflow.dispatch("workflow.status", { workspaceId, id: item.id }),
+        (result) => result.item.slotReleased,
+      );
+      assert.equal(done.status, "completed");
+      assert.equal(done.disposed, true);
+      assert.equal(f.flow.status(workspaceId).active.length, 0);
+      assert.equal(f.ctx.agents.get(item.sessionId), undefined);
+      const request = assertRequest(item.sessionId, markers[index]);
+      const snapshot = await f.ctx.sessionController.inspect(item.sessionId);
+      const firstSystem = snapshot.events.find((event) => event.type === "system/message");
+      assert.ok(firstSystem, "Official AgentLoop journals the first system message");
+      assert.equal(firstSystem.data.message.role, "system");
+      assert.deepEqual(
+        firstSystem.data.message.content,
+        request.messages.find((message) => message.role === "system").content,
+      );
+      assert.equal(snapshot.meta.parentSession, parents[index].id);
+      assert.equal(snapshot.meta.origin, "subagent");
+    }
+
+    // A fresh official spawn is bound to a workspace but has no explicit Flow role.
+    // Task prose naming a role must not become an inferred assignment.
+    const unassignedId = randomUUID();
+    f.store.dispatch("workspaces.bind", { id: workspaces[0], sessionId: unassignedId });
+    const receipt = await f.ctx.subagents.startActivation({
+      provider: "spawn",
+      childId: unassignedId,
+      label: "Synthetic unassigned executor",
+      request: {
+        parent: parents[0],
+        maxDepth: 1,
+        prompt: [{ type: "text", text: "作为 analyst 整理合成数字，不调用工具。" }],
+      },
+      signal: new AbortController().signal,
+      delivery: "caller",
+    });
+    try {
+      assert.equal((await receipt.result).stopReason, "completed");
+      assert.equal(f.flow.rolePrompt(unassignedId), null);
+      assertRequest(unassignedId);
+    } finally {
+      await receipt.dispose();
+    }
+
+    const ordinary = await f.create(null);
+    ordinary.followup(
+      f.api.llm.createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: "普通非演练合成会话：只回复已收到。" }],
+      }),
+    );
+    await ordinary.whenIdle();
+    assert.equal(f.store.dispatch("workspaces.forSession", { sessionId: ordinary.id }).item, null);
+    assertRequest(ordinary.id);
+
+    // Revoke an explicit assignment on the same resident Agent, without simulating assembly.
+    f.store.dispatch("workspaces.bind", { id: workspaces[0], sessionId: ordinary.id });
+    f.flow.dispatch("flow.assign", {
+      workspaceId: workspaces[0],
+      sessionId: ordinary.id,
+      role: "analyst",
+    });
+    f.flow.dispatch("flow.acquire", { workspaceId: workspaces[0], sessionId: ordinary.id });
+    ordinary.followup(
+      f.api.llm.createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: "明确分配角色后的合成输入。" }],
+      }),
+    );
+    await ordinary.whenIdle();
+    const whileAssigned = f.requests.filter((request) => request.sessionId === ordinary.id).at(-1);
+    assert.ok(firstSystemText(whileAssigned).includes(markers[0]));
+    assert.equal(firstSystemText(whileAssigned).includes(markers[1]), false);
+    assert.equal(
+      f.flow.dispatch("flow.release", { workspaceId: workspaces[0], sessionId: ordinary.id })
+        .released,
+      true,
+    );
+    assert.equal(
+      f.flow.rolePrompt(ordinary.id),
+      markers[0],
+      "Slot release preserves explicit assignment",
+    );
+    f.flow.dispatch("flow.assign", {
+      workspaceId: workspaces[0],
+      sessionId: ordinary.id,
+      role: null,
+    });
+    assert.equal(f.flow.rolePrompt(ordinary.id), null);
+    ordinary.followup(
+      f.api.llm.createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: "撤销角色后的合成输入。" }],
+      }),
+    );
+    await ordinary.whenIdle();
+    const afterRelease = f.requests.filter((request) => request.sessionId === ordinary.id).at(-1);
+    for (const marker of markers)
+      assert.equal(firstSystemText(afterRelease).includes(marker), false);
+
+    runtime.revert();
+    assert.deepEqual(Object.getOwnPropertyDescriptor(service, "assemble"), beforeAssemble);
+    const fresh = await f.create(workspaces[1]);
+    f.flow.dispatch("flow.assign", {
+      workspaceId: workspaces[1],
+      sessionId: fresh.id,
+      role: "analyst",
+    });
+    fresh.followup(
+      f.api.llm.createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: "运行控制还原后的新会话输入。" }],
+      }),
+    );
+    await fresh.whenIdle();
+    const afterRevert = f.requests.filter((request) => request.sessionId === fresh.id);
+    assert.equal(afterRevert.length, 1);
+    for (const marker of markers)
+      assert.equal(firstSystemText(afterRevert[0]).includes(marker), false);
+    assert.equal(firstSystemText(afterRevert[0]).includes("SYNTHETIC_WORKFLOW_OPERATOR"), false);
+    assert.ok(firstSystemText(afterRevert[0]).includes("SYNTHETIC_WORKFLOW_FUNCTION_GUIDANCE"));
+    assert.ok(afterRevert[0].tools.some((tool) => tool.name === "workflow_synthetic_evidence"));
+    assert.equal(f.ctx.agents.get(parents[0].id), parents[0]);
+    assert.equal(f.ctx.agents.get(parents[1].id), parents[1]);
+    assert.equal(f.requests.length, 7);
   },
 );

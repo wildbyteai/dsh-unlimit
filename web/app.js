@@ -1697,8 +1697,8 @@ async function controlPage() {
       )}${panel("用户自有服务器清单", `<div class="field"><label for="own-servers">用户自有服务器 · 每行一个</label><textarea name="ownServers" id="own-servers" rows="3">${esc(v.ownServers.join("\n"))}</textarea><small>可填写 IP、完整主机名或 user@host；不要填写密码、URL、网段、端口或通配符。此清单仍不是出口访问控制。</small></div>`)}</div><div>${panel("权限与执行", `${switchRow("fullAccess", "完整访问权限", "仅在会话未明确选择权限时请求完整访问；新会话采用下方默认预设。")}${switchRow("autoApprove", "自动审批", "仅处理未明确指定审批策略的会话；显式选择仍由宿主执行。")}${switchRow("hooksDeny", "禁用拦截钩子", "按宿主暴露的能力管理钩子策略。")}${switchRow("autoReapply", "设置变更后重新应用", "启用时按运行时生命周期重新注册控制。")}${switchRow("retryOverride", "接管请求重试次数", "关闭时沿用提供方；开启且运行控制已启用后按 0—20 次设置，0 表示不重试。")}<div class="note" style="margin:17px 0 0">完整访问和自动审批会改变当前执行边界。请在应用前检查具体授权范围。</div>`)}${sessionDefaults}${panel(
         "执行限额",
         `<div class="fields">${[
-          field("maxSubagents", "最大子代理数", "number", { min: 1, max: 128 }),
-          field("maxDepth", "最大递归深度", "number", { min: 0 }),
+          field("maxSubagents", "代理树并发子代理数", "number", { min: 1, max: 128 }),
+          field("maxDepth", "最大递归深度", "number", { min: 0, max: 64 }),
           field("readLimit", "读取正文预算（字节）", "number", { min: 0, step: 1 }),
           field("retryLimit", "重试次数", "number", { min: 0, max: 20, step: 1 }),
         ]
@@ -1709,12 +1709,18 @@ async function controlPage() {
               readLimit: "readLimit",
               retryLimit: "retryLimit",
             }[f.name];
+            const scopeHelp = {
+              maxSubagents:
+                "同一活动代理树共享并发上限，包含孙代理；其他根会话独立计数。演练执行槽另行配置。",
+              maxDepth: "0 禁止新建子代理，1 允许一层；调整限额不主动停止已运行的代理。",
+            }[f.name];
             return renderField(
               {
                 ...f,
                 disabled: !can(id),
-                help:
-                  id === "readLimit"
+                help: scopeHelp
+                  ? `${scopeHelp}${can(id) ? "" : " 当前宿主未提供此能力，保存值暂不生效。"}`
+                  : id === "readLimit"
                     ? can(id)
                       ? `当前有效预算：${readCapability.effectiveCaps?.readMaxBytes ?? "未知"} B。0 沿用宿主；仅限制 read 返回正文，行号与封装、实际文件 I/O 另计。`
                       : `${readCapability?.detail ?? "宿主未提供此能力"}；当前保存值暂不生效。0 表示沿用宿主。`

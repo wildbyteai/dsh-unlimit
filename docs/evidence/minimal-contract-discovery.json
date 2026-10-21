@@ -1,0 +1,268 @@
+{
+  "format": 1,
+  "kind": "readonly-static-contract",
+  "target": {
+    "version": "0.2.1-rc.2",
+    "platform": "darwin",
+    "arch": "arm64",
+    "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0"
+  },
+  "declaration": {
+    "path": "node_modules/@deepseek-ai/dsh-web-app/presets/minimal.patch.yml",
+    "sha256": "a2a9ba1c9c392a45466708f18bc0aefbf300577f9b544dc06049f73a8a5b3267",
+    "leafRows": 9,
+    "enabledLeafRowsDarwin": 7,
+    "executed": false
+  },
+  "archives": [
+    {
+      "name": "@deepseek-ai/dsh-tool-bash-persistent",
+      "version": "0.2.1-rc.2",
+      "tarball": "https://registry.npmjs.org/@deepseek-ai/dsh-tool-bash-persistent/-/dsh-tool-bash-persistent-0.2.1-rc.2.tgz",
+      "integrity": "sha512-bRxTzM+qRggJifBFonc1EGKm/GFw1utKk44sgWnHcW43Kr534rIwUnO/8AUS880Vl1hEFY0RdngM8ZRiYGftvg==",
+      "sha1": "f75133225df0665e370ddd222cb4f84c5ede25bc",
+      "sriMatch": true,
+      "sha1Match": true,
+      "inventoryMembers": [
+        {
+          "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/LICENSE",
+          "sha256": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/lib/index.js",
+          "sha256": "e5da0d699ca999f7372cc67ae913b1b881362b3232f5b01b003709e76390bc82"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/locale/en.json",
+          "sha256": "ef2b415deffee9635c0269cafad1d01a6d20bcc29299345535b5b644f20d784b"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/package.json",
+          "sha256": "7ca4d25875f6509dea331adface110259013a7a836bf07a914d9ba22ac4849b5"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/locale/zh.json",
+          "sha256": "482b987d86e0c1b210e10fa0398e1c1f94c62bbe5e693f317cb698e1a84ad0e0"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/README.md",
+          "sha256": "d349ad1df76cc5610b8313b81cc15961356a88eb1bb43015756a10c96b297f00"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/README.zh.md",
+          "sha256": "27ba46d241776a167210cc41e46d4e5f68ef35e9943cefe1eaed35e422c8c2f5"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-tool-bash-persistent/README.i18n.yaml",
+          "sha256": "f228e277ca2fd5825e250f5c53dc3dac596ad1c723849fc649d479d3387cb908"
+        }
+      ]
+    },
+    {
+      "name": "@deepseek-ai/dsh-terminal-bash",
+      "version": "0.2.1-rc.2",
+      "tarball": "https://registry.npmjs.org/@deepseek-ai/dsh-terminal-bash/-/dsh-terminal-bash-0.2.1-rc.2.tgz",
+      "integrity": "sha512-dSevTPD/crvesqmSj1scHyJVNTqjXt2TNc+iciMTP+Pwu+78Z66DFaRWApABW0ScJWJiRjz+VJaYcB424Qpdtw==",
+      "sha1": "40ea7f237ffad257cf73946c6c3750c4451d8034",
+      "sriMatch": true,
+      "sha1Match": true,
+      "inventoryMembers": [
+        {
+          "path": "node_modules/@deepseek-ai/dsh-terminal-bash/LICENSE",
+          "sha256": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-terminal-bash/lib/index.js",
+          "sha256": "388ce251b94a919edcfb9c13f6ffc49bcd1f4caf9ee493c65b46b454786c8c8b"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-terminal-bash/locale/en.json",
+          "sha256": "54478599fed4df6f9ff7f1adf3da2cf0dc56f5195b3de57898a37652771311b8"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-terminal-bash/package.json",
+          "sha256": "0048bd042a8ff2cda83bafb2931b8368bb69cc683670e132b39d65753ba4efbd"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-terminal-bash/locale/zh.json",
+          "sha256": "9eef29a7fe2e42428ac220a574c01ac5b4c09d86979200205e369f241187c312"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-terminal-bash/README.md",
+          "sha256": "043217a57116b7770f38ae3a07212d72197097c755885fb0c9686705e8996748"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-terminal-bash/README.zh.md",
+          "sha256": "30b123151090fc8ada99cf5c11dbc710f8a8c123ecd983b57ef3dbb79dc165f9"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-terminal-bash/README.i18n.yaml",
+          "sha256": "eb219dcbc85dfd95bd71cb34cdfc0f6a55458a3f3be5d99f0810c67c43f861d1"
+        }
+      ]
+    },
+    {
+      "name": "@deepseek-ai/dsh-compaction-basic",
+      "version": "0.2.1-rc.2",
+      "tarball": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction-basic/-/dsh-compaction-basic-0.2.1-rc.2.tgz",
+      "integrity": "sha512-nx3uY0auC4JP7dEQDlQ6bQAtsDgrcCu/gPPDqKy3iM9ZpJTi2BE7pObuqhIeRIUpIodByX4QHU0N9p7kFxi4Ng==",
+      "sha1": "b0eb32d33149b82eab91ec0c5932c682046d04e3",
+      "sriMatch": true,
+      "sha1Match": true,
+      "inventoryMembers": [
+        {
+          "path": "node_modules/@deepseek-ai/dsh-compaction-basic/LICENSE",
+          "sha256": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-compaction-basic/lib/index.js",
+          "sha256": "b7ac52f20a36430cf01a66b3a36f23a48ffdb22708d714dbe1fff541b5df4ec5"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-compaction-basic/locale/en.json",
+          "sha256": "f89f6574040f293cbf4e251a4a5a9bfc6a6378efed601ed3ba07278f221b0a3e"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-compaction-basic/package.json",
+          "sha256": "95af982d51a17c6566108f911101a18ea76d7953a1504943d901aa1bbdfe8903"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-compaction-basic/locale/zh.json",
+          "sha256": "036c01b0612620d5ee38b2e595a3b2df39f399b4121b951fff53433f07cb61e2"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-compaction-basic/README.md",
+          "sha256": "dd5409de780a6463f83fbee08bc0d07fc11de210463d1927f1b11cae840629eb"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-compaction-basic/README.zh.md",
+          "sha256": "4dac0ff54c0b88356f3a268d8fee7f9c730ef1722a2652989ee46716591986a8"
+        },
+        {
+          "path": "node_modules/@deepseek-ai/dsh-compaction-basic/README.i18n.yaml",
+          "sha256": "b22e05b2909a306719ef1fc59ac08d2e7bf3bf81e9984da10d54eafda4db8505"
+        }
+      ]
+    }
+  ],
+  "contract": {
+    "tool": {
+      "name": "bash",
+      "input": {
+        "command": {
+          "type": "string",
+          "required": true,
+          "nonEmptyAfterTrim": true
+        }
+      },
+      "outputType": "string",
+      "inject": {
+        "line": 367,
+        "services": ["tools", "terminals", "workingDirectory"]
+      },
+      "backendDefault": "shell",
+      "timeoutMs": 300000,
+      "maxOutputChars": 16000
+    },
+    "terminal": {
+      "inject": {
+        "line": 906,
+        "services": [
+          "terminals",
+          "sandboxPolicy",
+          "sessionProjections",
+          "subprocess",
+          "workingDirectory"
+        ]
+      },
+      "defaultShell": "/bin/bash",
+      "defaultArgs": ["--noprofile", "--norc", "-i"],
+      "backendDefault": "shell",
+      "confineBypassMode": "danger-full-access",
+      "confine": {
+        "lines": [964, 972],
+        "argv": ["config.shellPath", "...config.shellArgs"],
+        "policy": "{...policy,mode:policy.mode}",
+        "signal": "spec.signal",
+        "result": "result.argv"
+      },
+      "spawnTerminal": {
+        "lines": [1047, 1063],
+        "arguments": ["argv", "cwd", "env", "rows", "cols", "terminalType", "graceMs", "signal"],
+        "policySource": "ctx.sandboxPolicy.resolve({session:spec.owner.session})",
+        "cwdSource": "spec.cwd ?? await ctx.workingDirectory.ensure(spec.owner,spec.signal)",
+        "environmentKeys": [
+          "TERM",
+          "PAGER",
+          "GIT_PAGER",
+          "DSH_SHELL",
+          "DSH_SESSION_ID",
+          "DSH_PTY_SESSION_ID",
+          "PS1",
+          "PROMPT_COMMAND",
+          "BASH_SILENCE_DEPRECATION_WARNING"
+        ]
+      }
+    },
+    "compaction": {
+      "inject": {
+        "line": 801,
+        "services": ["llm", "tokenMeter", "sessions"]
+      },
+      "initLines": [824, 827],
+      "autoRegistersHooks": "only when resolved config.auto is true"
+    },
+    "sourceKind": "SRI/SHA1 verified public tar archives; every inventory-listed member SHA256 matched; no imports or execution"
+  },
+  "nativeBackends": [
+    {
+      "path": "node_modules/@deepseek-ai/node-addon-system-darwin-arm64/bin/system.node",
+      "sha256": "e25056346e033991ed14a01f0804851f2b7a33b2c8c0b2d8de58eb3159bbb390",
+      "inventorySha256": "e25056346e033991ed14a01f0804851f2b7a33b2c8c0b2d8de58eb3159bbb390",
+      "match": true,
+      "bytes": 70384
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/darwin-arm64/pty.node",
+      "sha256": "06906d34d3c2f5f868b1ce513183e33b90c9f6de4c0bf4dc31b0931d9c605a40",
+      "inventorySha256": "06906d34d3c2f5f868b1ce513183e33b90c9f6de4c0bf4dc31b0931d9c605a40",
+      "match": true,
+      "bytes": 104832
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper",
+      "sha256": "dca3af8fcb6056b843b09f29c703f78293725026282269f57135ac6bb902db3b",
+      "inventorySha256": "dca3af8fcb6056b843b09f29c703f78293725026282269f57135ac6bb902db3b",
+      "match": true,
+      "bytes": 68624
+    }
+  ],
+  "isolation": {
+    "realProfileRead": false,
+    "realSessionRead": false,
+    "officialModulesExecuted": false,
+    "backendStarted": false,
+    "network": "only three public npm metadata and tarballs",
+    "changedSourceOrTests": false
+  },
+  "remainingBlockers": [
+    {
+      "kind": "fixture",
+      "description": "Existing standard fixture rejects child_process and assumes isolated planMode, which minimal does not declare."
+    },
+    {
+      "kind": "platform",
+      "description": "Historical official Seatbelt probe refused sandbox_apply with Operation not permitted; no minimal dynamic retry was performed."
+    }
+  ],
+  "limitations": [
+    "Native SHA256 verification is not codesign or backend load/execution verification.",
+    "Host list is a static activation candidate; complete minimal has not activated or executed.",
+    "Parent environment merging at subprocess layer not inspected from the three permitted public archives."
+  ],
+  "parentVerification": {
+    "archiveMembersMatched": 24,
+    "nativeBackendsMatched": 3,
+    "modulesExecuted": false
+  }
+}

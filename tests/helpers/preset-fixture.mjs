@@ -290,7 +290,10 @@ export async function presetFixture(t, selectedRoot, cache) {
         tools: structuredClone(request.tools),
         plan: structuredClone(ctx.agentPresets.serviceFor(agent, "planMode").get(agent)),
       });
-      if (action === "finish")
+      // A held response pauses only this synthetic model transport. The real
+      // AgentLoop, activation admission and teardown remain unchanged.
+      if (action?.kind === "hold") await action.wait(request);
+      if (action === "finish" || action?.kind === "hold")
         yield { type: "text-delta", index: 0, text: "SYNTHETIC_STANDARD_COMPLETE" };
       else
         for (const [index, call] of action.entries())
@@ -538,6 +541,7 @@ export async function presetFixture(t, selectedRoot, cache) {
     sourceFile,
     content,
     create,
+    script: (sessionId, actions) => scripts.set(sessionId, actions),
     run,
     assemble,
     unadaptedAssembly,
