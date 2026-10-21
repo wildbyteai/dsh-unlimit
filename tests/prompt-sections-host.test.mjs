@@ -175,10 +175,11 @@ async function fixture(t) {
     maxDepth: 2,
     maxSubagents: 2,
   };
+  const library = { items: [], activeId: null };
   const store = {
     dispatch(action) {
       if (action === "settings.get") return { value: settings };
-      if (action === "rules.list") return { items: [], activeId: null };
+      if (action === "rules.list") return library;
       throw new Error(`Unexpected local action: ${action}`);
     },
   };
@@ -217,6 +218,7 @@ async function fixture(t) {
     runtime,
     settings,
     store,
+    library,
     observed,
     parent,
     agent,
@@ -226,6 +228,55 @@ async function fixture(t) {
     executed,
   };
 }
+
+test(
+  "same-model activation and edits select the rendered rule without leaking to another model; revert restores the host",
+  hostOnly,
+  async (t) => {
+    const f = await fixture(t);
+    const model = "synthetic-model-M";
+    const a = { id: "rule-a", model, content: "SYNTHETIC_RULE_A_INITIAL" };
+    const b = { id: "rule-b", model, content: "SYNTHETIC_RULE_B_INITIAL" };
+    const global = { id: "rule-global", content: "SYNTHETIC_GLOBAL_RULE" };
+    const editedA = "SYNTHETIC_RULE_A_EDITED";
+    const editedB = "SYNTHETIC_RULE_B_EDITED";
+    const markers = [a.content, b.content, global.content, editedA, editedB, f.settings.prompt];
+    f.library.items.push(a, b, global);
+    f.parent.agent.options.model = model;
+    const baseline = await f.assemble();
+    const originalText = f.api.prompt.renderPrompt(baseline);
+    const assertSelected = async (expected) => {
+      const assembly = await f.assemble();
+      const rendered = f.api.prompt.renderPrompt(assembly);
+      assert.equal(section(assembly, "dsh-unlimit/operator").text, expected);
+      for (const marker of markers)
+        assert.equal(rendered.includes(marker), marker === expected, marker);
+      assert.deepEqual(assembly.tools, baseline.tools);
+      f.preserved(assembly);
+    };
+    f.library.activeId = a.id;
+    f.runtime.apply();
+    await assertSelected(a.content);
+    a.content = editedA;
+    await assertSelected(editedA);
+    f.library.activeId = b.id;
+    await assertSelected(b.content);
+    b.content = editedB;
+    await assertSelected(editedB);
+    f.parent.agent.options.model = "synthetic-model-N";
+    await assertSelected(f.settings.prompt);
+    f.library.activeId = global.id;
+    await assertSelected(global.content);
+    f.parent.agent.options.model = model;
+    await assertSelected(editedA);
+    f.runtime.revert();
+    const restored = await f.assemble();
+    assert.deepEqual(restored.sections, baseline.sections);
+    assert.deepEqual(restored.tools, baseline.tools);
+    assert.equal(f.api.prompt.renderPrompt(restored), originalText);
+    for (const marker of markers) assert.equal(originalText.includes(marker), false);
+  },
+);
 
 test(
   "real native/PTC presentation and plan projection retain functional sections while persona is replaced",

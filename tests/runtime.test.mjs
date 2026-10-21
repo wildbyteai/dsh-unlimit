@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DesktopRuntime } from "../src/host/runtime.js";
 import { composePrompt } from "../src/core/prompts.js";
+import { WorkspaceStore } from "../src/core/store.js";
 
 function fixture(t, overrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), "dsh-unlimit-runtime-"));
@@ -228,6 +229,71 @@ test("model-specific rule precedes globally active rule, and model is read from 
     (await f.ctx.systemPrompt.assemble({ model: "other-model" })).sections[0].text,
     "Global",
   );
+});
+
+test("persisted activation switches same-model rules and cannot leak them to another model", async (t) => {
+  const f = fixture(t);
+  const originalStore = f.runtime.store;
+  const store = new WorkspaceStore(join(f.directory, "synthetic-rules.sqlite"));
+  f.runtime.store = store;
+  try {
+    const initial = store.dispatch("settings.get");
+    store.dispatch("settings.save", {
+      revision: initial.revision,
+      value: { ...initial.value, enabled: true, prompt: "Saved operator" },
+    });
+    const save = (name, content, model) =>
+      store.dispatch("rules.save", { name, content, model }).item;
+    const first = save("First", "RULE_A", "model-M");
+    const second = save("Second", "RULE_B", "model-M");
+    const global = save("Global", "GLOBAL_RULE", "");
+    const compose = async (model) =>
+      (await f.ctx.systemPrompt.assemble({ agent: { options: { model } } })).sections[0].text;
+    f.runtime.apply();
+    store.dispatch("rules.activate", { id: first.id });
+    assert.equal(await compose("model-M"), "RULE_A");
+    store.dispatch("rules.save", { ...first, content: "RULE_A_EDITED" });
+    assert.equal(await compose("model-M"), "RULE_A_EDITED");
+    store.dispatch("rules.activate", { id: second.id });
+    assert.equal(store.dispatch("rules.list").activeId, second.id);
+    assert.equal(await compose("model-M"), "RULE_B");
+    store.dispatch("rules.save", { ...second, content: "RULE_B_EDITED" });
+    assert.equal(await compose("model-M"), "RULE_B_EDITED");
+    assert.equal(await compose("model-N"), "Saved operator");
+    assert.equal(await compose(undefined), "Saved operator");
+    store.dispatch("rules.activate", { id: global.id });
+    assert.equal(await compose("model-M"), "RULE_A_EDITED");
+    assert.equal(await compose("model-N"), "GLOBAL_RULE");
+    f.runtime.revert();
+    assert.equal(await f.ctx.systemPrompt.assemble({ model: "model-M" }), f.assembly);
+    assert.equal(store.dispatch("rules.list").items.length, 3);
+  } finally {
+    f.runtime.revert();
+    f.runtime.store = originalStore;
+    store.close();
+  }
+});
+
+test("an active rule for another model does not suppress that model's workspace fallback", async (t) => {
+  const f = fixture(t, { enabled: true, prompt: "" });
+  const path = join(f.directory, "AGENTS.md");
+  writeFileSync(path, "WORKSPACE_FOR_OTHER_MODEL");
+  f.settings.workspaceFiles = [path];
+  f.library.items.push({ id: "specific", model: "model-M", content: "ONLY_MODEL_M" });
+  f.library.activeId = "specific";
+  const agent = {
+    options: { model: "model-N" },
+    session: { header: { cwd: f.directory } },
+  };
+  f.runtime.apply();
+  assert.equal(
+    (await f.ctx.systemPrompt.assemble({ agent })).sections[0].text,
+    "WORKSPACE_FOR_OTHER_MODEL",
+  );
+  assert.equal(f.runtime.nativeInstructions.policy(agent), false);
+  agent.options.model = "model-M";
+  assert.equal((await f.ctx.systemPrompt.assemble({ agent })).sections[0].text, "ONLY_MODEL_M");
+  assert.equal(f.runtime.nativeInstructions.policy(agent), true);
 });
 
 test("automatic approval preserves perimeter audit and never grants a cancelled request", async (t) => {

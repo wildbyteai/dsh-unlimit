@@ -22,7 +22,7 @@
 
 ## 官方隔离验证
 
-`tests/prompt-sections-host.test.mjs` 包含 5 项测试，使用以下 0.2.1-rc.2 官方模块。每个直接导入入口在执行 import 前，都与指定运行时的 `desktop-runtime.json` SHA-256 清单核对；不匹配立即失败，不当作干净官方证据。
+`tests/prompt-sections-host.test.mjs` 包含原有 5 项段落测试及新增 1 项规则选择测试，使用以下 0.2.1-rc.2 官方模块。每个直接导入入口在执行 import 前，都与指定运行时的 `desktop-runtime.json` SHA-256 清单核对；不匹配立即失败，不当作干净官方证据。
 
 | 模块                                  | 使用的真实能力                                            |
 | ------------------------------------- | --------------------------------------------------------- |
@@ -60,4 +60,6 @@ export DSH_UNLIMIT_RUNTIME='/Applications/DeepSeek Harness.app/Contents/Resource
 "$DSH_NODE" --test tests/prompt-sections-host.test.mjs
 ```
 
-本轮实际使用 DSH bundled Node **v24.21.0**，5/5 通过、0 失败、0 跳过。未提供 `DSH_UNLIMIT_RUNTIME` 时，这些官方隔离项明确跳过，不能被当作已经通过。
+新增规则选择回归在真实 SystemPrompt 与 renderer 中依次验证同模型 A 激活、编辑 A、切换 B、编辑 B，并核对其他模型使用保存正文、全局规则与模型优先级；每次只有预期正文出现，schema 保持，revert 恢复原始官方组装。规则库输入是合成对象；另由 `tests/runtime.test.mjs` 覆盖临时 SQLite 保存/激活到实际适配器组装的路径，以及跨模型的工作区 fallback。
+
+当前实际使用 DSH bundled Node **v24.21.0**，6/6 通过、0 失败、0 跳过。未提供 `DSH_UNLIMIT_RUNTIME` 时，这些官方隔离项明确跳过，不能被当作已经通过。新增场景没有调用真实模型或安装插件。

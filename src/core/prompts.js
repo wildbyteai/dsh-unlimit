@@ -14,9 +14,11 @@ const PERSONA_SECTIONS = new Set([
 ]);
 
 export function selectedRule(library, model) {
+  const active = library.items.find((item) => item.id === library.activeId);
+  if (active?.model && active.model === model) return active;
   return (
     library.items.find((item) => item.model && item.model === model) ??
-    library.items.find((item) => item.id === library.activeId)
+    (active?.model ? undefined : active)
   );
 }
 
