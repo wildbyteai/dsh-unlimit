@@ -208,7 +208,7 @@ async function eventually(check, message) {
   assert.fail(message);
 }
 
-async function fixture(t, { optional = true, admitted = true } = {}) {
+async function fixture(t, { optional = true, admitted = true, onMount } = {}) {
   const api = await loadOfficial();
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "dsh-unlimit-plugin-")));
   const host = {
@@ -276,6 +276,7 @@ async function fixture(t, { optional = true, admitted = true } = {}) {
     inject: ["webServer", "connection"],
     apply(scope) {
       controller = mount(scope, host);
+      onMount?.(controller, scope);
     },
   });
   const dispose = async () => {
@@ -292,7 +293,7 @@ async function fixture(t, { optional = true, admitted = true } = {}) {
   });
   await plugin.await();
   assert.ok(controller, "required services must activate mount");
-  if (admitted) {
+  if (admitted && plugin.uid !== null) {
     const clock = controller.admission.clock;
     controller.admission.clock = () => 0;
     const { challengeId } = controller.admission.dispatch("admission.begin");
@@ -304,7 +305,7 @@ async function fixture(t, { optional = true, admitted = true } = {}) {
     });
     controller.admission.clock = clock;
   }
-  if (optional)
+  if (optional && plugin.uid !== null)
     await eventually(
       () => ctx.tools.get("unlimit_workspace") !== undefined,
       "real ToolRuntime never received plugin tools",
@@ -395,6 +396,140 @@ async function fixture(t, { optional = true, admitted = true } = {}) {
     originalApproval,
   };
 }
+
+test(
+  "auto reapply does not start from a queued injection after its parent is disposed",
+  hostOnly,
+  async (t) => {
+    let applications = 0;
+    let closed = false;
+    let readsAfterClose = 0;
+    const f = await fixture(t, {
+      onMount(controller, scope) {
+        const saved = controller.store.dispatch("settings.get");
+        controller.store.dispatch("settings.save", {
+          revision: saved.revision,
+          value: { ...saved.value, enabled: true, autoReapply: true },
+        });
+        const apply = controller.runtime.apply.bind(controller.runtime);
+        controller.runtime.apply = () => {
+          applications++;
+          return apply();
+        };
+        const dispatch = controller.store.dispatch.bind(controller.store);
+        const close = controller.store.close.bind(controller.store);
+        controller.store.dispatch = (...args) => {
+          if (closed) readsAfterClose++;
+          return dispatch(...args);
+        };
+        controller.store.close = () => {
+          close();
+          closed = true;
+        };
+        void scope.fiber.dispose();
+      },
+    });
+    await new Promise(setImmediate);
+    assert.equal(f.plugin.uid, null);
+    assert.equal(closed, true);
+    assert.equal(applications, 0);
+    assert.equal(readsAfterClose, 0);
+    assert.equal(f.controller.runtime.enabled, false);
+    assert.equal(f.routes.size, 0);
+  },
+);
+
+test(
+  "saved auto reapply restores once per load and preserves settings across reload",
+  hostOnly,
+  async (t) => {
+    let applications = 0;
+    const track = (controller) => {
+      const apply = controller.runtime.apply.bind(controller.runtime);
+      controller.runtime.apply = () => {
+        applications++;
+        return apply();
+      };
+    };
+    const f = await fixture(t, {
+      onMount(controller) {
+        const saved = controller.store.dispatch("settings.get");
+        controller.store.dispatch("settings.save", {
+          revision: saved.revision,
+          value: {
+            ...saved.value,
+            enabled: true,
+            autoReapply: true,
+            prompt: "SYNTHETIC_RELOAD",
+          },
+        });
+        track(controller);
+      },
+    });
+    await eventually(() => f.controller.runtime.enabled, "initial auto reapply did not activate");
+    await f.controller.dispatch("status");
+    assert.equal(applications, 1);
+    await f.dispose();
+    let reloaded;
+    const replacement = f.ctx.plugin({
+      name: "synthetic-dsh-unlimit-reloaded",
+      inject: ["webServer", "connection"],
+      apply(scope) {
+        reloaded = mount(scope, f.host);
+        track(reloaded);
+      },
+    });
+    t.after(() => replacement.dispose());
+    await replacement.await();
+    await eventually(() => reloaded.runtime.enabled, "reloaded auto reapply did not activate");
+    await reloaded.dispatch("status");
+    assert.equal(applications, 2);
+    const settings = reloaded.store.dispatch("settings.get").value;
+    assert.equal(settings.enabled, true);
+    assert.equal(settings.autoReapply, true);
+    assert.equal(settings.prompt, "SYNTHETIC_RELOAD");
+    const assembly = await f.ctx.systemPrompt.assemble();
+    assert.ok(assembly.sections.some((section) => section.text === "SYNTHETIC_RELOAD"));
+    await replacement.dispose();
+    assert.equal(reloaded.runtime.enabled, false);
+    assert.equal(f.routes.size, 0);
+  },
+);
+
+test(
+  "dispose waits for an accepted asynchronous auto reapply before closing its store",
+  hostOnly,
+  async (t) => {
+    const entered = Promise.withResolvers();
+    const gate = Promise.withResolvers();
+    let registered = false;
+    const f = await fixture(t, {
+      onMount(controller) {
+        const saved = controller.store.dispatch("settings.get");
+        controller.store.dispatch("settings.save", {
+          revision: saved.revision,
+          value: { ...saved.value, enabled: true, autoReapply: true },
+        });
+        controller.repeat.apply = async () => {
+          entered.resolve();
+          await gate.promise;
+          registered = true;
+        };
+        controller.repeat.revert = async () => {
+          registered = false;
+        };
+      },
+    });
+    await entered.promise;
+    const disposing = f.dispose();
+    gate.resolve();
+    await disposing;
+    assert.equal(registered, false);
+    assert.equal(f.controller.runtime.enabled, false);
+    assert.equal(f.routes.size, 0);
+    assert.throws(() => f.controller.store.dispatch("settings.get"), /closed|open|database/i);
+  },
+);
 
 test(
   "catalog scope and local templates share real model-tool and HTTP entry points",

@@ -495,3 +495,104 @@ test("fallback ignores unavailable selected paths when an effective prompt or ru
   f.library.items[0].content = "\n";
   await assert.rejects(f.ctx.systemPrompt.assemble(context), { code: "RULE_NOT_FOUND" });
 });
+
+function retainedControls(f) {
+  const decide = f.ctx.approval.decide;
+  const resolve = f.ctx.sandboxPolicy.resolve;
+  const depth = f.ctx.subagents.config.maxDepth;
+  const count = f.ctx.subagents.config.maxActiveSubagents;
+  return {
+    approval: (...args) => decide.apply(f.ctx.approval, args),
+    sandbox: (...args) => resolve.apply(f.ctx.sandboxPolicy, args),
+    depth: () => depth.get(),
+    count: () => count.get(),
+  };
+}
+async function expectNativeControls(saved, f) {
+  assert.equal(await saved.approval({}), "rejected");
+  assert.deepEqual(saved.sandbox(), {
+    mode: "read-only",
+    workspaceRoot: f.directory,
+    sessionId: "synthetic",
+  });
+  assert.equal(saved.depth(), 3);
+  assert.equal(saved.count(), 4);
+}
+
+for (const externalOwner of [false, true])
+  test(`revoked permission and limit references stay inert${externalOwner ? " inside later owners" : " after normal disposal"}`, async (t) => {
+    const f = fixture(t, { enabled: true });
+    f.runtime.apply();
+    const saved = retainedControls(f);
+    let outer;
+    if (externalOwner) {
+      outer = {
+        decide: (...args) => saved.approval(...args),
+        resolve: (...args) => saved.sandbox(...args),
+        depth: { get: () => saved.depth() },
+        count: { get: () => saved.count() },
+      };
+      f.ctx.approval.decide = outer.decide;
+      f.ctx.sandboxPolicy.resolve = outer.resolve;
+      f.ctx.subagents.config.maxDepth = outer.depth;
+      f.ctx.subagents.config.maxActiveSubagents = outer.count;
+      assert.throws(() => f.runtime.revert(), AggregateError);
+      assert.equal(f.ctx.approval.decide, outer.decide);
+      assert.equal(f.ctx.sandboxPolicy.resolve, outer.resolve);
+      assert.equal(f.ctx.subagents.config.maxDepth, outer.depth);
+      assert.equal(f.ctx.subagents.config.maxActiveSubagents, outer.count);
+    } else f.runtime.revert();
+    // Lifecycle disposal preserves the durable enabled setting for autoReapply.
+    // Retained callbacks must use native behavior even before the store closes.
+    await expectNativeControls(saved, f);
+    t.mock.method(f.runtime.store, "dispatch", () => {
+      throw new Error("Synthetic store is closed");
+    });
+    await expectNativeControls(saved, f);
+  });
+
+test("reactivation cannot revive permission or limit callbacks from a previous activation", async (t) => {
+  const f = fixture(t, { enabled: true });
+  f.runtime.apply();
+  const previous = retainedControls(f);
+  f.runtime.revert();
+  f.settings.maxDepth = 6;
+  f.settings.maxSubagents = 7;
+  f.runtime.apply();
+  const reads = f.reads.length;
+  await expectNativeControls(previous, f);
+  assert.equal(f.reads.length, reads, "obsolete callbacks must not read new configuration");
+  assert.equal(await f.ctx.approval.decide({}), "allowed-once");
+  assert.equal(f.ctx.sandboxPolicy.resolve().mode, "danger-full-access");
+  assert.equal(f.ctx.subagents.config.maxDepth.get(), 6);
+  assert.equal(f.ctx.subagents.config.maxActiveSubagents.get(), 7);
+});
+
+test("sandbox resolution does not apply full access if native resolution revokes the activation", (t) => {
+  const f = fixture(t, { enabled: true });
+  const native = { mode: "read-only", workspaceRoot: f.directory, sessionId: "synthetic" };
+  f.ctx.sandboxPolicy.resolve = function (request) {
+    assert.equal(this, f.ctx.sandboxPolicy);
+    assert.equal(request.marker, "synthetic-request");
+    f.runtime.revert();
+    return native;
+  };
+  f.runtime.apply();
+  const resolve = f.ctx.sandboxPolicy.resolve;
+  assert.equal(resolve.call(f.ctx.sandboxPolicy, { marker: "synthetic-request" }), native);
+});
+
+test("failed activation invalidates permission wrappers retained during setup", async (t) => {
+  const f = fixture(t, { enabled: true });
+  let saved;
+  f.runtime.nativeInstructions.apply = () => {
+    saved = retainedControls(f);
+    throw new Error("Synthetic setup failed");
+  };
+  assert.throws(() => f.runtime.apply(), /Synthetic setup failed/);
+  assert.equal(f.runtime.enabled, false);
+  t.mock.method(f.runtime.store, "dispatch", () => {
+    throw new Error("Synthetic store is closed");
+  });
+  await expectNativeControls(saved, f);
+});

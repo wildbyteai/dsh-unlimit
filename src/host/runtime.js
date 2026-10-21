@@ -163,6 +163,7 @@ export class DesktopRuntime {
           "decide",
           (original) =>
             async function (request, ...args) {
+              if (runtime.#activation !== activation) return original.call(this, request, ...args);
               const config = runtime.settings();
               const session = args[0] ?? request.agent?.session;
               const explicit = session && this.overrideOf?.(session);
@@ -179,6 +180,7 @@ export class DesktopRuntime {
           (original) =>
             function (...args) {
               const resolved = original.apply(this, args);
+              if (runtime.#activation !== activation) return resolved;
               const config = runtime.settings();
               const request = args[0] ?? {};
               const explicit =
@@ -202,6 +204,7 @@ export class DesktopRuntime {
         if (typeof subagents?.[field]?.get !== "function") continue;
         pending.push(
           replaceReference(subagents, field, (original) => {
+            if (runtime.#activation !== activation) return original.get();
             const config = runtime.settings();
             return config.enabled ? config[setting] : original.get();
           }),

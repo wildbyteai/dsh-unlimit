@@ -185,6 +185,7 @@ export function mount(ctx, host) {
     });
   });
   ctx.inject(["systemPrompt", "approval", "sandboxPolicy"], async (scope) => {
+    if (ctx.fiber.uid === null || scope.fiber.uid === null) return;
     runtime.ctx = scope;
     repeat.ctx = scope;
     readLimits.ctx = scope;

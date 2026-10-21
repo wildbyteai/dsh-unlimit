@@ -58,3 +58,9 @@
 ## 已验证
 
 使用 bundled Node24 执行 `node --test tests/environment.test.mjs`，全部为新建临时目录与虚构值，覆盖持久化脱敏、遗漏秘密保留、单项删除、内部明确名单解析、修订冲突、排他锁、原子写失败、异常脱敏、主机规范化、密钥元信息不读字节、路径/链接/权限拒绝、首次配置/跳过及数据根隔离。没有访问真实 profile、密钥或网络。
+
+## 通用进程路径的接口核对（2026-10-21）
+
+已只读核对与发行库存一致的 `dsh-subprocess`、`dsh-subprocess-local`、`dsh-sandbox`、`dsh-sandbox-local`、`dsh-sandbox-policy`、`dsh-user-approval` 和 jobs 接口。官方 `sandbox.confine(argv, policy, signal)` 可配合 `subprocess.spawn` 启动精确参数进程，但 subprocess 自身不做会话权限或批准。`ApprovalService.request` 要求真实打开中的 turn；当前 Controller/UI 没有该执行上下文，不能用拼造 agent/turn 或直接 raw spawn 代替审批。安装 tool-bash 入口摘要不符，核对时使用已有固定公开归档，未执行该安装入口或读取其备份。
+
+后续适配需要在真实模型工具 `execution.agent` 中取得会话权限，走官方审批、沙箱及进程句柄；输出按 offset 读回并披露 lossy，停止只针对本插件保存的句柄并等待 done 与 waitForExit。macOS 官方进程树归属不保证收回逃离的后代。以上是接口调查，没有新增通用 start/output/stop，也没有执行命令、网络任务或真实会话。`ENV-PROCESS` 继续保留缺口。
