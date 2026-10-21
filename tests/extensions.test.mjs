@@ -135,6 +135,83 @@ test("an apply failure rolls back the exact config descriptor and permits a clea
   assert.deepEqual(Object.getOwnPropertyDescriptor(f.config, "enabled"), before);
 });
 
+test("retained log references are revoked before store closure and never revived by reapply", () => {
+  const f = fixture();
+  f.settings.enabled = true;
+  f.extensions.apply();
+  const retained = f.config.enabled;
+  assert.equal(retained.get(), false);
+  f.extensions.revert();
+  assert.equal(retained.get(), true, "saved enabled state must not keep a revoked overlay active");
+  const dispatch = f.store.dispatch;
+  f.store.dispatch = () => assert.fail("revoked reference must not read a closed store");
+  assert.equal(retained.get(), true);
+  f.store.dispatch = dispatch;
+  f.extensions.apply();
+  assert.notEqual(f.config.enabled, retained);
+  assert.equal(f.config.enabled.get(), false);
+  f.store.dispatch = () => assert.fail("a new registration must not revive an old reference");
+  assert.equal(retained.get(), true);
+  f.extensions.revert();
+});
+
+test("ownership conflicts revoke retained log references while preserving the external owner", () => {
+  for (const observe of ["capabilities", "apply", "revert"]) {
+    const f = fixture();
+    f.settings.enabled = true;
+    f.extensions.apply();
+    const retained = f.config.enabled;
+    const external = Object.freeze({ get: () => false });
+    f.config.enabled = external;
+    if (observe === "capabilities") {
+      assert.equal(
+        f.extensions.capabilities().find((item) => item.id === "sessionLogUpload").state,
+        "unsupported",
+      );
+    } else {
+      assert.throws(
+        () => f.extensions[observe](),
+        (error) => error.code === "CONFLICT",
+      );
+    }
+    f.store.dispatch = () => assert.fail("conflicted reference must not read a closed store");
+    assert.equal(retained.get(), true);
+    assert.equal(f.config.enabled, external);
+    if (observe !== "revert") {
+      assert.throws(
+        () => f.extensions.revert(),
+        (error) => error.code === "CONFLICT",
+      );
+    }
+  }
+});
+
+test("failed setup revokes a captured log reference before rollback and clean retry", () => {
+  const f = fixture();
+  f.settings.enabled = true;
+  let retained;
+  let calls = 0;
+  f.ctx.configEditor.entries = () => {
+    if (++calls === 2) {
+      retained = f.config.enabled;
+      throw new Error("synthetic setup failure");
+    }
+    return [f.entry];
+  };
+  assert.throws(() => f.extensions.apply(), /synthetic setup failure/);
+  assert.equal(f.config.enabled, f.original);
+  const dispatch = f.store.dispatch;
+  f.store.dispatch = () => assert.fail("failed setup reference must not read a closed store");
+  assert.equal(retained.get(), true);
+  f.store.dispatch = dispatch;
+  f.ctx.configEditor.entries = () => [f.entry];
+  f.extensions.apply();
+  assert.equal(f.config.enabled.get(), false);
+  f.store.dispatch = () => assert.fail("retry must not revive the failed setup reference");
+  assert.equal(retained.get(), true);
+  f.extensions.revert();
+});
+
 test("external ref replacement and host remounts are visible and never overwritten", () => {
   const f = fixture();
   f.extensions.apply();
@@ -155,7 +232,9 @@ test("external ref replacement and host remounts are visible and never overwritt
   assert.equal(f.config.enabled, external);
 
   const g = fixture();
+  g.settings.enabled = true;
   g.extensions.apply();
+  const retained = g.config.enabled;
   const newConfig = { enabled: Object.freeze({ get: () => true }) };
   g.entry.fiber.config = newConfig;
   assert.equal(
@@ -166,6 +245,8 @@ test("external ref replacement and host remounts are visible and never overwritt
     () => g.extensions.apply(),
     (error) => error.code === "CONFLICT",
   );
+  g.store.dispatch = () => assert.fail("remounted reference must not read a closed store");
+  assert.equal(retained.get(), true);
   g.extensions.revert();
   assert.equal(newConfig.enabled.get(), true);
   assert.equal(g.config.enabled, g.original);

@@ -46,8 +46,10 @@ export class HostExtensions {
     const owned = this.#registration;
     const current =
       owned &&
+      owned.activation.active &&
       target.container === owned.container &&
       owned.container.enabled === owned.replacement;
+    if (owned && !current) owned.activation.active = false;
     const logReason =
       owned && !current
         ? "日志引用已被宿主或其他插件替换；请还原并重新检查，未覆盖新引用"
@@ -82,9 +84,11 @@ export class HostExtensions {
     if (this.#registration) {
       const target = logTarget(this.ctx);
       if (
+        !this.#registration.activation.active ||
         target.container !== this.#registration.container ||
         this.#registration.container.enabled !== this.#registration.replacement
       ) {
+        this.#registration.activation.active = false;
         throw conflict("日志配置已由其他所有者改变，未覆盖");
       }
       return this.capabilities();
@@ -94,20 +98,23 @@ export class HostExtensions {
     const { container, descriptor } = target;
     const original = descriptor.value;
     const store = this.store;
+    const activation = { active: true };
     // The reference itself is frozen in the official runtime. Preserve its
     // symbol protocol and owning runtime's update closure; replace the field,
     // not original.get(), so host volatile updates continue to reach it.
     const replacement = Object.freeze({
       ...original,
       get() {
+        if (!activation.active) return original.get();
         return store.dispatch("settings.get", {}).value.enabled ? false : original.get();
       },
     });
     try {
       Object.defineProperty(container, "enabled", { ...descriptor, value: replacement });
-      this.#registration = { container, descriptor, replacement };
+      this.#registration = { container, descriptor, replacement, activation };
       return this.capabilities();
     } catch (error) {
+      activation.active = false;
       if (container.enabled === replacement)
         Object.defineProperty(container, "enabled", descriptor);
       this.#registration = null;
@@ -118,6 +125,7 @@ export class HostExtensions {
   revert() {
     const owned = this.#registration;
     if (!owned) return;
+    owned.activation.active = false;
     if (owned.container.enabled !== owned.replacement) {
       this.#registration = null;
       throw conflict("日志配置已被其他所有者替换，保留其修改；本插件未覆盖");
