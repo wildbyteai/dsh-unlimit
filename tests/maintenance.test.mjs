@@ -314,6 +314,7 @@ test("controller persists disarm and admission revocation before cleanup and rem
   };
   const result = await f.controller.dispatch("maintenance.uninstall", payload);
   assert.equal(result.removed, true);
+  assert.deepEqual(result.prepared.promptHistory, { status: "not-restored", scanned: false });
   assert.equal(result.prepared.controlsDisabled, true);
   assert.equal(result.prepared.admissionRevoked, true);
   assert.deepEqual(
@@ -358,6 +359,10 @@ test("preparation failure continues independent cleanup, skips removal and can b
     assert.equal(error.code, "UNINSTALL_PREPARATION_FAILED");
     assert.equal(error.partial.managerCalled, false);
     assert.equal(error.partial.removed, false);
+    assert.deepEqual(error.partial.prepared.promptHistory, {
+      status: "not-restored",
+      scanned: false,
+    });
     assert.equal(error.partial.prepared.controlsDisabled, true);
     assert.equal(error.partial.prepared.admissionRevoked, true);
     assert.deepEqual(

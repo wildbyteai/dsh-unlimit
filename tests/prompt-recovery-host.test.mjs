@@ -18,6 +18,84 @@ const systemWire = (body) =>
   ]);
 const owner = { version: 1, owner: "managed-prompt" };
 
+test(
+  "official DeepSeek cold history can retain a managed prompt after plugin scope disposal",
+  options,
+  async (t) => {
+    const target = targets[0];
+    const f = await rewindProtocolFixture(t, runtimeRoot, target, { unloadableRuntime: true });
+    const marker = "SYNTHETIC_REMOVED_PLUGIN_PROMPT";
+    const baseline = "SYNTHETIC_HOST_AFTER_PLUGIN_REMOVAL";
+    f.ctx.systemPrompt.section({
+      name: "fixture:baseline",
+      order: 100,
+      text: baseline,
+      interpolate: false,
+    });
+    f.settings.prompt = marker;
+    const agentOptions = { provider: target.id, model: target.model };
+    const first = await f.ctx.agents.create({
+      sessionId: "synthetic-unloaded-prompt",
+      meta: { cwd: join(f.directory, "project") },
+      agentOptions,
+    });
+    assert.equal((await f.follow(first.agent, "SYNTHETIC_BEFORE_UNLOAD")).kind, "completed");
+    assert.ok(systemWire(f.captures.at(-1).body).includes(marker));
+    const before = await f.durable(first.agent);
+    await first.dispose();
+    f.settings.enabled = false;
+    await f.unloadRuntime();
+    assert.equal(f.ctx.agents.get(first.agent.id), undefined);
+    assert.equal(
+      f.captures.length,
+      1,
+      "Closing and unloading must not send a synthetic cleanup turn",
+    );
+    const cold = await f.ctx.agents.resume({ resumeSessionId: first.agent.id, agentOptions });
+    try {
+      const resumed = (await f.durable(cold.agent)).events;
+      assert.deepEqual(
+        resumed.slice(0, before.events.length),
+        before.events,
+        "Unloading must not rewrite idle history",
+      );
+      assert.deepEqual(
+        resumed.slice(before.events.length).map(({ type, data }) => ({ type, data })),
+        [{ type: "session/end-seed", data: {} }],
+        "Official resume adds only its native seed marker before user input",
+      );
+      assert.equal((await f.follow(cold.agent, "SYNTHETIC_AFTER_UNLOAD")).kind, "completed");
+      const wire = systemWire(f.captures.at(-1).body);
+      assert.ok(
+        wire.includes(marker),
+        "Known gap: removal alone does not clear the historical prompt",
+      );
+      assert.ok(wire.includes(baseline));
+      assert.deepEqual(
+        (await f.durable(cold.agent)).events.slice(0, before.events.length),
+        before.events,
+      );
+    } finally {
+      await cold.dispose();
+    }
+    const fresh = await f.ctx.agents.create({
+      sessionId: "synthetic-fresh-after-unload",
+      meta: { cwd: join(f.directory, "project") },
+      agentOptions,
+    });
+    try {
+      assert.equal((await f.follow(fresh.agent, "SYNTHETIC_FRESH_INPUT")).kind, "completed");
+      const wire = systemWire(f.captures.at(-1).body);
+      assert.equal(wire.includes(marker), false);
+      assert.ok(wire.includes(baseline));
+      await f.durable(fresh.agent);
+      assert.equal(f.captures.length, 3);
+    } finally {
+      await fresh.dispose();
+    }
+  },
+);
+
 for (const target of targets)
   for (const mode of ["replace", "append"]) {
     test(

@@ -35,7 +35,12 @@ export const targets = [
   },
 ];
 
-export async function rewindProtocolFixture(t, runtimeRoot, target, { retry = false } = {}) {
+export async function rewindProtocolFixture(
+  t,
+  runtimeRoot,
+  target,
+  { retry = false, unloadableRuntime = false } = {},
+) {
   const forbiddenCalls = [];
   const deny = (name) =>
     function () {
@@ -211,6 +216,7 @@ export async function rewindProtocolFixture(t, runtimeRoot, target, { retry = fa
     fibers.push(fiber);
     await fiber.await();
     assert.equal(fiber.state, 2, "Every required official service must mount successfully");
+    return fiber;
   };
   const captures = [];
   const snapshots = [];
@@ -606,12 +612,21 @@ export async function rewindProtocolFixture(t, runtimeRoot, target, { retry = fa
   if (retry) await mount(api.retry);
   await mount(api.loop.AgentLoop, { agents: [], maxParallelToolCalls: 1 });
   await mount(api.controller.SessionController, { nativeOpen: false, listWorkSliceMs: 16 });
-  runtime = new DesktopRuntime(ctx, runtimeStore, {
-    supported: true,
-    version: manifest.release.version,
-    runtimeRoot: root,
-  });
-  runtime.apply();
+  const startRuntime = (scope) => {
+    runtime = new DesktopRuntime(scope, runtimeStore, {
+      supported: true,
+      version: manifest.release.version,
+      runtimeRoot: root,
+    });
+    runtime.apply();
+  };
+  let runtimeFiber;
+  if (unloadableRuntime) {
+    runtimeFiber = await mount((scope) => {
+      startRuntime(scope);
+      scope.effect(() => () => runtime.revert());
+    });
+  } else startRuntime(ctx);
   desktop = new DesktopSessions(ctx, store);
   const create = async () => {
     const created = await ctx.sessionController.create({ cwd: join(directory, "project") });
@@ -650,6 +665,12 @@ export async function rewindProtocolFixture(t, runtimeRoot, target, { retry = fa
     workspaceId,
     settings,
     runtime,
+    unloadRuntime: async () => {
+      assert.ok(runtimeFiber, "Enable unloadableRuntime to isolate the plugin lifetime");
+      await runtimeFiber.dispose();
+      assert.equal(runtimeFiber.uid, null);
+      assert.equal(runtime.enabled, false);
+    },
     create,
     follow,
     durable,

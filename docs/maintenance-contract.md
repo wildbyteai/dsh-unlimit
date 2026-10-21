@@ -34,6 +34,14 @@ HTTP 接口为 `maintenance.uninstall`，请求必须为 `{bundle:"dsh-unlimit",
 
 官方卸载可能在返回前释放本插件和关闭数据库。在途 HTTP handler 仍持有响应，路由注销只影响后续匹配；卸载后的处理只使用捕获的管理器和普通回执值，不再读取 store/status。界面停止轮询并显示回执，之后的本插件请求可能为 404，不能继续把它们当作状态查询通道。
 
+## 历史提示词与插件移除
+
+`prepared.promptHistory` 固定返回 `{status:"not-restored", scanned:false}`：这是本次准备链没有扫描或批量恢复历史会话的事实，不表示每个会话都存在残留。失败的部分回执也保留该字段；缺字段的旧回执显示“未返回恢复证据”。`controlsDisabled:true` 只表示禁用运行控制，不表示历史提示词已清除。
+
+恢复历史正文的监听器属于插件作用域。插件仍加载时，冷恢复的下一次正常请求可恢复宿主正文；完全释放插件作用域后，该监听器已不存在。`tests/prompt-recovery-host.test.mjs` 在 0.2.1-rc.2 的真实 Cordis、Session、AgentLoop 和 DeepSeek 适配器中复现：关闭会话 → 释放插件作用域 → 恢复会话 → 人工合成输入，旧自写正文仍进入请求；卸载后的新会话不含该正文。模型传输为合成，没有真实安装或卸载。
+
+确认页、维护说明与终态回执均说明此限制，并建议移除后的新会话使用路径；不自动发送清理消息，不改写旧日志，不把新建会话建议当作旧会话已恢复。完全卸载后的历史恢复仍为 DESK-REVERT 的差距。
+
 ## 资料保留与重启
 
 默认保留本插件整个数据目录，包括 `workspace.sqlite` 中的业务记录、规则、导入技能和材料，以及官方技能和无关文件。清理仅撤销本安装的演练使用确认与运行控制，不递归删除资料目录。重新加载同一数据根时须重新确认演练使用。
@@ -67,6 +75,6 @@ DSH_UNLIMIT_RUNTIME="/path/to/dsh" node --test tests/maintenance-host.test.mjs
 - 临时 profile 中仅移除自身依赖声明和选择，其他 bundle/字段保持；用户技能、插件导入技能、材料及无关文件字节保留。有效 SQLite 重开后其他记录保留，演练确认已撤销，关闭后 store 读取计数为零。
 - 真实管理器无 HMR 时返回 `stop-profile`；包管理器失败和假退出 0 却未移除依赖都不报告完成；安装自带条目拒绝且不做准备。另用合成 `cancelled` 响应验证失败语义。
 
-包管理器 `runPnpm` 是假边界，只接受 `remove dsh-unlimit` 并修改临时依赖声明，没有执行 pnpm、删除实际包、访问外网或启动子进程。HMR/Loader 后端也是假边界，负责按选择变化释放测试 fiber；没有验证真实 HMR 重组。测试使用真实维护适配器和 HTTP handler，但没有挂载完整 Controller/桌面 UI；控制器准备链、并发和HTTP部分回执由maintenance.test.mjs的10项覆盖；maintenance-ui.test.mjs有8项界面流程测试，实际1280×720合成预览另见 [验证记录](verification.md#预览交互记录)。
+包管理器 `runPnpm` 是假边界，只接受 `remove dsh-unlimit` 并修改临时依赖声明，没有执行 pnpm、删除实际包、访问外网或启动子进程。HMR/Loader 后端也是假边界，负责按选择变化释放测试 fiber；没有验证真实 HMR 重组。测试使用真实维护适配器和 HTTP handler，但没有挂载完整 Controller/桌面 UI；控制器准备链、并发和HTTP部分回执由maintenance.test.mjs的10项覆盖；maintenance-ui.test.mjs有9项界面流程测试，实际1280×720合成预览另见 [验证记录](verification.md#预览交互记录)。
 
 真实桌面安装/卸载、实际 pnpm 文件处理、完整 HMR、外部官方管理器卸载、Windows 和桌面重启仍未验收。临时隔离证据不能提高这些条目的验收层级。

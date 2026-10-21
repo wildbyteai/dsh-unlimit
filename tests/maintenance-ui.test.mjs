@@ -8,6 +8,7 @@ import {
 } from "../web/maintenance.js";
 
 const prepared = {
+  promptHistory: { status: "not-restored", scanned: false },
   controlsDisabled: true,
   admissionRevoked: true,
   steps: [
@@ -180,4 +181,23 @@ test("successful restart-required receipt stays read-only and instructs the user
   assert.match(html, /稍后自行重启宿主/);
   assert.match(html, /不会自动重启宿主/);
   assert.doesNotMatch(html, /<button/);
+});
+
+test("removal receipt separates package removal from unrestored prompt history", () => {
+  for (const text of [
+    uninstallConfirmation,
+    uninstallSection({ available: true }),
+    renderReceipt({ receipt: removed }),
+  ]) {
+    assert.match(text, /卸载不会批量恢复旧会话中的提示词/);
+    assert.match(text, /卸载后旧会话可能保留原正文/);
+    assert.match(text, /本操作不会自动发送消息/);
+  }
+  assert.match(
+    renderReceipt({ receipt: removed }),
+    /历史会话提示词<\/span><span>未批量恢复（未扫描历史会话）/,
+  );
+  const legacy = renderReceipt({ receipt: { ...removed, prepared: { controlsDisabled: true } } });
+  assert.match(legacy, /历史会话提示词<\/span><span>未返回恢复证据/);
+  assert.doesNotMatch(legacy, /历史会话提示词<\/span><span>已/);
 });

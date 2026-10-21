@@ -256,6 +256,8 @@ export class Controller {
 
   async prepareUninstall() {
     const prepared = {
+      // Disabling runtime registrations does not rewrite closed session journals.
+      promptHistory: { status: "not-restored", scanned: false },
       controlsDisabled: false,
       admissionRevoked: false,
       steps: [],

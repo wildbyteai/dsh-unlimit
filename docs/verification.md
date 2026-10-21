@@ -753,3 +753,14 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 - 修改共用夹具后，全量官方隔离回归 **1090 通过、0 失败、0 跳过**；上述实际 shell 探针独立运行，不包含在 1090 中。语法 **192/192**、有限来源检查、**54 模块**分层检查通过。构建及离线打包成功，76 个发布文件；包 SHA-256 `d74bdddf67266b56a64140b3052b068dd7c8a0986a271aca677f00c590bf46de`，与上一批一致。
 
 复验命令和覆盖表见 [文件权限合同](file-permissions-contract.md#完整-standard-文件与-shell-权限对照2026-10-21)。这批证明固定文件写入在官方文件后端与标准 shell/Seatbelt 下的效果一致，不证明持久 PTY 权限切换、所有内核边界、shell 升权重试或真实审批 UI。未安装或重载插件、未改真实 DSH 配置/profile/会话，真实来源说明及 117 项原验收保留。
+
+## 卸载回执中的历史提示词范围（2026-10-21）
+
+基于 `4037ceff43c9f689e25fc26ffde494b1db19a49f`，修正工作台卸载确认和回执的说明缺口，没有实现或宣称完全卸载后的历史提示词恢复。准备链返回 `promptHistory:{status:"not-restored",scanned:false}`；成功和失败回执均保留，缺字段时不推断恢复成功。
+
+- `tests/prompt-recovery-host.test.mjs` **9 通过**：新增真实 Cordis 插件作用域释放后，DeepSeek 旧会话冷恢复仍携带自写提示词的复现；新会话不含该残留。三个合成模型请求，完整 JSONL 前缀保留，关闭、释放和恢复均不自动发消息。首次新增断言误将官方 resume 自动追加的 `session/end-seed` 视为日志改写；核对 Session 构造器后改为精确检查原前缀与唯一原生标记，没有修改宿主行为或既定验收目标。
+- Controller、维护和 UI 定向 **40 通过**；完整 `--expose-internals --test tests/*.test.mjs` **1092 通过、0 失败、0 跳过**。首轮环境 PATH 缺 `/opt/homebrew/bin`，仅 npm 打包测试 ENOENT；补齐工具路径后同一套全量测试通过，没有放宽断言。
+- **1280×720** 回环预览使用真实工作台页面、Controller 准备链和临时 SQLite，卸载管理器为合成。实际检查诊断说明、打开确认、取消、再次确认、只读回执和历史提示词字段；无 console error。截图 `artifacts/uninstall-history-preview.png`。预览进程退出 0，临时数据已由退出处理器清理，预览页已关闭。
+- 格式、192 项语法、有限来源与 54 模块分层检查通过。117 项原验收前五列保持。构建与离线打包通过：76 文件、326534 字节，SHA-256 `df8e71346b9925f04239ba84db82d3fdf2f8f1b3986e7ff87f7527b785df98af`。
+
+本批不包含真实桌面安装、卸载、HMR 或用户会话验收；没有读写真实 profile，没有调用真实模型。NOTICE、来源说明和 UNLICENSED 保留。旧会话提示词自动清理仍为明确缺口，不能把本次披露修复记为 1:1 完成。
