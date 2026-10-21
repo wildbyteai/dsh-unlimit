@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-21T03:59:23.701Z",
+  "behaviorId": "CORE-WEBTOOLS",
+  "status": "partial-official-isolation",
+  "target": {
+    "desktop": "0.2.1-rc.2",
+    "node": "v24.21.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "testResult": {
+    "tests": 10,
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0
+  },
+  "command": "DSH_UNLIMIT_RUNTIME=<official-runtime> DSH_UNLIMIT_WEBTOOLS_EVIDENCE=1 <bundled-node> --test tests/webtools-host.test.mjs",
+  "sourceDigests": [
+    {
+      "path": "tests/webtools-host.test.mjs",
+      "sha256": "7710d7c5547721fee19fbdf2f4222f72cac302e84d545444932758098b713b78"
+    },
+    {
+      "path": "tests/helpers/web-runtime.mjs",
+      "sha256": "d032b0414bf83e2c067a5613f1a6bf849384605ef2add74ff321199de2b98c73"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "WEB-PRESET-DECLARATIONS",
+      "result": "passed"
+    },
+    {
+      "id": "WEB-NATIVE-TEXT",
+      "result": "passed"
+    },
+    {
+      "id": "WEB-CHILD-HTML",
+      "result": "passed"
+    },
+    {
+      "id": "WEB-PLAN-FETCH",
+      "result": "passed"
+    },
+    {
+      "id": "WEB-UNAVAILABLE-PROVIDER",
+      "result": "passed"
+    },
+    {
+      "id": "WEB-AGENT-RESTRICTION",
+      "result": "passed"
+    },
+    {
+      "id": "WEB-PTC-DIRECT-BOUNDARY",
+      "result": "passed"
+    },
+    {
+      "id": "WEB-TOOL-DISPOSE",
+      "result": "passed"
+    },
+    {
+      "id": "WEB-LOOPBACK-NATIVE-REFUSAL",
+      "result": "passed"
+    }
+  ],
+  "entries": [
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session-projection/lib/index.js",
+      "sha256": "7dc2b212819baf4fc292751054d30b97afcbdee0a4733230abf92c6722e6550c",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-session/lib/index.js",
+      "sha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-plan-mode/lib/index.js",
+      "sha256": "39a825b066aefe948c3bd6bdb69f229d68436c8561a7058df2184abd6c5fd552",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js",
+      "sha256": "cf57e3ecd487ac5c2553455aaa5cef2c6fb41e6bd61be5aa455675d1d7193033",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web-app/presets/standard.patch.yml",
+      "sha256": "0d398d2a6872a73a106cb3bd19303ecccf1637e1fcad4d0bf9d8a72d2c2c68f5",
+      "matchesInventory": true,
+      "role": "preset-declaration-inspection-only"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web-app/presets/cordis.patch.yml",
+      "sha256": "01b0fc94fd49136b332254a7ae5658e43ffe646f7248047dba65d499cfc74596",
+      "matchesInventory": true,
+      "role": "preset-declaration-inspection-only"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web-app/presets/ptc.patch.yml",
+      "sha256": "9e355c947bf61c3d2fe9bf3214b386f83c0d99d37579ce22576d4b82cb6e1a2c",
+      "matchesInventory": true,
+      "role": "preset-declaration-inspection-only"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web-app/presets/minimal.patch.yml",
+      "sha256": "a2a9ba1c9c392a45466708f18bc0aefbf300577f9b544dc06049f73a8a5b3267",
+      "matchesInventory": true,
+      "role": "preset-declaration-inspection-only"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/cordis/lib/index.js",
+      "sha256": "6a9394c0877ff45218818c6e815edd038f8057e1a1deb390a8d43ec81c57691e",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/cosmokit/lib/index.js",
+      "sha256": "ba44c0871656e4c7cac2c3c8a2ff644e0d2eb9d6bda7f6355866d686d513268e",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-system-prompt/lib/index.js",
+      "sha256": "7be9f7aafbf345d01ddcc12fd297b16e9a1d41283a6a04073b867becca0bf020",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-agent/lib/index.js",
+      "sha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tools/lib/index.js",
+      "sha256": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web/lib/index.js",
+      "sha256": "994d4809416c9efbd5890ab81e41cf2e10427395cab3d42139d80881909f4e2a",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-tool-web/lib/index.js",
+      "sha256": "a8313d4e02c751f79d0f91dceb8dfcaa29e7c7a0299ab0d7f8db65471217b0c8",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-web-fetch-http/lib/index.js",
+      "sha256": "489fef91b0c11c063029ea7aed27b312817570b9c3177aeaa44983b9a25aedcd",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-http-proxy/lib/index.js",
+      "sha256": "5310861bc89788ea24be82a3b323e34cbd42b9e6214e2a179b2e6f92a8758cd5",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/@deepseek-ai/dsh-scope/lib/index.js",
+      "sha256": "2829df71d76e08941457d4dd173eac60783e55354921137c8b75e8b5c0d2ecca",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    },
+    {
+      "path": "node_modules/undici/index.js",
+      "sha256": "93fc85c00a59b58f410c901e5477d56770de3816bfbe183e751624aeb4a5e6a5",
+      "matchesInventory": true,
+      "role": "executed-official-entry"
+    }
+  ],
+  "presets": [
+    {
+      "id": "standard",
+      "includesWebTool": true,
+      "inspectionOnly": true
+    },
+    {
+      "id": "cordis",
+      "includesWebTool": true,
+      "inspectionOnly": true
+    },
+    {
+      "id": "ptc",
+      "includesWebTool": true,
+      "inspectionOnly": true
+    },
+    {
+      "id": "minimal",
+      "includesWebTool": false,
+      "inspectionOnly": true
+    }
+  ],
+  "text": {
+    "url": "https://page.invalid/text",
+    "pseudoInstructionReturnedAsBody": true,
+    "sourceInValueMetaAndRenderedHeader": true,
+    "systemPromptUnchanged": true,
+    "syntheticSessionUnchanged": true
+  },
+  "html": {
+    "url": "https://page.invalid/html",
+    "originalHtmlRetainedInCanonicalValue": true,
+    "activeMarkupOmittedFromModelText": true,
+    "pageInstructionRemainsData": true,
+    "exactChildIdentity": true
+  },
+  "plan": {
+    "realController": true,
+    "realSessionProjection": true,
+    "fetchExecuted": true
+  },
+  "ptc": {
+    "actualScopedPresentation": true,
+    "directWebFetchRefused": true,
+    "missingExecutorExplicit": true,
+    "executorStarted": false,
+    "nestedWebFetchExecuted": false
+  },
+  "isolation": {
+    "syntheticDnsCalls": 3,
+    "mockHttpDispatches": 3,
+    "sideEffectToolCalls": 0,
+    "realIoAttempts": [],
+    "fullAgentLoopExecuted": false,
+    "completePresetsMounted": false,
+    "realProfileLoaded": false,
+    "desktopInstalledOrReloaded": false
+  },
+  "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
+  "verifiedRuntimeFiles": 267,
+  "loopback": {
+    "listenerStarted": true,
+    "requests": [],
+    "listenerClosed": true,
+    "nativeResolverUnchanged": true,
+    "resultCode": "WEB_BLOCKED_URL",
+    "realDnsCalls": 0,
+    "outboundConnectionAttempts": 0,
+    "successfulLoopbackFetch": false
+  },
+  "boundaries": {
+    "actualToolRuntimeAndFetchTool": true,
+    "actualWebRuntimeAndHttpProvider": true,
+    "nativeAndPlanFetch": "synthetic DNS answers and Undici MockAgent dispatch; not a successful loopback fetch",
+    "liveLoopbackServer": "native public-only rejection, zero requests, closed after test",
+    "promptInjectionClaim": "tool result is labelled untrusted with source and causes no tool/service side effects; no model-behavior claim",
+    "ptc": "actual scoped presentation rejects direct web_fetch; no executor, nested program or complete preset",
+    "minimal": "inventory-verified default declaration has no web-tool plugin; complete preset not mounted"
+  },
+  "notVerified": [
+    "successful native loopback retrieval (blocked by the official public-only provider)",
+    "complete standard, cordis, minimal or PTC preset activation",
+    "PTC executor and nested web_fetch program",
+    "AgentLoop/model behavior after receiving the page",
+    "real desktop UI, installation, profile, Session history or reload",
+    "external target, real DNS, live search or country dataset",
+    "system or hostile in-process plugin isolation"
+  ],
+  "publicCI": "No official runtime is bundled; both top-level tests explicitly skip when DSH_UNLIMIT_RUNTIME is absent."
+}

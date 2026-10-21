@@ -24,7 +24,8 @@
     "cordis.patch.yml",
     "README.md",
     "NOTICE.md",
-    "docs"
+    "docs/user-guide.md",
+    "docs/ui-preview.png"
   ],
   "scripts": {
     "check": "node scripts/check.mjs && node scripts/provenance-check.mjs && node scripts/self-audit.mjs",
