@@ -15,6 +15,7 @@ import { DesktopRuntime } from "../../src/host/runtime.js";
 import { officialReadRuntime } from "./official-packages.mjs";
 import { createPtcProcessGuard } from "./ptc-process-guard.mjs";
 import { createMinimalTerminalGuard } from "./minimal-terminal-guard.mjs";
+import { createStandardShellGuard } from "./standard-shell-guard.mjs";
 
 export const presetProjectRoot = fileURLToPath(new URL("../../", import.meta.url));
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -34,11 +35,13 @@ export async function presetFixture(
     modelModalities,
     ptcExecution = false,
     terminalExecution = false,
+    shellExecution = false,
   } = {},
 ) {
   assert.ok(["standard", "minimal", "ptc"].includes(presetId));
   assert.equal(ptcExecution, presetId === "ptc", "PTC is an explicit standalone execution probe");
   if (terminalExecution) assert.equal(presetId, "minimal");
+  if (shellExecution) assert.equal(presetId, "standard");
   const marker = presetId.toUpperCase();
   const provider = `synthetic-${presetId}-offline`;
   const installedRoot = fs.realpathSync(selectedRoot);
@@ -63,7 +66,7 @@ export async function presetFixture(
     DSH_HOME: join(directory, "dsh-home"),
     DSH_AGENTS_HOME: join(directory, "agents-home"),
     DSH_BUNDLED_SKILL_DIR: join(directory, "bundled-skills"),
-    ...(terminalExecution
+    ...(terminalExecution || shellExecution
       ? {
           HOME: join(directory, "home"),
           TMPDIR: join(directory, "tmp"),
@@ -84,7 +87,7 @@ export async function presetFixture(
     join(homes.DSH_AGENTS_HOME, "skills"),
     homes.DSH_BUNDLED_SKILL_DIR,
     join(directory, "home"),
-    ...(terminalExecution ? [join(directory, "tmp")] : []),
+    ...(terminalExecution || shellExecution ? [join(directory, "tmp")] : []),
   ])
     fs.mkdirSync(path, { recursive: true });
   const sourceFile = join(workspace, "evidence.txt");
@@ -118,7 +121,7 @@ export async function presetFixture(
         t.mock.method(api, key, deny(`${label}.${key}`));
   syncBuiltinESMExports();
 
-  let runtime, ctx, adapter, ptc, minimalTerminal;
+  let runtime, ctx, adapter, ptc, minimalTerminal, standardShell;
   const handles = [],
     fibers = [],
     errors = [],
@@ -152,6 +155,7 @@ export async function presetFixture(
       await cleanup("context", () => ctx?.fiber.dispose());
       await cleanup("PTC processes", () => ptc?.verifyDisposed());
       await cleanup("minimal terminal processes", () => minimalTerminal?.verifyDisposed());
+      await cleanup("standard shell processes", () => standardShell?.verifyDisposed());
       officialLifecycleDisposed = cleanupErrors.length === 0;
       await cleanup("descriptors and installed entries", () => {
         assert.equal(directoryFsyncFds.size, 0, "All ancestor metadata handles must be closed");
@@ -196,6 +200,8 @@ export async function presetFixture(
       directory,
       forbidden,
     });
+  if (shellExecution)
+    standardShell = createStandardShellGuard(t, { installedRoot, workspace, directory, forbidden });
   assert.ok(
     runtime.verifiedFiles instanceof Map,
     "Shared Loader must record every actual official import",
@@ -206,13 +212,13 @@ export async function presetFixture(
   const ancestorMetadata = new Set();
   const platformMetadata = new Set();
   const metadataReads = [];
-  if (permissionPresets || presetId === "minimal") {
+  if (permissionPresets || presetId === "minimal" || shellExecution) {
     for (let ancestor = dirname(directory); ; ancestor = dirname(ancestor)) {
       ancestorMetadata.add(ancestor);
       if (dirname(ancestor) === ancestor) break;
     }
   }
-  if (permissionPresets) {
+  if (permissionPresets || shellExecution) {
     for (const path of ["/tmp", os.tmpdir()]) {
       platformMetadata.add(path);
       platformMetadata.add(fs.realpathSync(path));
@@ -239,6 +245,14 @@ export async function presetFixture(
     const filename = resolve(path instanceof URL ? fileURLToPath(path) : String(path));
     if (
       !writing &&
+      standardShell?.metadataPaths.includes(filename) &&
+      /^(?:stat|lstat|access|exists|realpath)(?:Sync)?(?:\.native)?$/.test(operation)
+    ) {
+      metadataReads.push({ operation, scope: "fixed-standard-shell-executable" });
+      return;
+    }
+    if (
+      !writing &&
       minimalTerminal?.metadataPaths.includes(filename) &&
       /^(?:stat|lstat|access|exists|realpath)(?:Sync)?(?:\.native)?$/.test(operation)
     ) {
@@ -258,7 +272,7 @@ export async function presetFixture(
     if (
       !writing &&
       (((operation === "open-directory-fsync" ||
-        (permissionPresets && /^stat(?:Sync)?$/.test(operation))) &&
+        ((permissionPresets || shellExecution) && /^stat(?:Sync)?$/.test(operation))) &&
         ancestorMetadata.has(filename)) ||
         (/^(?:realpath(?:Sync)?(?:\.native)?|stat(?:Sync)?)$/.test(operation) &&
           platformMetadata.has(filename)))
@@ -586,6 +600,7 @@ export async function presetFixture(
   await mount(api.tokenMeter);
   await mount(api.subprocess);
   minimalTerminal?.bind(ctx);
+  standardShell?.bind(ctx);
   await mount(api.sandbox);
   await mount(api.shell, { timeoutMs: 1000 });
   await mount(api.shellEnv, { dshHome: homes.DSH_HOME });
@@ -803,6 +818,7 @@ export async function presetFixture(
     dispose,
     ptc,
     minimalTerminal,
+    standardShell,
     evidence: () => ({
       inventorySha256: digest(inventoryBytes),
       patch: { path: patchPath, sha256: digest(patchBytes) },
@@ -862,6 +878,12 @@ export async function presetFixture(
             }
           : {}),
         syntheticModelAdapter: true,
+        ...(standardShell
+          ? {
+              standardShellBackend: standardShell.evidence(),
+              metadataReads: structuredClone(metadataReads),
+            }
+          : {}),
         ...(minimalTerminal
           ? {
               minimalTerminalBackend: minimalTerminal.evidence(),

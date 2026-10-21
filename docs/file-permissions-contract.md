@@ -66,6 +66,37 @@ node --expose-internals --test tests/file-permissions-host.test.mjs
 ## 保留缺口
 
 - 真实桌面安装与嵌入操作、侧边栏预览渲染、Gateway 认证授权和真实会话权限选择未验收。
-- 没有运行 PTY、shell 命令或操作系统进程沙箱；文件与终端跨执行族的内核权限一致性仍未验收。
+- 早期组件场景没有运行 shell；后续标准模式的文件/Bash 写入对照见下节。持久 PTY 的三模式权限切换、任意额外目录授权及所有 shell 命令仍未验收。
 - 本文件权限场景没有执行 `read_image`、文件搜索、`present`、文件 watch 或扩大权限后的重试；这些接口不能由本证据推定通过。后续 `present` 与权限扩大已有独立限定场景，分别见 [交付合同](deliverables-contract.md) 和 [扩大权限合同](escalation-contract.md)，不倒推本场景覆盖了它们。
 - 文件后端的官方 trusted-code fence 不等于内核安全边界。当前安装 tool-fs 摘要不符仍是实际部署限制，临时干净副本不会修复安装或授予额外权限。
+
+## 完整 standard 文件与 shell 权限对照（2026-10-21）
+
+`scripts/probe-standard-shell.mjs` 挂载完整原始 standard 预设，经真实 Loader/Registry 和 AgentLoop 执行官方 `write` 与 `bash`，使用已核验的干净归档。文件后端、沙箱策略、shell executor、subprocess 和 macOS Seatbelt 都是真实官方实现；仅模型动作和输入文件是合成。没有修改产品代码，也没有拿直接调用后端代替工具执行。
+
+在项目忽略目录下建立同级 workspace/outside；outside 不位于平台临时根。每个场景分别用 write 和 bash 向内外两个新文件写入同一标记，共 **20 次工具调用、10 个真实 shell 子进程、25 次合成模型请求**：
+
+| 场景                             | 文件工具和 Bash 的实际磁盘结果                          |
+| -------------------------------- | ------------------------------------------------------- |
+| 显式只读、插件启用               | 内外均拒绝，新文件均不存在                              |
+| 显式工作区可写                   | 内部创建且字节准确，外部拒绝                            |
+| 插件全访问默认、新会话无显式覆盖 | 内外均实际创建，字节准确                                |
+| 同一个全访问会话显式切回只读     | 下一轮内外均拒绝，新目标不存在；插件全访问设置仍为 true |
+| 撤销插件后新建无显式覆盖会话     | 恢复官方只读默认，内外均拒绝                            |
+
+五个场景 **6 项通过**（父测试及 5 场景）。相同会话切换前后的历史结果保留；每次结果进入下一步模型输入，schema 不变，自写正文随启用/撤销一致。官方 JSONL reader 核对全部事件，物理 JSONL 另核对调用、结果和权限切换事件；四个会话、五轮数据均可追溯。
+
+**拒绝语义不同，效果一致：**文件工具返回 `isError:true / FS_SANDBOX_DENIED`；已完成的 Bash 进程即使退出码非零，官方工具仍可返回 `isError:false`。本探针同时断言真实进程退出码为 1、原生沙箱拒绝说明存在、目标文件不存在；正向场景要求退出码 0 和逐字磁盘读回。不能把 Bash 的工具包装成功当作命令成功。
+
+只读和工作区模式实际通过官方生成的 `sandbox-exec` profile 执行；全访问路径按官方合同直接执行 Bash。命令只包含固定 printf 重定向，无外部程序、网络或用户输入。父环境从 `env -i` 建立，HOME/TMPDIR 均为本次临时目录；实际启动的 argv、环境及调用 Agent 身份检查后才允许执行。保持官方 profile，没有关闭或伪造内核沙箱。
+
+10 个子进程 close 均确认，subprocess/controlChannels 集合为 0，两处临时根删除，禁止访问记录与清理错误为空。源码摘要、逐场景结果和原生进程记录见 [standard-shell-acceptance.json](evidence/standard-shell-acceptance.json)。这不是 PTY、真实审批 UI、扩大权限后重试或网络限制验收；只证明这些固定文件变更场景在两个执行族中的一致性，不证明全部内核隔离性质。
+
+```sh
+/usr/bin/env -i PATH=/usr/bin:/bin \
+  DSH_UNLIMIT_RUNTIME='/Applications/DeepSeek Harness.app/Contents/Resources/app/dsh' \
+  '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node' \
+  --expose-internals scripts/probe-standard-shell.mjs
+```
+
+探针独立于 `npm test`，需要本机已核验的官方归档。它不安装或重载插件，不读写真实 profile、会话或配置。
