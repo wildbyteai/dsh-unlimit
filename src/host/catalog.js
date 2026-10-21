@@ -459,7 +459,7 @@ export class HostCatalog {
       }
     }
   }
-  async preflight(payload = {}, { signal } = {}) {
+  async preflight(payload = {}, { signal, includeContent = false } = {}) {
     fields(payload, ["sessionId", "skills", "requirements"]);
     const selected = payload.skills ?? [];
     if (!Array.isArray(selected)) fail("INVALID_INPUT", "skills must be an array");
@@ -473,6 +473,7 @@ export class HostCatalog {
     const environment = { loaded: false };
     const checks = (explicit || []).map((item) => this.check(item, catalog, environment));
     const skills = [];
+    const skillBodies = [];
     for (let index = 0; index < refs.length; index++) {
       signal?.throwIfAborted();
       const ref = refs[index];
@@ -507,6 +508,14 @@ export class HostCatalog {
           state: "invalid",
           detail: "Skill provider returned no text body",
         });
+      if (includeContent && item.invocation?.modelInvocable === false)
+        ownChecks.push({
+          kind: "skill-invocation",
+          state: "invalid",
+          detail: "This skill disables model invocation; workflow delivery is unavailable",
+        });
+      if (includeContent && result.readStatus === "readable")
+        skillBodies.push({ ...ref, name: item.name, content: item.content });
       result.dependencyStatus = combined(ownChecks);
       skills.push(result);
       checks.push(...ownChecks.map((check) => ({ ...check, skill: ref })));
@@ -543,6 +552,7 @@ export class HostCatalog {
       context: context.view,
       status: combined(checks),
       skills,
+      ...(includeContent ? { skillBodies } : {}),
       checks,
       sources: catalog.sources,
       toolkit: catalog.toolkit,

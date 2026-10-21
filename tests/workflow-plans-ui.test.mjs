@@ -145,7 +145,12 @@ async function setup({ capability = { available: true, evidenceSummary: true }, 
 }
 
 test("goal planning displays a checked draft, fills JSON only on request and never auto-submits", async () => {
-  const draft = { ...task, dependsOn: [], task: "整理合成材料 <script>never-run</script>" };
+  const draft = {
+    ...task,
+    dependsOn: [],
+    task: "整理合成材料 <script>never-run</script>",
+    skills: [{ origin: "project", id: "evidence-review" }],
+  };
   const ui = await setup({
     respond(action, payload) {
       if (action === "workflow.plan.capabilities") return { available: true, planDrafting: true };
@@ -168,6 +173,7 @@ test("goal planning displays a checked draft, fills JSON only on request and nev
   assert.equal(ui.host.node("use-draft").disabled, true);
   await ui.emit("query-form", "submit");
   assert.match(ui.host.node("result").innerHTML, /生成的任务草稿/);
+  assert.match(ui.host.node("result").innerHTML, /project\/evidence-review/);
   assert.match(ui.host.node("result").innerHTML, /&lt;script&gt;/);
   assert.doesNotMatch(ui.host.node("result").innerHTML, /<script>/);
   assert.deepEqual(JSON.parse(ui.host.node("json").value), [task]);

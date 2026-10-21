@@ -90,7 +90,7 @@ export async function installTools(ctx, controller, host) {
               type: "json",
               required: true,
               description:
-                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id。workflow.plan.create 使用 tasks:[{id,role,task,requirements:[],dependsOn?:[]}]，可选 summarize:true 会额外启动一次 planner 汇总全部已结束任务，默认关闭；汇总是待核实草稿，不自动登记为事实。workflow.plan.propose 使用 goal，启动规划者生成基于当前目录的任务草稿；plan.status 返回 proposal，只有 ready 草稿可检查后另用 plan.create 提交，生成不自动执行草稿中的任务。规划者仍继承宿主工具与权限。plan.status/stop 使用计划 id，父会话均强制为调用者。依赖结果保持未验证，超限明确阻断。templates.read 使用相对 path。",
+                "action 对应的数据对象；记录保存使用 kind 与 data，工作区作用域自动取本会话绑定。workflow.dispatch 使用 role、task；workflow.status/stop 使用运行 id。workflow.plan.create 使用 tasks:[{id,role,task,requirements:[],dependsOn?:[],skills?:[{origin,id}]}]，可选 summarize:true 会额外启动一次 planner 汇总全部已结束任务，默认关闭；汇总是待核实草稿，不自动登记为事实。workflow.plan.propose 使用 goal，启动规划者生成基于当前目录的任务草稿；plan.status 返回 proposal，只有 ready 草稿可检查后另用 plan.create 提交，生成不自动执行草稿中的任务。规划者仍继承宿主工具与权限。plan.status/stop 使用计划 id，父会话均强制为调用者。skills 选择的完整正文和文件内依赖声明在执行前一起读取检查，未知依赖或超限阻断；不允许在任务中覆盖技能依赖。依赖结果保持未验证，超限明确阻断。templates.read 使用相对 path。",
             },
           },
           output,

@@ -115,7 +115,15 @@ function metadata(content) {
     const match = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/.exec(line);
     if (!match) fail("INVALID_SKILL", "Unsupported frontmatter syntax");
     const [, key, raw] = match;
-    if (!["name", "description", "user-invocable", "disable-model-invocation"].includes(key))
+    if (
+      ![
+        "name",
+        "description",
+        "user-invocable",
+        "disable-model-invocation",
+        "dsh-unlimit-requirements",
+      ].includes(key)
+    )
       continue;
     if (fields[key] !== undefined) fail("INVALID_SKILL", `Duplicate frontmatter ${key}`);
     if (/^[|>][-+]?$/.test(raw)) {
@@ -133,9 +141,20 @@ function metadata(content) {
     if (fields[flag] !== undefined && !["true", "false"].includes(fields[flag]))
       fail("INVALID_SKILL", `${flag} must be true or false`);
   }
+  let requirements;
+  if (fields["dsh-unlimit-requirements"] !== undefined) {
+    try {
+      requirements = JSON.parse(fields["dsh-unlimit-requirements"]);
+    } catch {
+      fail("INVALID_SKILL", "dsh-unlimit-requirements must be a single-line JSON array");
+    }
+    if (!Array.isArray(requirements) || requirements.length > 32)
+      fail("INVALID_SKILL", "dsh-unlimit-requirements must contain at most 32 requirements");
+  }
   return {
     name: fields.name,
     description: fields.description,
+    ...(requirements === undefined ? {} : { metadata: { "dsh-unlimit": { requirements } } }),
     invocation: {
       userInvocable: fields["user-invocable"] !== "false",
       modelInvocable: fields["disable-model-invocation"] !== "true",

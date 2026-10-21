@@ -73,7 +73,7 @@ export async function workflowPlans({
       <div class="field"><label for="workflow-plan-parent">当前项目已绑定的父会话编号</label><input id="workflow-plan-parent" name="parentSessionId" list="workflow-plan-parents" value="${esc(bound[0]?.id || "")}" autocomplete="off" required><datalist id="workflow-plan-parents">${options}</datalist><small>创建需选当前已绑定会话；不替其他会话提交任务。</small></div>
       <div class="field wide"><label for="workflow-plan-goal">想完成什么</label><textarea id="workflow-plan-goal" rows="3" placeholder="描述目标、允许操作的范围和完成条件；不要填入密钥。"></textarea><small>生成草稿会启动一次规划者。提示要求只规划，但其工具和权限仍由宿主管理，不是无工具沙箱。草稿不会自动启动其中的任务。</small></div>
       <div class="toolbar"><button type="button" id="workflow-plan-propose" ${capability.available && capability.planDrafting ? "" : "disabled"}>生成任务草稿</button><button type="button" id="workflow-plan-use-draft" disabled>将当前草稿填入任务表</button></div>
-      <div class="field wide"><label for="workflow-plan-json">明确任务 JSON（1–32 项）</label><textarea id="workflow-plan-json" name="tasks" rows="14" spellcheck="false" required>${esc(sample)}</textarea><small>每项填写 id、role、task、requirements，可选 dependsOn 与 usePreset。[] 只表示声明无依赖。示例没有附带真实材料，请先改为当前项目的明确任务；不要填入密钥。</small></div>
+      <div class="field wide"><label for="workflow-plan-json">明确任务 JSON（1–32 项）</label><textarea id="workflow-plan-json" name="tasks" rows="14" spellcheck="false" required>${esc(sample)}</textarea><small>每项填写 id、role、task、requirements，可选 dependsOn、usePreset 和 skills:[{origin,id}]。[] 只表示声明无依赖。示例没有附带真实材料，请先改为当前项目的明确任务；不要填入密钥。</small></div>
       <div class="field wide"><label><input type="checkbox" id="workflow-plan-summarize" name="summarize" ${capability.available && capability.evidenceSummary === true ? "" : "disabled"}> 任务结束后生成指挥汇总</label><small>使用当前项目的规划者角色，增加一次模型调用；引用任务结果与失败、未执行状态，不会自动核实事实。</small><small id="workflow-plan-summary-availability">${capability.evidenceSummary === true ? "" : "当前服务不支持指挥汇总。"}</small></div>
       <div class="toolbar"><button type="button" id="workflow-plan-check">检查 JSON</button><button type="submit" class="primary" id="workflow-plan-create" ${capability.available && bound.length ? "" : "disabled"}>提交明确计划</button></div>
     </form>
@@ -108,7 +108,10 @@ export async function workflowPlans({
         throw new Error("每个任务须为对象");
       if (
         Object.keys(task).some(
-          (key) => !["id", "role", "task", "requirements", "dependsOn", "usePreset"].includes(key),
+          (key) =>
+            !["id", "role", "task", "requirements", "dependsOn", "usePreset", "skills"].includes(
+              key,
+            ),
         )
       )
         throw new Error("任务包含未知字段；不会执行额外命令选项");
@@ -127,6 +130,19 @@ export async function workflowPlans({
           task.dependsOn.some((id) => typeof id !== "string" || !id.trim()))
       )
         throw new Error("dependsOn 须为任务编号数组");
+      if (
+        task.skills !== undefined &&
+        (!Array.isArray(task.skills) ||
+          task.skills.some(
+            (ref) =>
+              !ref ||
+              !["host", "project"].includes(ref.origin) ||
+              typeof ref.id !== "string" ||
+              !ref.id.trim() ||
+              Object.keys(ref).some((key) => !["origin", "id"].includes(key)),
+          ))
+      )
+        throw new Error("skills 须为准确的 {origin,id} 引用，不允许覆盖技能依赖声明");
       if (task.usePreset !== undefined && typeof task.usePreset !== "boolean")
         throw new Error("usePreset 须为布尔值");
     }
@@ -253,12 +269,16 @@ export async function workflowPlans({
                         task.requirements.map((item) => `${item.kind}: ${item.name}`).join("；") ||
                         "未声明",
                       dependsOn: task.dependsOn.join("、") || "无",
+                      skills:
+                        (task.skills ?? []).map((ref) => `${ref.origin}/${ref.id}`).join("；") ||
+                        "未选择",
                     })),
                     [
                       ["id", "任务"],
                       ["role", "角色"],
                       ["task", "内容与完成条件"],
                       ["requirements", "匹配能力"],
+                      ["skills", "技能正文来源"],
                       ["dependsOn", "前置任务"],
                     ],
                   )

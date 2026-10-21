@@ -1,10 +1,91 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { SkillLibrary } from "../src/core/skills.js";
 import { WORKFLOW_PRESET_ID } from "../src/host/workflow.js";
 import { DesktopWorkflowPlan } from "../src/host/workflow-plan.js";
 import { HostCatalog } from "../src/host/catalog.js";
 import { fixture, optionalHost, waitFor } from "./helpers/workflow-host-fixture.mjs";
+
+test(
+  "official executors receive selected project skill text with its checked declaration and durable source, without leaking into sibling tasks",
+  optionalHost,
+  async (t) => {
+    const f = await fixture(t);
+    const parent = await f.create();
+    const library = new SkillLibrary(join(f.directory, "project-skills"));
+    const content =
+      "---\nname: evidence-review\ndescription: Original synthetic evidence guidance\ndsh-unlimit-requirements: []\n---\nPROJECT_SKILL_BODY: Only count supplied synthetic records, then report their source.";
+    library.dispatch("skills.save", { id: "evidence-review", content });
+    const catalog = new HostCatalog(
+      {
+        get: (key) =>
+          key === "skills"
+            ? { snapshot: async () => ({ skills: [], complete: true }) }
+            : f.ctx.get(key),
+      },
+      { library, toolkit: { status: () => ({ tools: [] }) } },
+    );
+    const plans = new DesktopWorkflowPlan(f.workflow, { catalog });
+    try {
+      const owner = { workspaceId: f.workspaceId, parentSessionId: parent.id };
+      const ref = { origin: "project", id: "evidence-review" };
+      const { item } = await plans.dispatch("workflow.plan.create", {
+        ...owner,
+        tasks: [
+          {
+            id: "selected",
+            role: "analyst",
+            task: "Count supplied records A and B.",
+            requirements: [],
+            skills: [ref],
+          },
+          {
+            id: "sibling",
+            role: "analyst",
+            task: "Sort supplied values 2 and 1.",
+            requirements: [],
+          },
+        ],
+      });
+      const done = await waitFor(
+        () => plans.dispatch("workflow.plan.status", { ...owner, id: item.id }),
+        (result) => result.item.state === "completed",
+      );
+      const [selected, sibling] = done.item.tasks;
+      assert.deepEqual(selected.skillContext, [{ ...ref, name: "evidence-review", content }]);
+      assert.equal(selected.preflight.skills[0].declaration.state, "declared");
+      assert.equal(selected.preflight.skillBodies, undefined);
+      assert.equal(sibling.skillContext, undefined);
+      const request = f.requests.find(
+        (request) => request.sessionId === selected.receipt.sessionId,
+      );
+      const expected = JSON.stringify([{ ...ref, name: "evidence-review", content }]);
+      assert.ok(
+        request.messages.some((message) =>
+          message.content?.some((part) => part.type === "text" && part.text.includes(expected)),
+        ),
+      );
+      assert.ok(
+        !JSON.stringify(
+          f.requests.find((request) => request.sessionId === sibling.receipt.sessionId),
+        ).includes("PROJECT_SKILL_BODY"),
+      );
+      await f.ctx.sessionPersistence.flush();
+      const reader = await f.ctx.sessionPersistence.open(selected.receipt.sessionId, "read");
+      try {
+        assert.ok(JSON.stringify((await reader.read()).events).includes("PROJECT_SKILL_BODY"));
+      } finally {
+        await reader.close();
+      }
+      assert.equal(f.flow.status(f.workspaceId).active.length, 0);
+      assert.equal(selected.receipt.disposed, true);
+    } finally {
+      await plans.close();
+    }
+  },
+);
 
 test(
   "official AgentLoop returns a proposal, releases its planner and only executes tasks after separate submission",

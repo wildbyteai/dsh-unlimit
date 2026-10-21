@@ -8,6 +8,8 @@ import { WorkspaceStore } from "../src/core/store.js";
 import { Flow } from "../src/core/flow.js";
 import { DesktopWorkflow } from "../src/host/workflow.js";
 import { DesktopWorkflowPlan } from "../src/host/workflow-plan.js";
+import { HostCatalog } from "../src/host/catalog.js";
+import { SkillLibrary } from "../src/core/skills.js";
 import { StoreError } from "../src/core/validation.js";
 
 function deferred() {
@@ -45,8 +47,13 @@ const planningCatalog = () => ({
       },
     ],
     skills: [
-      { origin: "host", name: "inventory", description: "Inventory supplied data" },
-      { origin: "project", name: "private-project-skill" },
+      {
+        origin: "host",
+        id: "inventory",
+        name: "inventory",
+        description: "Inventory supplied data",
+      },
+      { origin: "project", id: "local-skill", name: "private-project-skill" },
     ],
     toolkit: { tools: [{ id: "unavailable", available: false }] },
     sources: { tools: { state: "available", complete: true } },
@@ -69,7 +76,8 @@ test("a goal produces a checked proposal using exact catalog names, without disp
   const prompt = f.starts[0].request.prompt[0].text;
   assert.match(prompt, /synthetic_read/);
   assert.match(prompt, /inventory/);
-  assert.doesNotMatch(prompt, /NOT_FOR_PLANNER|private-project-skill|unavailable/);
+  assert.match(prompt, /private-project-skill/);
+  assert.doesNotMatch(prompt, /NOT_FOR_PLANNER|unavailable/);
   const generated = [
     task("read", { requirements: [{ kind: "tool", name: "synthetic_read" }] }),
     task("report", { dependsOn: ["read"] }),
@@ -108,6 +116,11 @@ test("invalid model proposals retain raw output and cannot be treated as executa
     ["cycle", [task("a", { dependsOn: ["b"] }), task("b", { dependsOn: ["a"] })]],
     ["unknown role", [task("a", { role: "invented" })]],
     ["preset injection", [task("a", { usePreset: true })]],
+    ["invented skill", [task("a", { skills: [{ origin: "project", id: "missing" }] })]],
+    [
+      "skill dependency override",
+      [task("a", { skills: [{ origin: "project", id: "local-skill", requirements: [] }] })],
+    ],
     ["extra action", [task("a", { command: "never-execute" })]],
   ])
     await t.test(name, async (t) => {
@@ -444,11 +457,126 @@ function fixture(t, catalog) {
     gates,
     control,
     coordinators,
+    directory,
     create,
     status,
     stop,
   };
 }
+
+function skillFixture(t) {
+  const f = fixture(t);
+  const library = new SkillLibrary(join(f.directory, "selected-skills"));
+  f.agents.set(f.owner.parentSessionId, {
+    id: f.owner.parentSessionId,
+    session: { id: f.owner.parentSessionId, header: { cwd: f.directory } },
+  });
+  f.services.skills = {
+    snapshot: async () => ({
+      complete: true,
+      skills: [{ name: "same-name", invocation: { modelInvocable: true } }],
+    }),
+    get: async () => ({
+      name: "same-name",
+      content: "HOST_BODY_MUST_NOT_LEAK",
+      metadata: { "dsh-unlimit": { requirements: [] } },
+    }),
+  };
+  f.services.tools = { schemas: () => [{ name: "synthetic_read" }] };
+  f.plans.catalog = new HostCatalog(
+    { get: (key) => f.services[key] },
+    { library, toolkit: { status: () => ({ tools: [] }) } },
+  );
+  const save = (body, declaration = "[]") =>
+    library.dispatch("skills.save", {
+      id: "local-skill",
+      content: `---\nname: same-name\ndescription: Original synthetic project skill\n${declaration === null ? "" : `dsh-unlimit-requirements: ${declaration}\n`}---\n${body}`,
+    });
+  return { ...f, library, save, ref: { origin: "project", id: "local-skill" } };
+}
+
+test("project skill selection is available to planning and exact complete body reaches only its selected executor", async (t) => {
+  const f = skillFixture(t);
+  f.save("PROJECT_BODY_COMPLETE\nUse only the supplied synthetic records.");
+  const selected = task("selected", { skills: [f.ref] });
+  const { item: draft } = await f.plans.dispatch("workflow.plan.propose", {
+    ...f.owner,
+    goal: "Use the project inventory skill",
+  });
+  await until(() => f.starts.length === 1);
+  const plannerPrompt = f.starts[0].request.prompt[0].text;
+  assert.match(plannerPrompt, /local-skill/);
+  assert.doesNotMatch(plannerPrompt, /PROJECT_BODY_COMPLETE|HOST_BODY_MUST_NOT_LEAK/);
+  f.pending.get(f.starts[0].childId).resolve(modelOutput({ tasks: [selected] }));
+  const ready = await until(async () => {
+    const current = await f.status(draft.id);
+    return current.proposal.state === "ready" && current;
+  });
+  assert.deepEqual(ready.proposal.tasks[0].skills, [f.ref]);
+  const { item } = await f.create([...ready.proposal.tasks, task("unrelated")]);
+  await until(() => f.starts.length === 2);
+  const prompt = f.starts[1].request.prompt[0].text;
+  const content = f.library.dispatch("skills.read", { id: f.ref.id }).item.content;
+  assert.ok(prompt.includes(JSON.stringify([{ ...f.ref, name: "same-name", content }])));
+  assert.doesNotMatch(prompt, /HOST_BODY_MUST_NOT_LEAK/);
+  f.pending.get(f.starts[1].childId).resolve(modelOutput({ result: "done" }));
+  await until(() => f.starts.length === 3);
+  assert.doesNotMatch(f.starts[2].request.prompt[0].text, /PROJECT_BODY_COMPLETE/);
+  const state = await f.status(item.id);
+  assert.equal(state.tasks[0].preflight.skillBodies, undefined);
+  assert.equal(state.tasks[0].skillContext[0].content, content);
+  await f.stop(item.id);
+});
+
+test("undeclared, missing and oversized skills block without dispatch or truncation", async (t) => {
+  for (const [name, body, declaration, code] of [
+    ["undeclared", "Original body", null, "DEPENDENCIES_UNAVAILABLE"],
+    [
+      "missing tool",
+      "Original body",
+      '[{"kind":"tool","name":"missing"}]',
+      "DEPENDENCIES_UNAVAILABLE",
+    ],
+    ["oversized", "x".repeat(33 * 1024), "[]", "DEPENDENCY_CONTEXT_LIMIT"],
+  ])
+    await t.test(name, async (t) => {
+      const f = skillFixture(t);
+      f.save(body, declaration);
+      const { item } = await f.create([task("selected", { skills: [f.ref] })]);
+      const done = await until(async () => {
+        const state = await f.status(item.id);
+        return state.state === "finished-with-errors" && state;
+      });
+      assert.equal(done.tasks[0].error.code, code);
+      assert.equal(f.starts.length, 0);
+      assert.ok(done.tasks[0].skillContext[0].content.endsWith(body));
+    });
+});
+
+test("queued tasks reread selected skill declarations and cannot silently ignore absent body delivery", async (t) => {
+  const f = skillFixture(t);
+  f.save("Original body");
+  const { item } = await f.create([
+    task("first"),
+    task("second", { skills: [f.ref], dependsOn: ["first"] }),
+  ]);
+  await until(() => f.starts.length === 1);
+  f.save("Changed body", '[{"kind":"tool","name":"missing"}]');
+  f.pending.get(f.starts[0].childId).resolve(modelOutput({ result: "done" }));
+  const done = await until(async () => {
+    const current = await f.status(item.id);
+    return current.state === "finished-with-errors" && current;
+  });
+  assert.equal(done.tasks[1].state, "blocked");
+  assert.match(done.tasks[1].skillContext[0].content, /Changed body/);
+  assert.equal(f.starts.length, 1);
+  f.plans.catalog = { preflight: async () => ({ status: "ready" }) };
+  const next = await f.create([task("incomplete", { skills: [f.ref] })]);
+  await until(
+    async () => (await f.status(next.item.id)).tasks[0].error?.code === "SKILL_CONTEXT_UNAVAILABLE",
+  );
+  assert.equal(f.starts.length, 1);
+});
 
 test("two explicit harmless tasks queue behind one slot and disposal, with exact executor-reported results", async (t) => {
   const f = fixture(t);
@@ -603,6 +731,15 @@ test("input contracts reject cycles, undeclared requirements, role errors and ex
     [task("x", { requirements: undefined })],
     [task("x", { role: "invented" })],
     [task("x", { shell: "invented" })],
+    [task("x", { skills: [{ origin: "foreign", id: "a" }] })],
+    [
+      task("x", {
+        skills: [
+          { origin: "project", id: "a" },
+          { origin: "project", id: "a" },
+        ],
+      }),
+    ],
     [task("x", { requirements: [{ kind: "tool", name: "read", path: "/unexpected" }] })],
     Array.from({ length: 33 }, (_, i) => task(String(i))),
   ]) {

@@ -120,6 +120,82 @@ function fixture(t) {
 }
 const code = (expected) => (error) => error.code === expected;
 
+test("workflow skill bodies and dependencies come from one source read; public preflight stays metadata-only", async (t) => {
+  const f = fixture(t);
+  const content =
+    '---\nname: same-name\ndescription: Synthetic declared skill\ndsh-unlimit-requirements: [{"kind":"tool","name":"mcp__synthetic__lookup"}]\n---\n\nOriginal synthetic project instructions.';
+  f.library.dispatch("skills.save", { id: "local-one", content });
+  const payload = { sessionId: "first", skills: [{ origin: "project", id: "local-one" }] };
+  const metadata = await f.catalog.preflight(payload);
+  assert.equal(metadata.status, "ready");
+  assert.equal(metadata.skillBodies, undefined);
+  const read = f.catalog.load.bind(f.catalog);
+  let reads = 0;
+  f.catalog.load = async (...args) => {
+    reads++;
+    const value = await read(...args);
+    f.library.dispatch("skills.save", {
+      id: "local-one",
+      content: content
+        .replace("mcp__synthetic__lookup", "missing_tool")
+        .replace("Original", "Changed"),
+    });
+    return value;
+  };
+  const prepared = await f.catalog.preflight(payload, { includeContent: true });
+  assert.equal(reads, 1);
+  assert.equal(prepared.status, "ready");
+  assert.deepEqual(prepared.skillBodies, [
+    { origin: "project", id: "local-one", name: "same-name", content },
+  ]);
+  const current = await f.catalog.preflight(payload, { includeContent: true });
+  assert.equal(current.status, "blocked");
+  assert.match(current.skillBodies[0].content, /Changed/);
+  await assert.rejects(f.catalog.preflight({ ...payload, includeContent: true }), {
+    code: "INVALID_INPUT",
+  });
+});
+
+test("skill dependency metadata preserves unknown/empty/invalid declarations and model invocation flags", async (t) => {
+  const f = fixture(t);
+  const ref = { origin: "project", id: "local-one" };
+  assert.equal(
+    (await f.catalog.preflight({ skills: [ref] }, { includeContent: true })).status,
+    "unknown",
+  );
+  const content =
+    "---\nname: same-name\ndescription: Synthetic skill\ndsh-unlimit-requirements: []\n---\nNo dependencies.";
+  f.library.dispatch("skills.save", { id: ref.id, content });
+  assert.equal(
+    (await f.catalog.preflight({ skills: [ref] }, { includeContent: true })).status,
+    "ready",
+  );
+  f.library.dispatch("skills.save", {
+    id: ref.id,
+    content: content.replace("[]", '[{"kind":"invented","name":"bad"}]'),
+  });
+  assert.equal(
+    (await f.catalog.preflight({ skills: [ref] }, { includeContent: true })).status,
+    "blocked",
+  );
+  for (const value of ["invalid-json", "{}", JSON.stringify(Array(33).fill({}))])
+    assert.throws(
+      () =>
+        f.library.dispatch("skills.save", { id: ref.id, content: content.replace("[]", value) }),
+      { code: "INVALID_SKILL" },
+    );
+  f.library.dispatch("skills.save", {
+    id: ref.id,
+    content: content.replace(
+      "dsh-unlimit-requirements:",
+      "disable-model-invocation: true\ndsh-unlimit-requirements:",
+    ),
+  });
+  const result = await f.catalog.preflight({ skills: [ref] }, { includeContent: true });
+  assert.equal(result.status, "blocked");
+  assert.ok(result.checks.some((check) => check.kind === "skill-invocation"));
+});
+
 test("session catalog preserves host/project collisions, invocation flags and MCP public names", async (t) => {
   const { catalog, first, observed, root } = fixture(t);
   const result = await catalog.list({ sessionId: "first" });
