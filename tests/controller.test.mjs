@@ -62,6 +62,160 @@ function controlFixture() {
   return { controller, store, runtime, repeat, calls, save };
 }
 
+test("concurrent applies finish in acceptance order without stale revision rollback", async () => {
+  const f = controlFixture();
+  const entered = Promise.withResolvers();
+  const gate = Promise.withResolvers();
+  const completed = [];
+  let applications = 0;
+  f.repeat.apply = async () => {
+    const application = ++applications;
+    f.calls.push(`repeat.start:${application}`);
+    if (application === 1) {
+      entered.resolve();
+    }
+    await gate.promise;
+    f.calls.push(`repeat.done:${application}`);
+  };
+  const first = f.controller.dispatch("control.apply").then((result) => {
+    completed.push("first");
+    return result;
+  });
+  await entered.promise;
+  const second = f.controller.dispatch("control.apply").then((result) => {
+    completed.push("second");
+    return result;
+  });
+  gate.resolve();
+  const results = await Promise.allSettled([first, second]);
+  const saved = f.store.dispatch("settings.get");
+  assert.deepEqual(
+    results.map((result) => result.status),
+    ["fulfilled", "fulfilled"],
+  );
+  assert.deepEqual(completed, ["first", "second"]);
+  assert.equal(saved.value.enabled, true);
+  assert.equal(f.runtime.enabled, true);
+  assert.equal(f.calls.includes("runtime.revert"), false);
+});
+
+test("revert accepted during apply waits for activation and leaves no late mount", async () => {
+  const f = controlFixture();
+  const entered = Promise.withResolvers();
+  const gate = Promise.withResolvers();
+  const completed = [];
+  let mounted = false;
+  f.repeat.apply = async () => {
+    f.calls.push("repeat.start");
+    entered.resolve();
+    await gate.promise;
+    mounted = true;
+    f.calls.push("repeat.mounted");
+  };
+  f.repeat.revert = async () => {
+    mounted = false;
+    f.calls.push("repeat.revert");
+  };
+  const applying = f.controller.dispatch("control.apply").then((result) => {
+    completed.push("apply");
+    return result;
+  });
+  await entered.promise;
+  const reverting = f.controller.dispatch("control.revert").then((result) => {
+    completed.push("revert");
+    return result;
+  });
+  gate.resolve();
+  const results = await Promise.allSettled([applying, reverting]);
+  const saved = f.store.dispatch("settings.get");
+  assert.deepEqual(
+    results.map((result) => result.status),
+    ["fulfilled", "fulfilled"],
+  );
+  assert.deepEqual(completed, ["apply", "revert"]);
+  assert.equal(saved.value.enabled, false);
+  assert.equal(f.runtime.enabled, false);
+  assert.equal(mounted, false);
+  assert.equal(f.calls.filter((call) => call === "repeat.mounted").length, 1);
+  assert.equal(f.calls.filter((call) => call === "repeat.revert").length, 1);
+  assert.ok(f.calls.indexOf("repeat.mounted") < f.calls.indexOf("repeat.revert"));
+});
+
+test("a failed apply releases the next accepted apply and preserves its enabled state", async () => {
+  const f = controlFixture();
+  const entered = Promise.withResolvers();
+  const gate = Promise.withResolvers();
+  let applications = 0;
+  f.repeat.apply = async () => {
+    const application = ++applications;
+    f.calls.push(`repeat.start:${application}`);
+    if (application === 1) entered.resolve();
+    await gate.promise;
+    if (application === 1) throw new Error("Synthetic first application veto");
+    f.calls.push(`repeat.done:${application}`);
+  };
+  const first = f.controller.dispatch("control.apply");
+  await entered.promise;
+  const second = f.controller.dispatch("control.apply");
+  gate.resolve();
+  const results = await Promise.allSettled([first, second]);
+  const saved = f.store.dispatch("settings.get");
+  assert.deepEqual(
+    results.map((result) => result.status),
+    ["rejected", "fulfilled"],
+  );
+  assert.match(results[0].reason.message, /first application veto/);
+  assert.equal(saved.value.enabled, true);
+  assert.equal(f.runtime.enabled, true);
+  assert.ok(f.calls.indexOf("runtime.revert") < f.calls.lastIndexOf("runtime.apply"));
+});
+
+test("lifecycle cleanup waits for accepted activation while preserving reload intent", async () => {
+  const f = controlFixture();
+  const entered = Promise.withResolvers();
+  const gate = Promise.withResolvers();
+  let mounted = false;
+  f.repeat.apply = async () => {
+    entered.resolve();
+    await gate.promise;
+    mounted = true;
+  };
+  f.repeat.revert = async () => {
+    mounted = false;
+  };
+  const applying = f.controller.dispatch("control.apply");
+  await entered.promise;
+  const cleaning = f.controller.revertControls();
+  gate.resolve();
+  await Promise.all([applying, cleaning]);
+  assert.equal(f.runtime.enabled, false);
+  assert.equal(mounted, false);
+  assert.equal(f.store.dispatch("settings.get").value.enabled, true);
+});
+
+test("a queued rule policy write retains revision conflicts without rolling back activation", async () => {
+  const f = controlFixture();
+  const entered = Promise.withResolvers();
+  const gate = Promise.withResolvers();
+  f.repeat.apply = async () => {
+    entered.resolve();
+    await gate.promise;
+  };
+  const applying = f.controller.dispatch("control.apply");
+  await entered.promise;
+  const changing = f.controller.dispatch("rules.policy", { revision: 0, policy: "strict" });
+  gate.resolve();
+  const [applied, changed] = await Promise.allSettled([applying, changing]);
+  assert.equal(applied.status, "fulfilled");
+  assert.equal(changed.status, "rejected");
+  const saved = f.store.dispatch("settings.get");
+  assert.equal(saved.revision, 1);
+  assert.equal(saved.value.workspacePolicy, "fallback");
+  assert.equal(saved.value.enabled, true);
+  assert.equal(f.runtime.enabled, true);
+  assert.equal(f.calls.includes("runtime.revert"), false);
+});
+
 test("HTTP scope activation failure rolls back controls before enabled is persisted", async () => {
   const f = controlFixture();
   const gate = Promise.withResolvers();

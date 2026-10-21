@@ -5,9 +5,17 @@ const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.me
 const unavailable = (message) => {
   throw Object.assign(new Error(message), { code: "UNSUPPORTED" });
 };
+const controlActions = new Set([
+  "control.apply",
+  "control.revert",
+  "settings.save",
+  "rules.select",
+  "rules.policy",
+]);
 
 export class Controller {
   #pending = new Set();
+  #controlTail = Promise.resolve();
 
   constructor({
     store,
@@ -62,7 +70,16 @@ export class Controller {
       onSkillsChanged,
     });
   }
-  async revertControls() {
+  #sequenceControl(operation) {
+    const pending = this.#controlTail.then(operation);
+    // Keep the queue usable after a failure; the caller still receives rejection.
+    this.#controlTail = pending.catch(() => {});
+    return pending;
+  }
+  revertControls() {
+    return this.#sequenceControl(() => this.#revertControls());
+  }
+  async #revertControls() {
     const errors = [];
     for (const service of [
       this.webScope,
@@ -205,7 +222,9 @@ export class Controller {
       throw Object.assign(new Error("正在卸载或已经移除本插件，请在宿主插件管理器查看状态"), {
         code: "MAINTENANCE_BUSY",
       });
-    const pending = this.route(action, payload);
+    const pending = controlActions.has(action)
+      ? this.#sequenceControl(() => this.route(action, payload))
+      : this.route(action, payload);
     this.#pending.add(pending);
     try {
       return await pending;
@@ -357,7 +376,7 @@ export class Controller {
           });
         } catch (error) {
           try {
-            await this.revertControls();
+            await this.#revertControls();
           } catch (cleanup) {
             throw new AggregateError([error, cleanup], "运行控制应用失败，部分撤销未完成");
           }
@@ -379,7 +398,7 @@ export class Controller {
           revision: current.revision,
           value: { ...current.value, enabled: false },
         });
-        await this.revertControls();
+        await this.#revertControls();
         return this.status();
       }
       case "settings.save": {
