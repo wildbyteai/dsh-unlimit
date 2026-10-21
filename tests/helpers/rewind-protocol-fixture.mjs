@@ -35,7 +35,7 @@ export const targets = [
   },
 ];
 
-export async function rewindProtocolFixture(t, runtimeRoot, target) {
+export async function rewindProtocolFixture(t, runtimeRoot, target, { retry = false } = {}) {
   const forbiddenCalls = [];
   const deny = (name) =>
     function () {
@@ -111,6 +111,7 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
   const api = Object.fromEntries(
     await Promise.all(Object.entries(names).map(async ([key, name]) => [key, await load(name)])),
   );
+  if (retry) api.retry = await load("@deepseek-ai/dsh-llm-retry");
   for (const name of [
     "openai-completions.lazy",
     "openai-responses.lazy",
@@ -225,12 +226,14 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
     );
     snapshots.push({
       sessionId: options.sessionId,
+      turn: agent.phase.turn,
+      step: agent.phase.step,
       messages: structuredClone(options.messages),
       events: structuredClone(agent.session.snapshotEvents()),
     });
   };
   let responseId = 0;
-  const messagesEvents = (model) => {
+  const messagesEvents = (model, tool) => {
     const id = `synthetic-msg-${++responseId}`;
     return [
       [
@@ -251,14 +254,22 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
       ],
       [
         "content_block_start",
-        { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+        {
+          type: "content_block_start",
+          index: 0,
+          content_block: tool
+            ? { type: "tool_use", id: tool.id, name: tool.name, input: {} }
+            : { type: "text", text: "" },
+        },
       ],
       [
         "content_block_delta",
         {
           type: "content_block_delta",
           index: 0,
-          delta: { type: "text_delta", text: "Synthetic reply." },
+          delta: tool
+            ? { type: "input_json_delta", partial_json: JSON.stringify(tool.arguments) }
+            : { type: "text_delta", text: "Synthetic reply." },
         },
       ],
       ["content_block_stop", { type: "content_block_stop", index: 0 }],
@@ -266,7 +277,7 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
         "message_delta",
         {
           type: "message_delta",
-          delta: { stop_reason: "end_turn", stop_sequence: null },
+          delta: { stop_reason: tool ? "tool_use" : "end_turn", stop_sequence: null },
           usage: { output_tokens: 3 },
         },
       ],
@@ -275,7 +286,7 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
       .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
       .join("");
   };
-  const chatEvents = (model) => {
+  const chatEvents = (model, tool) => {
     const common = {
       id: `synthetic-chat-${++responseId}`,
       object: "chat.completion.chunk",
@@ -289,14 +300,26 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
           choices: [
             {
               index: 0,
-              delta: { role: "assistant", content: "Synthetic reply." },
+              delta: tool
+                ? {
+                    role: "assistant",
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: tool.id,
+                        type: "function",
+                        function: { name: tool.name, arguments: JSON.stringify(tool.arguments) },
+                      },
+                    ],
+                  }
+                : { role: "assistant", content: "Synthetic reply." },
               finish_reason: null,
             },
           ],
         },
         {
           ...common,
-          choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+          choices: [{ index: 0, delta: {}, finish_reason: tool ? "tool_calls" : "stop" }],
           usage: { prompt_tokens: 1, completion_tokens: 3, total_tokens: 4 },
         },
       ]
@@ -304,15 +327,24 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
         .join("") + "data: [DONE]\n\n"
     );
   };
-  const responsesEvents = (model) => {
+  const responsesEvents = (model, tool) => {
     const id = `synthetic-response-${++responseId}`;
-    const item = {
-      id: `${id}-message`,
-      type: "message",
-      role: "assistant",
-      status: "completed",
-      content: [{ type: "output_text", text: "Synthetic reply.", annotations: [] }],
-    };
+    const item = tool
+      ? {
+          id: `${id}-function`,
+          type: "function_call",
+          call_id: tool.id,
+          name: tool.name,
+          arguments: JSON.stringify(tool.arguments),
+          status: "completed",
+        }
+      : {
+          id: `${id}-message`,
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text: "Synthetic reply.", annotations: [] }],
+        };
     const response = {
       id,
       object: "response",
@@ -328,6 +360,31 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
         output_tokens_details: { reasoning_tokens: 0 },
       },
     };
+    if (tool)
+      return [
+        { type: "response.created", response: { ...response, status: "in_progress", output: [] } },
+        {
+          type: "response.output_item.added",
+          output_index: 0,
+          item: { ...item, status: "in_progress", arguments: "" },
+        },
+        {
+          type: "response.function_call_arguments.delta",
+          item_id: item.id,
+          output_index: 0,
+          delta: item.arguments,
+        },
+        {
+          type: "response.function_call_arguments.done",
+          item_id: item.id,
+          output_index: 0,
+          arguments: item.arguments,
+        },
+        { type: "response.output_item.done", output_index: 0, item },
+        { type: "response.completed", response },
+      ]
+        .map((data) => `event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`)
+        .join("");
     return [
       { type: "response.created", response: { ...response, status: "in_progress", output: [] } },
       {
@@ -375,6 +432,18 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
     const raw = init.body ?? (input instanceof Request ? await input.clone().text() : undefined);
     const body = JSON.parse(raw);
     captures.push({ path: url.pathname, body });
+    if (transportPlan?.kind === "transient") {
+      const plan = transportPlan;
+      transportPlan = undefined;
+      await plan.callback?.();
+      return new Response(
+        JSON.stringify({
+          type: "error",
+          error: { type: "api_error", message: "Synthetic transient failure" },
+        }),
+        { status: 503, headers: { "content-type": "application/json" } },
+      );
+    }
     if (transportPlan?.kind === "error") {
       transportPlan = undefined;
       return new Response(
@@ -398,12 +467,14 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
         if (signal.aborted) rejectAbort();
       });
     }
+    const tool = transportPlan?.kind === "tool" ? transportPlan.tool : undefined;
+    if (tool) transportPlan = undefined;
     const data = url.pathname.endsWith("/chat/completions")
-      ? chatEvents(body.model)
+      ? chatEvents(body.model, tool)
       : url.pathname.endsWith("/responses")
-        ? responsesEvents(body.model)
+        ? responsesEvents(body.model, tool)
         : url.pathname.endsWith("/messages")
-          ? messagesEvents(body.model)
+          ? messagesEvents(body.model, tool)
           : null;
     assert.notEqual(data, null, "Unknown official wire endpoints must fail");
     return new Response(data, {
@@ -532,6 +603,7 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
   });
   await mount(api.workspaces.WorkspaceRegistry);
   await mount(api.query.SessionQueryEngine);
+  if (retry) await mount(api.retry);
   await mount(api.loop.AgentLoop, { agents: [], maxParallelToolCalls: 1 });
   await mount(api.controller.SessionController, { nativeOpen: false, listWorkSliceMs: 16 });
   runtime = new DesktopRuntime(ctx, runtimeStore, {
@@ -577,6 +649,7 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
     store,
     workspaceId,
     settings,
+    runtime,
     create,
     follow,
     durable,
@@ -585,6 +658,12 @@ export async function rewindProtocolFixture(t, runtimeRoot, target) {
     modules,
     failNext: () => {
       transportPlan = { kind: "error" };
+    },
+    failTransientNext: (callback) => {
+      transportPlan = { kind: "transient", callback };
+    },
+    replyWithTool: (tool) => {
+      transportPlan = { kind: "tool", tool: structuredClone(tool) };
     },
     cancelNext: (agent) => {
       transportPlan = { kind: "cancel", cancel: () => agent.cancel({ kind: "user" }) };

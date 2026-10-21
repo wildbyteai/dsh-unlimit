@@ -88,3 +88,36 @@ test("a preserved external wrapper can call a disposed refresh wrapper without r
   assert.deepEqual(f.agent.systemPrompt.project("host text"), { text: "host text / external" });
   assert.equal(f.listeners.size, 0);
 });
+
+test("managed prompt projections replace old text without changing caller options or inactive host behavior", async () => {
+  const f = fixture();
+  const calls = [];
+  const original = function (...args) {
+    assert.equal(this, f.agent.systemPrompt);
+    calls.push(args);
+    return args;
+  };
+  f.agent.systemPrompt.project = original;
+  const dispose = connectPromptRefresh(f.ctx, f.runtime);
+  await f.listeners.get("agent/request")(f.payload, async () => ({ model: "synthetic" }));
+  const wrapper = f.agent.systemPrompt.project;
+  const input = Object.freeze({ inHistory: true, startsSeries: false });
+  try {
+    wrapper.call(f.agent.systemPrompt, "current text", input, "unchanged extra argument");
+    assert.deepEqual(calls[0], [
+      "current text",
+      { inHistory: false, startsSeries: false },
+      "unchanged extra argument",
+    ]);
+    assert.deepEqual(input, { inHistory: true, startsSeries: false });
+    f.runtime.settings = () => ({ enabled: false });
+    wrapper.call(f.agent.systemPrompt, "host text", input);
+    assert.equal(calls[1][1], input, "Disabled controls preserve the host's update mode");
+  } finally {
+    dispose();
+  }
+  assert.equal(f.agent.systemPrompt.project, original);
+  f.runtime.settings = () => assert.fail("A revoked wrapper must not read settings");
+  wrapper.call(f.agent.systemPrompt, "after revert", input);
+  assert.equal(calls[2][1], input);
+});
