@@ -30,6 +30,7 @@ const reasons = {
   "country-denied": "CN / HK / MO 地区无例外，拒绝检查",
   "special-address": "特殊或私网地址无例外，拒绝检查",
   "country-unknown": "国家未知且无例外，拒绝检查",
+  "ipv6-unverified": "IPv6 译址发现不明确，未检查此地址",
   "database-unavailable": "本地国家数据库不可用且无例外，拒绝检查",
   "invalid-url": "登记 URL 无效",
   "invalid-listener": "监听地址或端口无效",
@@ -39,12 +40,15 @@ const reasons = {
   "admission-changed": "演练确认已变化",
 };
 export const connectionCheckNotice =
-  "仅检查你本次确认的目标：精确自有服务器例外、已刷新的解析快照派生 IP，或本地数据库判定为其他国家的地址。CN / HK / MO 无例外时拒绝；未知国家、私网或特殊地址无例外时拒绝。此范围判定尚未覆盖通用工具出口。登记 URL 的查询参数会原样发送，不附加凭据、Cookie 或请求正文。HTTP 仅发送 HEAD；收到任意状态码仅证明有响应，不代表 WebShell 可用；TCP 仅检查明确登记的监听端，不证明终端或整条隧道可用。";
+  "仅检查你本次确认的目标：精确自有服务器例外、已刷新的解析快照派生 IP，或本地数据库判定为其他国家的地址。CN / HK / MO 无例外时拒绝；未知国家、私网或特殊地址无例外时拒绝。无例外的 IPv6 会查询 ipv4only.arpa 以识别译址，无法判明时不使用该地址；查询计入本次总时限。此范围判定尚未覆盖通用工具出口。登记 URL 的查询参数会原样发送，不附加凭据、Cookie 或请求正文。HTTP 仅发送 HEAD；收到任意状态码仅证明有响应，不代表 WebShell 可用；TCP 仅检查明确登记的监听端，不证明终端或整条隧道可用。";
 const label = (value, labels) => labels[value] || value || "未返回";
 export function connectionScopeText(scope) {
   if (!scope) return "";
   const country = scope.country || (scope.matchedHost ? "未查询（精确例外）" : "未知");
-  return `${scope.allowed ? "范围允许" : "范围拒绝"} · ${label(scope.reason, reasons)} · 国家 ${country} · 判定地址 ${scope.address || "尚未解析"}${scope.matchedHost ? ` · 匹配主机 ${scope.matchedHost}` : ""}`;
+  const address = scope.countryAddress
+    ? `连接候选 ${scope.address} · 译址目标 ${scope.countryAddress}`
+    : `判定地址 ${scope.address || "尚未解析"}`;
+  return `${scope.allowed ? "范围允许" : "范围拒绝"} · ${label(scope.reason, reasons)} · 国家 ${country} · ${address}${scope.matchedHost ? ` · 匹配主机 ${scope.matchedHost}` : ""}`;
 }
 export function connectionResultText(item) {
   const result = item?.lastCheck;

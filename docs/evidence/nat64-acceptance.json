@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-21",
+  "target": {
+    "desktop": "0.2.1-rc.2",
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "24.21.0"
+  },
+  "source": {
+    "baseCommit": "d1fc29e4ef4826cc03ee20a1f2a196bcbc24afd7",
+    "revision": "the commit containing this evidence",
+    "sha256": {
+      "src/core/nat64.js": "b5a7df3915398254f2d4164cb1e95fb3eaad8ff855ba7f4db78627d52198e527",
+      "src/core/network-scope.js": "8351c5c508cc0f9e1766ce49c9c9128d54954337d5857d60c0f04201e0bf898f",
+      "src/core/connection-checks.js": "3e4615d57f360db9fb3d4545bc4b53d4e8ae068c8bfb9536777bc45e4994f419",
+      "src/host/native-http-resolution.js": "711c8d2039d13e30481b99be574dd560c75d8563b19049dec7ad27331868be99",
+      "src/host/scoped-http.js": "8fe689a58e63db9cfc3e5eaa78780b0de7535bdc5d583fbe93867e5d29f616fc",
+      "src/host/web-scope.js": "17f6f4e21e8de5da394dd07043141829a0c59fc6eb002df851625ca3b26bc5a5",
+      "web/connection-checks.js": "d7211e8e913aa8735b80d385c0469e5200dfcb603fff44ac755f606cd1a43b1a",
+      "tests/nat64.test.mjs": "842a731ab30a32ddce7e22fe16103b001edc244661bf3a522a651a4bc6650754",
+      "tests/native-http-resolution.test.mjs": "6955b471f7ad256757294b725490d110a79d8d778b46fc262260e66c7a25041e",
+      "tests/web-nat64-host.test.mjs": "0c8911c3484e63420ede5510f4c29311c00ea0117eed77e93820603100318560",
+      "tests/connection-nat64.test.mjs": "12e3602e0f952dd0d858ccbf1de1e15933980a14827963d734085fbd377abb04",
+      "tests/network-scope.test.mjs": "634c999dbbddedab3b85482e062889f33629225315ce0e403d44778a37fc7ac7",
+      "tests/connection-checks-ui.test.mjs": "2c477ca1b1e870015a399afdd8d09a17dac33c43d42ee6038e7a059bf552d6f7"
+    }
+  },
+  "officialResolver": {
+    "inventoryPath": "node_modules/@deepseek-ai/dsh-web-fetch-http/lib/index.js",
+    "sha256": "489fef91b0c11c063029ea7aed27b312817570b9c3177aeaa44983b9a25aedcd",
+    "scope": "The loaded official resolver is inventory-verified in an isolated runtime; the installed application as a whole is not attested."
+  },
+  "status": "partial-functional-parity",
+  "verification": {
+    "fullSuite": {
+      "command": "DSH_UNLIMIT_RUNTIME=<official-runtime> DSH_UNLIMIT_OFFICIAL_PACKAGES=<pinned-archive-cache> <bundled-node> --expose-internals --test tests/*.test.mjs",
+      "passed": 580,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "syntax": {
+      "passed": 127,
+      "total": 127
+    },
+    "newResults": {
+      "nat64Algorithm": 14,
+      "nativeLookupObservation": 5,
+      "officialHttpPath": 15,
+      "connectionChecks": 15,
+      "sharedPolicy": 4,
+      "receiptUI": 1,
+      "total": 54
+    },
+    "behaviorRequirements": {
+      "rows": 117,
+      "firstFiveColumnsUnchanged": true
+    }
+  },
+  "observed": [
+    {
+      "id": "IPV6-CLASSIFY",
+      "result": "Original RFC 6052/7050 implementation supports six layouts, ambiguity rejection, u validation including /96, nonzero suffix and fixed mapped IPv4 semantics; no I/O."
+    },
+    {
+      "id": "HTTP-NAT64",
+      "syntheticDnsLookups": 33,
+      "targetLookups": 16,
+      "discoveryLookups": 17,
+      "mockHttpHops": 7,
+      "realSockets": 0,
+      "result": "Default resolver identity retained; same lookup response observed with no added discovery. Main/child concurrency and each same-origin hop have independent snapshots. Literal translation is evaluated after discovery."
+    },
+    {
+      "id": "HTTP-PIN",
+      "result": "Actual Undici connector reaches an intercepted tls.connect; pinned lookup contains only the original IPv6 and preserves hostname/SNI. Synthetic error stops before socket creation."
+    },
+    {
+      "id": "HTTP-NATIVE",
+      "result": "Native private and translated-private rejection occurs before the country decision. Discovery failure propagates; ambiguous IPv6 has no transport, an eligible IPv4 alternative can be selected after native validation."
+    },
+    {
+      "id": "CHECK-NAT64",
+      "result": "Explicit confirmation only; discovery shares each item total deadline. IPv4, mapped IPv4 and original-target exceptions do not add discovery. Scope/admission/record changes, abort and timeout prevent transport. Wire address and countryAddress persist independently."
+    },
+    {
+      "id": "POLICY-UPGRADE",
+      "result": "dns64-v1 is included in the scope revision; earlier receipts remain readable but are stale."
+    }
+  ],
+  "ui": {
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "componentOnly": true,
+    "passed": 15,
+    "failed": 0,
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "unrelatedBrowserExtensionWarnings": 12,
+    "assetSha256": {
+      "web/connection-checks.js": "d7211e8e913aa8735b80d385c0469e5200dfcb603fff44ac755f606cd1a43b1a",
+      "web/styles.css": "7022e281345cf50a7541b2a657484d2ba0b2c1d76222af3167a119460f5f1995"
+    },
+    "image": "../nat64-results-preview.jpg",
+    "imageSha256": "a6c5c899082e519cd036c45ab12fe68338c5cae33ee68307c097b22209d95b12",
+    "cleanup": {
+      "serverClosed": true,
+      "tabClosed": true,
+      "viewportOverrideReset": true
+    },
+    "limitations": [
+      "No backend API or real transport invoked by this component preview",
+      "No real desktop embedding or native NAT64 network tested"
+    ]
+  },
+  "notVerified": [
+    "Actual desktop installation or embedded UI",
+    "Real DNS64 network or DNS authenticity",
+    "Real country data accuracy",
+    "Nonstandard/custom address translation",
+    "MCP, terminal, search, Chromium and other egress",
+    "Process or system firewall isolation"
+  ],
+  "externalActions": {
+    "installedPlugin": false,
+    "modifiedRealProfile": false,
+    "restartedDesktop": false,
+    "realTargetRequests": 0,
+    "realDnsQueries": 0,
+    "loopbackFixtureOnly": true
+  },
+  "publicCI": "Official runtime is not included; official host tests explicitly skip in public CI."
+}

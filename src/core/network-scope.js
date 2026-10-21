@@ -50,7 +50,7 @@ export class NetworkScope {
     const snapshots = this.snapshots(hosts);
     const database = this.database.status();
     return {
-      revision: digest({ hosts, snapshots, database: database.revision }),
+      revision: digest({ hosts, snapshots, database: database.revision, policy: "dns64-v1" }),
       active: Boolean(this.#active),
       database,
       hosts: hosts.map((name) => ({
@@ -74,11 +74,13 @@ export class NetworkScope {
     return null;
   }
 
-  preview(target) {
+  preview(target, { translationPending = false } = {}) {
     const name = hostname(target);
     const exception = this.exception(name);
     if (exception) return { state: "ready", ...exception };
-    if (isIP(name)) {
+    // Transports discover DNS64 before classifying an IPv6 literal. Its surface
+    // country cannot pre-deny a translated destination.
+    if (isIP(name) && !(translationPending && isIP(name) === 6)) {
       const decision = this.decide(name, name);
       return { state: decision.allowed ? "ready" : "denied", ...decision };
     }
@@ -87,18 +89,23 @@ export class NetworkScope {
       : { state: "denied", reason: "database-unavailable" };
   }
 
-  decide(target, address) {
+  decide(target, address, { ipv4Destination } = {}) {
     const name = hostname(target);
     if (typeof address !== "string" || address.includes("%") || !isIP(address))
       return { allowed: false, reason: "country-unknown", country: null, address: "" };
     const ip = hostname(address);
     if (isIP(name) && name !== ip)
       return { allowed: false, reason: "country-unknown", country: null, address: ip };
+    if (
+      ipv4Destination !== undefined &&
+      (isIP(ip) !== 6 || typeof ipv4Destination !== "string" || isIP(ipv4Destination) !== 4)
+    )
+      return { allowed: false, reason: "country-unknown", country: null, address: ip };
     // A shared IP does not grant an alias or subdomain the registered host's exception.
     const exception = this.exception(name);
     if (exception) return { allowed: true, ...exception, country: null, address: ip };
     const databaseRevision = this.database.status().revision;
-    const result = this.database.lookup(ip);
+    const result = this.database.lookup(ipv4Destination ?? ip);
     const reason =
       result.kind === "special"
         ? "special-address"
@@ -114,6 +121,7 @@ export class NetworkScope {
       reason,
       country: result.country,
       address: ip,
+      ...(ipv4Destination === undefined ? {} : { countryAddress: ipv4Destination }),
       databaseRevision,
     };
   }

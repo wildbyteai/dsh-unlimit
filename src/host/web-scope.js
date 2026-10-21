@@ -161,7 +161,7 @@ export class WebScope {
           target.reason ??
           (conflict
             ? "HTTP 运行时所有权已变化；拒绝沿用适配，保留外部改动"
-            : "应用运行控制时约束现有 web.fetch/http，每跳核验并固定一个地址。代理、远端 Fetch 和无精确例外的 IPv6 暂不支持；不覆盖搜索、MCP、终端或浏览器。"),
+            : "约束现有 web.fetch/http，每跳核验地区并固定地址。无例外的 IPv6 需明确译址发现；代理和远端 Fetch 拒绝。不覆盖搜索、MCP、终端或浏览器。"),
       },
     ];
   }

@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import { normalizeServers } from "./servers.js";
 import { fail, object } from "./validation.js";
 import { checkEndpoint, resolveAddresses } from "./connection-transport.js";
+import { ipv6Destination, nat64Prefixes } from "./nat64.js";
 
 const kinds = ["webshell", "tunnel"];
 const digest = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -133,7 +134,9 @@ export class ConnectionChecks {
     const policy = this.policy();
     const items = selected.map((record) => {
       const address = endpoint(record);
-      const scope = address.reason ? null : this.scope?.preview(address.hostname);
+      const scope = address.reason
+        ? null
+        : this.scope?.preview(address.hostname, { translationPending: true });
       const permitted =
         !address.reason && (scope ? scope.state === "ready" : policy.hosts.has(address.hostname));
       const { state: _previewState, ...decision } = scope ?? {};
@@ -210,6 +213,17 @@ export class ConnectionChecks {
   async inspect(item, signal, timeoutMs, changed) {
     const started = performance.now();
     const remaining = () => Math.max(0, timeoutMs - (performance.now() - started));
+    const interrupted = () => {
+      const cancelled = signal.aborted || changed();
+      if (!cancelled && remaining() > 0) return null;
+      return {
+        state: cancelled ? "cancelled" : "unreachable",
+        reason: cancelled ? "cancelled" : "timeout",
+        latencyMs: Math.round(performance.now() - started),
+      };
+    };
+    let stopped = interrupted();
+    if (stopped) return stopped;
     let addresses;
     const family = isIP(item.endpoint.hostname);
     if (family) addresses = [{ address: item.endpoint.hostname, family }];
@@ -217,37 +231,85 @@ export class ConnectionChecks {
       try {
         addresses = await this.resolve(item.endpoint.hostname, { signal, timeoutMs: remaining() });
       } catch (error) {
-        return {
-          state: error.code === "DNS_CANCELLED" ? "cancelled" : "unreachable",
-          reason:
-            error.code === "DNS_CANCELLED"
-              ? "cancelled"
-              : error.code === "DNS_TIMEOUT"
-                ? "timeout"
-                : "dns-error",
-          latencyMs: Math.round(performance.now() - started),
-        };
+        return (
+          interrupted() ?? {
+            state: error.code === "DNS_CANCELLED" ? "cancelled" : "unreachable",
+            reason:
+              error.code === "DNS_CANCELLED"
+                ? "cancelled"
+                : error.code === "DNS_TIMEOUT"
+                  ? "timeout"
+                  : "dns-error",
+            latencyMs: Math.round(performance.now() - started),
+          }
+        );
       }
     }
+    stopped = interrupted();
+    if (stopped) return stopped;
     if (!addresses.length)
       return {
         state: "unreachable",
         reason: "dns-error",
         latencyMs: Math.round(performance.now() - started),
       };
-    if (signal.aborted || changed())
-      return {
-        state: "cancelled",
-        reason: "cancelled",
-        latencyMs: Math.round(performance.now() - started),
-      };
+    const exception = this.scope?.exception(item.endpoint.hostname);
+    let discovery;
+    const requiresDiscovery = addresses.some(
+      (candidate) =>
+        isIP(candidate.address) === 6 &&
+        ipv6Destination(candidate.address, undefined).kind === "unknown",
+    );
+    if (this.scope && !exception && requiresDiscovery) {
+      let records = [];
+      try {
+        records = await this.resolve("ipv4only.arpa", { signal, timeoutMs: remaining() });
+      } catch (error) {
+        stopped = interrupted();
+        if (stopped) return stopped;
+        if (["DNS_CANCELLED", "DNS_TIMEOUT"].includes(error.code))
+          return {
+            state: error.code === "DNS_CANCELLED" ? "cancelled" : "unreachable",
+            reason: error.code === "DNS_CANCELLED" ? "cancelled" : "timeout",
+            latencyMs: Math.round(performance.now() - started),
+          };
+        // Discovery failure leaves IPv6 unverified; an existing IPv4 answer can
+        // still be classified without issuing another target lookup.
+      }
+      stopped = interrupted();
+      if (stopped) return stopped;
+      discovery = nat64Prefixes(records);
+    }
     const decisions = this.scope
-      ? addresses.map((candidate) => ({
-          candidate,
-          scope: this.scope.decide(item.endpoint.hostname, candidate.address),
-        }))
+      ? addresses.map((candidate) => {
+          const destination =
+            !exception && isIP(candidate.address) === 6
+              ? ipv6Destination(candidate.address, discovery)
+              : null;
+          return {
+            candidate,
+            scope:
+              destination?.kind === "unknown"
+                ? {
+                    allowed: false,
+                    reason: "ipv6-unverified",
+                    country: null,
+                    address: candidate.address,
+                  }
+                : this.scope.decide(
+                    item.endpoint.hostname,
+                    candidate.address,
+                    destination?.kind === "translated"
+                      ? { ipv4Destination: destination.address }
+                      : {},
+                  ),
+          };
+        })
       : addresses.map((candidate) => ({ candidate, scope: null }));
     const selected = decisions.find((decision) => !decision.scope || decision.scope.allowed);
+    // Local database handles can observe replacements by another process during lookup.
+    stopped = interrupted();
+    if (stopped) return stopped;
     if (!selected)
       return {
         state: "denied",
@@ -255,14 +317,7 @@ export class ConnectionChecks {
         scope: decisions[0].scope,
         latencyMs: Math.round(performance.now() - started),
       };
-    // Local database handles can observe replacements by another process during lookup.
-    if (signal.aborted || changed())
-      return {
-        state: "cancelled",
-        reason: "cancelled",
-        latencyMs: Math.round(performance.now() - started),
-      };
-    // Select one permitted address from this lookup. No second DNS, redirect or retry.
+    // Select one permitted address from this lookup. No second target DNS, redirect or retry.
     const result = await this.transport(
       { ...item.endpoint, ...selected.candidate },
       { signal, timeoutMs: remaining() },

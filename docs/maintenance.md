@@ -28,6 +28,8 @@
 
 网络适配位于 `src/host/web-scope.js` 与 `scoped-http.js`。升级时重新核对官方 `web_fetch`、provider 选择、HTTP 实例/解析器、Agent 归属、逐跳代理和固定 lookup；运行 `web-scope-host.test.mjs` 检查主/子会话、共享数据库判定、原生拒绝、官方代理拒绝、范围变化、回环传输与撤销。不能只调整版本号或以自有检查通过替代宿主工具链证据，详见 [HTTP 范围合同](web-scope-contract.md)。
 
+`native-http-resolution.js` 使用当前原生 resolver 的第三个 lookup 参数透明观察同次 DNS64 发现，这个内部参数必须在升级时重新核验。运行 `web-nat64-host.test.mjs` 验证无额外发现查询、主/子并发和逐跳隔离、原生 public-only、固定原 IPv6 与译址地区；`connection-nat64.test.mjs` 验证本地检查的单次发现及总时限。改变地区判定语义时更新范围判定版本，保留但作废旧检查结论，详见 [IPv6 译址合同](nat64-contract.md)。
+
 `systemPrompt.project` 是当前版本的内部实例接口，升级时尤其需要复验。发生部分失败时不伪造完成，不直接编辑会话日志补救。
 
 原生规则适配还依赖精确的事件来源和步骤时点。内存 Session 接纳成功不代表物理 JSONL 合法；升级必须运行 `native-instructions-host.test.mjs`，从落盘日志重建每次完整请求，并检验恢复、分支与取消。文件权限验收运行 `file-permissions-host.test.mjs`，不能以默认配置读回替代工具实际写入/拒绝。两项均需要显式官方运行时与可信公开归档目录；不执行摘要已变化的安装入口。

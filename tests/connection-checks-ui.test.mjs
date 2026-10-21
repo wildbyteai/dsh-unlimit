@@ -390,6 +390,7 @@ test("country and exception decisions distinguish the evaluated address from a c
     ["country-denied", "CN / HK / MO"],
     ["special-address", "特殊或私网地址"],
     ["country-unknown", "国家未知"],
+    ["ipv6-unverified", "IPv6 译址发现不明确"],
     ["database-unavailable", "本地国家数据库不可用"],
   ]) {
     const preview = connectionPreview({ ...prepared, items: [{ ...ready, reason }] });
@@ -401,4 +402,31 @@ test("country and exception decisions distinguish the evaluated address from a c
     connectionResults({ items: [{ scope: { ...scope, country: null } }] }),
     /未查询（精确例外）/,
   );
+});
+
+test("translated country receipts distinguish IPv6 candidate and IPv4 destination without implying connection", () => {
+  const scope = {
+    allowed: false,
+    reason: "country-denied",
+    country: "CN",
+    address: "2606:aaaa:1111:1:2:3:100:101",
+    countryAddress: "1.0.1.1",
+  };
+  const denied = {
+    ...result.items[0],
+    state: "denied",
+    reason: "country-denied",
+    scope,
+    transport: undefined,
+  };
+  const html = connectionResults({ items: [denied] });
+  assert.match(html, /国家 CN.*连接候选 2606:aaaa:1111:1:2:3:100:101.*译址目标 1.0.1.1/);
+  assert.doesNotMatch(html, /HTTP \d|TCP 监听端口已连接/);
+  assert.match(connectionResultText({ lastCheck: denied }), /译址目标 1.0.1.1/);
+  assert.match(connectionCheckNotice, /ipv4only.arpa.*总时限/);
+  const hostile = connectionResults({
+    items: [{ ...denied, scope: { ...scope, countryAddress: '<img src="x">' } }],
+  });
+  assert.doesNotMatch(hostile, /<img/);
+  assert.match(hostile, /&lt;img/);
 });

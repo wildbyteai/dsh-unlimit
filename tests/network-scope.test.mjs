@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -241,6 +242,75 @@ test("country decisions reject CN HK MO, unknown and special destinations, and h
   assert.deepEqual(f.calls, { dns: [], transport: [] });
 });
 
+test("verified IPv6 translation classifies the IPv4 country while preserving the wire address", async (t) => {
+  const f = fixture(t);
+  await f.load();
+  const wire = "2001:4860:1234::100:101";
+  assert.equal(f.scope.decide("target.invalid", wire).country, "US");
+  const denied = f.scope.decide("target.invalid", wire, { ipv4Destination: "1.0.1.1" });
+  assert.deepEqual(
+    [denied.allowed, denied.reason, denied.country, denied.address, denied.countryAddress],
+    [false, "country-denied", "CN", wire, "1.0.1.1"],
+  );
+  const unknownSurface = "3001:1234::808:808";
+  assert.equal(f.scope.decide("target.invalid", unknownSurface).allowed, false);
+  const allowed = f.scope.decide(unknownSurface, unknownSurface, { ipv4Destination: "8.8.8.8" });
+  assert.deepEqual(
+    [allowed.allowed, allowed.country, allowed.address, allowed.countryAddress],
+    [true, "US", unknownSurface, "8.8.8.8"],
+  );
+  assert.equal(
+    f.scope.decide("target.invalid", wire, { ipv4Destination: "127.0.0.1" }).reason,
+    "special-address",
+  );
+  assert.deepEqual(f.calls, { dns: [], transport: [] });
+});
+
+test("translation metadata cannot change the literal target or grant a decoded address exception", async (t) => {
+  const f = fixture(t);
+  await f.load();
+  const wire = "3001:1234::100:101";
+  await f.settings(["1.0.1.1", "owned.invalid"]);
+  assert.equal(
+    f.scope.decide("target.invalid", wire, { ipv4Destination: "1.0.1.1" }).allowed,
+    false,
+  );
+  assert.equal(
+    f.scope.decide("owned.invalid", wire, { ipv4Destination: "1.0.1.1" }).reason,
+    "exact-host",
+  );
+  assert.equal(f.scope.decide("1.0.1.1", wire, { ipv4Destination: "8.8.8.8" }).allowed, false);
+  assert.equal(f.scope.decide("3001:1234::2", wire, { ipv4Destination: "8.8.8.8" }).allowed, false);
+  for (const ipv4Destination of ["bad", "::1", "1.2.3.4%lo0", null, 42]) {
+    assert.equal(f.scope.decide("target.invalid", wire, { ipv4Destination }).allowed, false);
+  }
+  assert.equal(
+    f.scope.decide("target.invalid", "1.0.1.1", { ipv4Destination: "8.8.8.8" }).allowed,
+    false,
+  );
+  assert.equal(
+    f.scope.decide("::ffff:1.0.1.1", "::ffff:1.0.1.1", { ipv4Destination: "8.8.8.8" }).allowed,
+    false,
+  );
+});
+
+test("HTTP IPv6 literal preview defers surface classification only while discovery is pending", async (t) => {
+  const f = fixture(t);
+  const wire = "3001:1234::808:808";
+  assert.equal(f.scope.preview(wire, { translationPending: true }).state, "denied");
+  await f.load();
+  assert.equal(f.scope.preview(wire).state, "denied");
+  assert.deepEqual(f.scope.preview(wire, { translationPending: true }), {
+    state: "ready",
+    reason: "region-pending",
+  });
+  assert.equal(f.scope.preview("1.0.1.1", { translationPending: true }).state, "denied");
+  assert.equal(f.scope.preview("::ffff:1.0.1.1", { translationPending: true }).state, "denied");
+  await f.settings([wire]);
+  assert.equal(f.scope.preview(wire, { translationPending: true }).reason, "exact-host");
+  assert.deepEqual(f.calls, { dns: [], transport: [] });
+});
+
 test("mixed DNS selects only the first permitted address, preserves original host/path, and records its country", async (t) => {
   const f = fixture(t);
   await f.load();
@@ -252,7 +322,10 @@ test("mixed DNS selects only the first permitted address, preserves original hos
   const record = f.record("https://target.example.invalid/health?q=synthetic");
   assert.equal(f.prepare([record]).items[0].reason, "region-pending");
   const result = await f.run([record]);
-  assert.equal(f.calls.dns.length, 1);
+  assert.deepEqual(
+    f.calls.dns.map(([hostname]) => hostname),
+    ["target.example.invalid", "ipv4only.arpa"],
+  );
   assert.equal(f.calls.transport.length, 1);
   assert.equal(f.calls.transport[0].address, "8.8.8.8");
   assert.equal(f.calls.transport[0].hostname, "target.example.invalid");
@@ -304,6 +377,29 @@ test("DNS snapshots and country releases invalidate prepared confirmations and o
   await f.load("2026-11");
   assert.equal(first.sha256, f.database.status().sha256);
   assert.notEqual(first.revision, f.database.status().revision);
+});
+
+test("receipts created before translation-aware policy remain visible but become stale", async (t) => {
+  const f = fixture(t);
+  await f.load();
+  const record = f.record("https://8.8.8.8/");
+  await f.run([record]);
+  const key = `connection-check:${record.id}`;
+  const saved = f.store.meta(key);
+  const legacyRevision = createHash("sha256")
+    .update(
+      JSON.stringify({
+        hosts: f.scope.hosts(),
+        snapshots: f.scope.snapshots(),
+        database: f.database.status().revision,
+      }),
+    )
+    .digest("hex");
+  assert.notEqual(f.scope.status().revision, legacyRevision);
+  f.store.setMeta(key, { ...saved, policy: legacyRevision });
+  const status = f.checks.status({ workspaceId: f.workspaceId }).items[0];
+  assert.equal(status.stale, true);
+  assert.deepEqual(status.lastCheck, saved.result);
 });
 
 test("scope changes during check DNS prevent connection and stale persistence", async (t) => {
