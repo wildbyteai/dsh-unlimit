@@ -189,6 +189,35 @@ test("goal planning displays a checked draft, fills JSON only on request and nev
   assert.deepEqual(ui.calls.at(-1).payload.tasks, [draft]);
 });
 
+test("task receipts show native image storage and source separately from actual startup", async () => {
+  const ui = await setup({
+    respond: () => ({
+      item: plan("image-plan", {
+        state: "finished-with-errors",
+        tasks: [
+          {
+            ...task,
+            state: "failed",
+            runId: "saved-run",
+            receipt: {
+              imageStorage: "saved",
+              images: [{ origin: "host", id: "evidence", path: "assets/<chart>.png" }],
+            },
+          },
+          { ...task, id: "unknown", state: "failed", receipt: { imageStorage: "unconfirmed" } },
+        ],
+      }),
+    }),
+  });
+  ui.select("image-plan");
+  await ui.emit("query-form", "submit");
+  const html = ui.host.node("result").innerHTML;
+  assert.match(html, /已保存原生附件：host\/evidence\/assets\/&lt;chart&gt;\.png/);
+  assert.match(html, /保存结果未确认/);
+  assert.match(html, /仅有运行记录，检查收据/);
+  assert.doesNotMatch(html, /已取得启动收据|<chart>/);
+});
+
 test("unavailable, invalid and late proposals cannot fill an unrelated plan", async () => {
   const unsupported = await setup();
   assert.equal(unsupported.host.node("propose").disabled, true);
@@ -541,7 +570,14 @@ test("explicit host and project resource paths pass through the task form and in
     const ui = await setup();
     const selected = {
       ...task,
-      skills: [{ origin, id: "evidence-review", resources: ["references/count.md"] }],
+      skills: [
+        {
+          origin,
+          id: "evidence-review",
+          resources: ["references/count.md"],
+          images: ["assets/diagram.png"],
+        },
+      ],
     };
     ui.host.node("json").value = JSON.stringify([selected]);
     await ui.emit("create-form", "submit");
@@ -550,10 +586,19 @@ test("explicit host and project resource paths pass through the task form and in
       [selected],
     );
     assert.match(ui.view.html, /resources:/);
+    assert.match(ui.view.html, /images:/);
   }
   for (const ref of [
     { origin: "unknown", id: "example", resources: ["a.md"] },
     { origin: "project", id: "example", resources: "a.md" },
+    { origin: "project", id: "example", images: "a.png" },
+    { origin: "host", id: "example", resources: ["a.png"], images: ["a.png"] },
+    {
+      origin: "host",
+      id: "example",
+      resources: Array.from({ length: 16 }, (_, i) => `${i}.md`),
+      images: ["a.png"],
+    },
   ]) {
     const invalid = await setup();
     invalid.host.node("json").value = JSON.stringify([{ ...task, skills: [ref] }]);

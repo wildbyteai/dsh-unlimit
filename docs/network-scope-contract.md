@@ -58,4 +58,6 @@ CSV 最大 48 MiB；gzip 最大 16 MiB，展开最大 64 MiB；最多 150 万行
 
 合成 CSV、假 DNS、临时 SQLite 和官方挂载入口有自动测试；浏览器实际操作覆盖本地文件选择与导入、取消确认、解析停止、混合地址选择、别名拒绝、保存与刷新读回，见 [验收证据](evidence/network-scope-acceptance.json)。预览所有目标 DNS 和传输均为合成回调，只有页面服务监听回环。它不证明真实国家数据准确、外部目标可达或桌面嵌入已通过。
 
-官方 0.2.1-rc.2 的 `web_fetch → HttpFetchProvider` 已有独立的每跳适配，并在解析前及解析后检查代理路由，保留原生 public-only。其代理分支、远端 Fetch 和无例外 IPv6 暂拒绝；MCP、shell、搜索和 Chromium 仍未纳入。详见 [HTTP 合同与证据](web-scope-contract.md)，不能把局部适配当作系统防火墙。
+官方 0.2.1-rc.2 的 `web_fetch → HttpFetchProvider` 已有独立的每跳适配，并在解析前及解析后检查代理路由，保留原生 public-only。其代理分支和远端 Fetch 保持拒绝；IPv6 按 NAT64 合同处理，无法确定的目标不放行；MCP、shell、搜索和 Chromium 仍未纳入。详见 [HTTP 合同与证据](web-scope-contract.md)，不能把局部适配当作系统防火墙。
+
+2026-10-22 又复核了搜索、MCP HTTP/stdio、Bash/Pwsh/PTY 和 Chromium 的连接入口。未找到能在插件层保留原行为并实施逐请求 DNS/地址/重定向约束的公开合同，本轮没有扩大受控出口清单。具体缺失接口和已核验文件摘要见 [其他出口复核](web-scope-contract.md#其他网络出口接口复核2026-10-22)。SDK 自身有 fetch 选项不等于 DSH 暴露该选项；关闭工具或停用整个 MCP 也不等于范围控制。

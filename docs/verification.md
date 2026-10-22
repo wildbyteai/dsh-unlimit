@@ -866,3 +866,16 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 重启接口只读复核范围见[维护合同](maintenance-contract.md#桌面重启入口复核2026-10-22)，仍无适配的 relaunch 接口。Hook、第三方记忆、完全卸载后旧提示词恢复、空闲 PTC 待办恢复、其他网络出口、URL/不透明来源及二进制资源、实际升级和桌面验收等缺口仍保留。没有安装、重载、读写真实 profile/配置/会话、请求真实模型或修改宿主程序；来源与许可声明不变。
 
 本批语法、来源、分层、格式检查通过；客户端构建及本地打包完成，78 文件，SHA-256 `81a9e6c3b31c30ad58f33ea2deaed5b65d3b3e7ad86bcf69ef434a23f3d10864`。最终原验收基线、包内容、首次提示和任务表专项复验通过，日志 `artifacts/gap-paths-final.log`。两个预览回环端口均已确认无监听。
+
+## 本地 URL 技能图片与其他出口复核（2026-10-22）
+
+基于 `02a1265` 工作树，完成本地 file URL 和显式原生图片交付；其他出口没有新增强制范围控制。117 项原验收前五列保持，来源和许可说明不变。
+
+- 目录与 `file://` 资源使用同一受限本地读取路径；拒绝远端 authority、query/hash、编码分隔符、链接根/链接文件和特殊文件。官方 SkillRegistry 同名作用域选择、规划候选、执行前正文/资源更新、所属任务隔离、AgentLoop 请求、JSONL 持久重开及汇总均经过临时合成链路验证。与上批仅 Registry/合成协调器相比，本轮补验了真实官方执行路径。
+- 图片通过 `images` 单独选择 PNG/JPEG/WebP/GIF，跨技能使用当前宿主图片限额，预检不写附件。项目/宿主图片经过实际 LocalAttachmentStore、官方子代理/AgentLoop 和持久 reader，原生 readImageRequest 可返回相应规范化字节；未选图片、规划者和无图片任务没有附件。技能来源/原始摘要与原生附件引用分开记录，base64 不进入状态、提示词或日志。项目库原有快照读取保持，图片预算不限制之前的整库/整技能磁盘 I/O。
+- 真实附件模块验证损坏批次、当前数量限额、纯文本模型拒绝和保存中取消。取消后不启动执行者，处置并释放槽位；已发布的共享附件对象保留，因为官方存储没有删除回滚或保存取消合同。保存成功不等于任务启动或视觉模型可用。LLM 为合成传输，没有请求外部视觉模型。
+- 其他出口只读复核搜索、MCP HTTP/stdio、Bash/Pwsh/PTY、macOS sandbox、Chromium sidebar 及全局代理；逐文件先对官方库存核对摘要。搜索未开放独立 transport；MCP SDK 虽有 fetch 选项，DSH 创建 transport 时未暴露，且服务端下游连接不可见；终端/浏览器缺少插件层逐地址请求合同。没有改写全局 fetch/dispatcher、拦截命令或停用整项工具来冒充出口控制。文件摘要、范围与原因见 [接口证据](evidence/network-egress-interface-review.json) 和 [合同](web-scope-contract.md#其他网络出口接口复核2026-10-22)；没有调查 Electron 主进程或全部第三方生态，不把结论扩张为永久无法实现。
+- 实际页面模块在约 1265×720 回环预览验证：生成草稿显示文本与图片路径，填入 JSON 保留 images，提交计划后读回完成及清理状态；图片任务显示来源/原生附件保存状态，其他任务显示无图片。页面所有执行/附件服务为合成，官方存储证据来自上述独立测试。无 console error/warn，截图 `artifacts/skill-images-preview.png`。页面已关闭、预览进程正常退出，端口确认无监听。
+- bundled Node v24.21.0、显式 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`：`node --expose-internals --test tests/*.test.mjs`，1149 通过、0 失败、0 跳过；日志 `artifacts/resource-egress-full.log`。定向日志 `artifacts/skill-images-plan.log`。语法、来源、分层检查通过，客户端构建与本地包完成，78 文件，SHA-256 `20cec8050267557e6206c69f114a991630cd0483bf100b32808d950c878bc77c`。
+
+尚缺：其他网络出口；远端 URL/opaque、其他二进制技能附件、真实视觉模型及桌面验收。Hook/第三方记忆、完全卸载提示词修复、空闲 PTC 待办恢复、重启/实际升级等原差距继续保留。本轮未安装或重载插件，未读写真实配置、profile、会话，未修改宿主程序或连接真实模型。

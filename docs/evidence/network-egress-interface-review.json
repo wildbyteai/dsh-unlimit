@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-22",
+  "baseCommit": "02a1265",
+  "target": {
+    "version": "0.2.1-rc.2",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "result": "static-interface-inspection-only",
+  "inventorySha256": "3b264f1d9d4d3dc01e37aa382b2575a9dda6e34480af04982921b7d7720f0ef0",
+  "files": [
+    {
+      "id": "search",
+      "path": "node_modules/@deepseek-ai/dsh-web-search-deepseek/lib/index.js",
+      "sha256": "fc13dd4eaba3c9298af41a4d0559a1b8bb61614462fe18ba6e76d8c598c332bd",
+      "lines": [
+        [96, 106],
+        [133, 145]
+      ],
+      "observation": "Provider directly uses global fetch; no per-provider fetch/dispatcher injection. Remote search downstream targets are not visible."
+    },
+    {
+      "id": "mcp-host",
+      "path": "node_modules/@deepseek-ai/dsh-mcp-client/lib/index.js",
+      "sha256": "758d8fc473b700b5d351158d06ce9f9e92c16e8b25497b08bb7bd2122a87f5dd",
+      "lines": [
+        [38, 46],
+        [127, 146],
+        [481, 497],
+        [643, 677],
+        [780, 800]
+      ],
+      "observation": "Transport construction is local to the plugin and only exposes headers. Initialization and reconnection can connect before tool execution."
+    },
+    {
+      "id": "mcp-sdk",
+      "path": "node_modules/@modelcontextprotocol/client/dist/index.mjs",
+      "sha256": "b5891864a6ebcef27d8d999d662d03d7095368a2c0ff072ac578c2f31b27afa4",
+      "lines": [
+        [5328, 5340],
+        [5435, 5451],
+        [5637, 5643],
+        [5680, 5693],
+        [5788, 5798]
+      ],
+      "observation": "SDK custom fetch exists, but DSH does not expose it at transport creation. It cannot govern MCP server downstream egress."
+    },
+    {
+      "id": "mcp-stdio",
+      "path": "node_modules/@modelcontextprotocol/client/dist/stdio.mjs",
+      "sha256": "26bba09797abb03929888ce234141ab89e5456a8ff3cdf5fadcb522d42f4ba3e",
+      "lines": [
+        [71, 87],
+        [181, 203]
+      ],
+      "observation": "SDK spawns its own child; cancel and transport close do not constrain downstream sockets."
+    },
+    {
+      "id": "bash",
+      "path": "node_modules/@deepseek-ai/dsh-bash-local/lib/index.js",
+      "sha256": "6d9b4426b8455198b79de398f57c0f5693e7292411059b66d5ac5eba608b59cb",
+      "lines": [[88, 126]],
+      "observation": "Execution receives command/workdir/env/signal/sandboxPolicy; no destination or resolver contract."
+    },
+    {
+      "id": "pwsh",
+      "path": "node_modules/@deepseek-ai/dsh-pwsh-local/lib/index.js",
+      "sha256": "8b7b57eb7f6c597caa5ee72e4dfd88cec7b5ac51e450ed3521b6b6b29306b88e",
+      "lines": [[174, 224]],
+      "observation": "Execution receives command/workdir/env/signal/sandboxPolicy; no destination or resolver contract."
+    },
+    {
+      "id": "sandbox-policy",
+      "path": "node_modules/@deepseek-ai/dsh-sandbox-policy/lib/index.js",
+      "sha256": "772ca58f0f786d6cb4d839deb621634c31097c13228d81b14e3f3153d0524924",
+      "lines": [[141, 147]],
+      "observation": "Policy contains mode/workspaceRoot/sessionId rather than per-address network restrictions."
+    },
+    {
+      "id": "macos-sandbox",
+      "path": "node_modules/@deepseek-ai/dsh-sandbox-local/lib/index.js",
+      "sha256": "be6e1107871cf8d94c040090b13c405bc833822e2f51ed5280e93eececf762be",
+      "lines": [
+        [65, 74],
+        [305, 335]
+      ],
+      "observation": "Current macOS sandbox confines file writes; it is not a per-target network policy."
+    },
+    {
+      "id": "terminal",
+      "path": "node_modules/@deepseek-ai/dsh-terminal-bash/lib/index.js",
+      "sha256": "388ce251b94a919edcfb9c13f6ffc49bcd1f4caf9ee493c65b46b454786c8c8b",
+      "lines": [
+        [964, 972],
+        [1047, 1062]
+      ],
+      "observation": "Persistent terminal shares the process confinement contract, with no destination/address binding."
+    },
+    {
+      "id": "chromium",
+      "path": "node_modules/@deepseek-ai/dsh-client-ui-sidebar-browser/lib/client.js",
+      "sha256": "7a1caf03a0afe030d67405997ee851d552432c141fc34c72f2eb5b03de499144",
+      "lines": [
+        [363, 406],
+        [1158, 1184],
+        [1213, 1223],
+        [1286, 1304],
+        [1335, 1343]
+      ],
+      "observation": "Browser bridge manages guest lifetime and navigation. No exposed per-request DNS, address pinning or redirect interception."
+    },
+    {
+      "id": "proxy",
+      "path": "node_modules/@deepseek-ai/dsh-http-proxy/lib/index.js",
+      "sha256": "5310861bc89788ea24be82a3b323e34cbd42b9e6214e2a179b2e6f92a8758cd5",
+      "lines": [
+        [377, 450],
+        [536, 536]
+      ],
+      "observation": "Process-global proxy routing is not an Agent-owned per-target transport interface."
+    }
+  ],
+  "boundaries": {
+    "hostCodeExecuted": false,
+    "realProfileRead": false,
+    "realConfigurationModified": false,
+    "realSessionsRead": false,
+    "networkRequests": false,
+    "processesStarted": false,
+    "modifiedEntrypointsRead": false,
+    "electronMainProcessInspected": false,
+    "absenceProvesAllPossibleAdaptersUnsupported": false
+  }
+}

@@ -101,6 +101,8 @@ export async function loadOfficial() {
       presets: "@deepseek-ai/dsh-agent-preset-registry",
       approval: "@deepseek-ai/dsh-user-approval",
       sandboxPolicy: "@deepseek-ai/dsh-sandbox-policy",
+      attachments: "@deepseek-ai/dsh-attachment-local",
+      skills: "@deepseek-ai/dsh-skill",
     };
     return Object.fromEntries(
       await Promise.all(Object.entries(names).map(async ([key, name]) => [key, await load(name)])),
@@ -112,7 +114,17 @@ export async function loadOfficial() {
 // streamBehavior receives a 1-based count for this session and returns
 // "stop" (default), "max-tokens", or "hold". A held request remains cancellable
 // and is exposed in holds with resolve() for tests that explicitly release it.
-export async function fixture(t, { captureAll = false, streamBehavior, textOutput } = {}) {
+export async function fixture(
+  t,
+  {
+    captureAll = false,
+    streamBehavior,
+    textOutput,
+    realAttachments = false,
+    imageModel = true,
+    attachmentConfig = {},
+  } = {},
+) {
   const finishGuard = denyExternalExecution(t);
   let dispose;
   t.after(async () => {
@@ -190,6 +202,10 @@ export async function fixture(t, { captureAll = false, streamBehavior, textOutpu
       const model = new api.cordis.Service(scope, "agentDefaultModel");
       model.currentSelection = () => ({ provider: "synthetic-offline", model: "never-called" });
       const llm = new api.cordis.Service(scope, "llm");
+      if (realAttachments)
+        llm.resolveModelInfo = async () => ({
+          inputModalities: imageModel ? ["text", "image"] : ["text"],
+        });
       // Only the transport is synthetic. Official AgentLoop consumes this valid
       // provider-neutral stream and commits real session/activation events.
       llm.prepareCall = async (config) => ({ config, stream: (request) => llm.stream(request) });
@@ -250,15 +266,18 @@ export async function fixture(t, { captureAll = false, streamBehavior, textOutpu
       };
       fs.stat = async (target) => ({ type: statSync(target).isDirectory() ? "directory" : "file" });
       fs.processPath = (target) => target;
-      const attachments = new api.cordis.Service(scope, "attachments");
-      attachments.imageLimits = {
-        maxImageBytes: 1024,
-        maxImagesPerMessage: 1,
-        maxMessageImageBytes: 1024,
-        maxImagePixels: 1024,
-        maxImageDimension: 32,
-        mediaTypes: ["image/png"],
-      };
+      if (realAttachments) new api.skills.SkillRegistry(scope);
+      else {
+        const attachments = new api.cordis.Service(scope, "attachments");
+        attachments.imageLimits = {
+          maxImageBytes: 1024,
+          maxImagesPerMessage: 1,
+          maxMessageImageBytes: 1024,
+          maxImagePixels: 1024,
+          maxImageDimension: 32,
+          mediaTypes: ["image/png"],
+        };
+      }
       const uploads = new api.cordis.Service(scope, "fileUploads");
       uploads.registerAgentResolver = () => () => {};
       const access = new api.cordis.Service(scope, "remoteAccess");
@@ -266,6 +285,11 @@ export async function fixture(t, { captureAll = false, streamBehavior, textOutpu
         resource.kind === "session" && ctx.sessions.get(resource.id) !== undefined;
     },
   });
+  if (realAttachments)
+    await mount(api.attachments.LocalAttachmentStore, {
+      ...attachmentConfig,
+      dshHome: join(directory, "isolated-attachment-home"),
+    });
   await mount(api.jsonStorage, { root: join(directory, "domains") });
   await mount(api.domain, { backend: "json", routes: {} });
   await mount(api.persistence, {

@@ -66,14 +66,15 @@ export async function workflowPlans({
   const html = panel(
     "任务规划与执行",
     `<div id="workflow-plans-module">
-    <p class="info">可以直接填写明确任务，也可以描述目标，让规划者根据当前能力目录拆分草稿。可先检查草稿再提交，也可选择规划后直接执行。两种方式都会产生模型调用。规划者可从项目技能的附属文件目录选择文本，执行前重新检查；文件名可见不代表内容已读取。</p>
+    <p class="info">可以直接填写明确任务，也可以描述目标，让规划者根据当前能力目录拆分草稿。可先检查草稿再提交，也可选择规划后直接执行。两种方式都会产生模型调用。规划者可从宿主及项目技能目录选择文本或图片，执行前重新检查；文件名可见不代表内容已读取。</p>
     <div id="workflow-plan-capability" class="${capability.available ? "note" : "error"}" role="status">${esc(capability.available ? "当前可提交显式计划；依赖预检不增加执行授权，执行者结果仍须核实。" : `不能提交计划：${unavailable()}`)}</div>
     ${!capability.available && capability.reasons?.length ? `<details><summary>查看接口诊断详情</summary><p class="info">${esc(capability.reasons.join("；"))}</p></details>` : ""}
     <form id="workflow-plan-create-form">
       <div class="field"><label for="workflow-plan-parent">当前项目已绑定的父会话编号</label><input id="workflow-plan-parent" name="parentSessionId" list="workflow-plan-parents" value="${esc(bound[0]?.id || "")}" autocomplete="off" required><datalist id="workflow-plan-parents">${options}</datalist><small>创建需选当前已绑定会话；不替其他会话提交任务。</small></div>
       <div class="field wide"><label for="workflow-plan-goal">想完成什么</label><textarea id="workflow-plan-goal" rows="3" placeholder="描述目标、允许操作的范围和完成条件；不要填入密钥。"></textarea><small>生成草稿会启动一次规划者。提示要求只规划，但其工具和权限仍由宿主管理，不是无工具沙箱。“生成任务草稿”只规划；“规划并执行目标”会直接启动检查通过的生成任务，沿用下方汇总选项。</small></div>
       <div class="toolbar"><button type="button" id="workflow-plan-propose" ${capability.available && capability.planDrafting ? "" : "disabled"}>生成任务草稿</button><button type="button" id="workflow-plan-run-goal" class="primary" disabled>规划并执行目标</button><button type="button" id="workflow-plan-use-draft" disabled>将当前草稿填入任务表</button></div>
-      <div class="field wide"><label for="workflow-plan-json">明确任务 JSON（1–32 项）</label><textarea id="workflow-plan-json" name="tasks" rows="14" spellcheck="false" required>${esc(sample)}</textarea><small>每项填写 id、role、task、requirements，可选 dependsOn、usePreset 和 skills:[{origin,id}]；宿主及项目技能可加 resources:["references/checklist.md"]，只随附显式选中的 UTF-8 文本（最多16个，任务总计32KiB），不执行脚本。[] 只表示声明无依赖。示例没有附带真实材料，请先改为当前项目的明确任务；不要填入密钥。</small></div>
+      <div class="field wide"><label for="workflow-plan-json">明确任务 JSON（1–32 项）</label><textarea id="workflow-plan-json" name="tasks" rows="14" spellcheck="false" required>${esc(sample)}</textarea><small>每项填写 id、role、task、requirements，可选 dependsOn、usePreset 和 skills:[{origin,id}]；宿主及项目技能可加 resources:["references/checklist.md"]，只随附显式选中的 UTF-8 文本；图片另用 images:["assets/diagram.png"]，支持 PNG/JPEG/WebP/GIF，通过宿主附件提供。两类每技能合计最多16个且不重复；任务文本总计32KiB，图片采用宿主限制并可能规范化。不执行脚本。[] 只表示声明无依赖。示例没有附带真实材料，请先改为当前项目的明确任务；不要填入密钥。</small></div>
+      <p class="info">${capability.imageAttachments === true ? "原生图片附件接口可用；实际模型是否支持图片仍由宿主检查。" : "当前没有可用的原生图片附件接口，含图片的任务会在执行前拒绝；文本任务仍可使用。"}</p>
       <div class="field wide"><label><input type="checkbox" id="workflow-plan-summarize" name="summarize" ${capability.available && capability.evidenceSummary === true ? "" : "disabled"}> 任务结束后生成指挥汇总</label><small>使用当前项目的规划者角色，增加一次模型调用；引用任务结果与失败、未执行状态，不会自动核实事实。</small><small id="workflow-plan-summary-availability">${capability.evidenceSummary === true ? "" : "当前服务不支持指挥汇总。"}</small></div>
       <div class="toolbar"><button type="button" id="workflow-plan-check">检查 JSON</button><button type="submit" class="primary" id="workflow-plan-create" ${capability.available && bound.length ? "" : "disabled"}>提交明确计划</button></div>
     </form>
@@ -139,15 +140,24 @@ export async function workflowPlans({
               !["host", "project"].includes(ref.origin) ||
               typeof ref.id !== "string" ||
               !ref.id.trim() ||
-              Object.keys(ref).some((key) => !["origin", "id", "resources"].includes(key)) ||
-              (ref.resources !== undefined &&
-                (!Array.isArray(ref.resources) ||
-                  ref.resources.length > 16 ||
-                  ref.resources.some((path) => typeof path !== "string" || !path.trim()))),
+              Object.keys(ref).some(
+                (key) => !["origin", "id", "resources", "images"].includes(key),
+              ) ||
+              ["resources", "images"].some(
+                (kind) =>
+                  ref[kind] !== undefined &&
+                  (!Array.isArray(ref[kind]) ||
+                    ref[kind].some((path) => typeof path !== "string" || !path.trim())),
+              ) ||
+              (Array.isArray(ref.resources ?? []) &&
+                Array.isArray(ref.images ?? []) &&
+                ((ref.resources?.length ?? 0) + (ref.images?.length ?? 0) > 16 ||
+                  new Set([...(ref.resources ?? []), ...(ref.images ?? [])]).size !==
+                    (ref.resources?.length ?? 0) + (ref.images?.length ?? 0))),
           ))
       )
         throw new Error(
-          "skills 须为准确的 {origin,id} 引用；宿主及项目技能可选 resources 路径数组，不允许覆盖依赖声明",
+          "skills 须为准确的 {origin,id} 引用；宿主及项目技能可选 resources 文本和 images 图片路径，两类合计最多16个且不重复，不允许覆盖依赖声明",
         );
       if (task.usePreset !== undefined && typeof task.usePreset !== "boolean")
         throw new Error("usePreset 须为布尔值");
@@ -286,7 +296,7 @@ export async function workflowPlans({
                         (task.skills ?? [])
                           .map(
                             (ref) =>
-                              `${ref.origin}/${ref.id}${ref.resources?.length ? ` [${ref.resources.join(", ")}]` : ""}`,
+                              `${ref.origin}/${ref.id}${ref.resources?.length ? ` [文本：${ref.resources.join(", ")}]` : ""}${ref.images?.length ? ` [图片：${ref.images.join(", ")}]` : ""}`,
                           )
                           .join("；") || "未选择",
                     })),
@@ -311,6 +321,9 @@ export async function workflowPlans({
           : task.runId
             ? "仅有运行记录，检查收据"
             : "未取得运行记录",
+        images: task.receipt?.imageStorage
+          ? `${{ saving: "正在保存", saved: "已保存原生附件", unconfirmed: "保存结果未确认" }[task.receipt.imageStorage] || task.receipt.imageStorage}${task.receipt.images?.length ? `：${task.receipt.images.map((image) => `${image.origin}/${image.id}/${image.path}`).join("；")}` : ""}`
+          : "无图片附件",
         cleanup: task.runId
           ? `处置 ${task.receipt?.disposed === true ? "已确认" : "未确认"}；槽位 ${task.receipt?.slotReleased === true ? "已释放" : "仍占用"}`
           : "尚无自有收据",
@@ -323,6 +336,7 @@ export async function workflowPlans({
             ["role", "角色"],
             ["stateLabel", "状态"],
             ["execution", "实际启动"],
+            ["images", "技能图片"],
             ["cleanup", "清理与槽位"],
           ],
         )}${proposalView}${summary(item)}<details><summary>完整计划、逐任务回执与原样结果（未验证）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto">${esc(JSON.stringify(item, null, 2))}</pre></details>`;

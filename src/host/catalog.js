@@ -4,9 +4,12 @@ import { fail, object, string } from "../core/validation.js";
 import { normalizeServers } from "../core/servers.js";
 import {
   hostSkillResourceInventory,
-  normalizeSkillResources,
+  normalizeSkillSelections,
+  selectedHostSkillImages,
   selectedHostSkillResources,
+  selectedSkillImages,
   selectedSkillResources,
+  skillImageBudget,
 } from "../core/skill-resources.js";
 
 const ORIGINS = ["host", "project"];
@@ -19,11 +22,14 @@ function fields(value, allowed) {
     fail("INVALID_INPUT", "Unsupported catalog option");
 }
 function reference(value) {
-  fields(value, ["origin", "id", "requirements", "resources"]);
+  fields(value, ["origin", "id", "requirements", "resources", "images"]);
   if (!ORIGINS.includes(value.origin)) fail("INVALID_INPUT", "origin must be host or project");
   string(value.id, "id");
-  const resources = normalizeSkillResources(value.origin, value.resources);
-  return { origin: value.origin, id: value.id, ...(resources === undefined ? {} : { resources }) };
+  return {
+    origin: value.origin,
+    id: value.id,
+    ...normalizeSkillSelections(value.origin, value),
+  };
 }
 export function normalizeRequirements(value) {
   if (!Array.isArray(value)) fail("INVALID_INPUT", "requirements must be an array");
@@ -487,6 +493,15 @@ export class HostCatalog {
     for (const item of selected)
       if (item.requirements !== undefined) normalizeRequirements(item.requirements);
     const context = this.context(payload.sessionId);
+    const imageCount = refs.reduce((count, ref) => count + (ref.images?.length ?? 0), 0);
+    let imageBudget, imagePolicyError;
+    if (imageCount) {
+      try {
+        imageBudget = skillImageBudget(this.service("attachments"), imageCount);
+      } catch (error) {
+        imagePolicyError = error;
+      }
+    }
     const catalog = await this.collect(context, signal);
     const environment = { loaded: false };
     const checks = (explicit || []).map((item) => this.check(item, catalog, environment));
@@ -549,6 +564,24 @@ export class HostCatalog {
           });
         }
       }
+      let images;
+      if (ref.images !== undefined) {
+        try {
+          if (ref.images.length && imagePolicyError) throw imagePolicyError;
+          images =
+            ref.origin === "host"
+              ? selectedHostSkillImages(item, ref.images, imageBudget)
+              : selectedSkillImages(item, ref.images, imageBudget);
+          result.images = images.map(({ contentBase64, ...metadata }) => metadata);
+        } catch (error) {
+          ownChecks.push({
+            kind: "skill-image",
+            state: "invalid",
+            code: error.code,
+            detail: error.message,
+          });
+        }
+      }
       if (includeContent && result.readStatus === "readable")
         skillBodies.push({
           origin: ref.origin,
@@ -556,6 +589,7 @@ export class HostCatalog {
           name: item.name,
           content: item.content,
           ...(resources === undefined ? {} : { resources }),
+          ...(images === undefined ? {} : { images }),
         });
       result.dependencyStatus = combined(ownChecks);
       skills.push(result);

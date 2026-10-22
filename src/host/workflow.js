@@ -4,6 +4,7 @@ import { StoreError, fail, object, string } from "../core/validation.js";
 export const WORKFLOW_PRESET_ID = "dsh-unlimit/local-evidence-worker";
 
 const now = () => new Date().toISOString();
+const original = (value) => value?.[Symbol.for("cordis.original")] ?? value;
 const diagnostic = (error) => ({
   code: error?.code ?? "HOST_ERROR",
   message: String(error?.message ?? error),
@@ -54,6 +55,9 @@ export class DesktopWorkflow {
         ["register", "list", "resolve"].every((key) => typeof presets?.[key] === "function") &&
         provider?.capabilities?.agentPreset === true,
       runtimeOnly: true,
+      imageAttachments:
+        typeof this.service("attachments")?.saveImages === "function" &&
+        Boolean(this.service("attachments")?.imageLimits),
       reasons,
     };
   }
@@ -69,7 +73,7 @@ export class DesktopWorkflow {
       fail("NOT_FOUND", "No owned workflow run in this workspace");
     return run;
   }
-  async dispatch(action, payload = {}) {
+  async dispatch(action, payload = {}, options = {}) {
     if (this.closed) fail("CLOSED", "Workflow has been closed");
     object(payload);
     switch (action) {
@@ -78,7 +82,7 @@ export class DesktopWorkflow {
       case "workflow.presets":
         return this.presets(payload);
       case "workflow.dispatch":
-        return this.start(payload);
+        return this.start(payload, options);
       case "workflow.status": {
         const workspaceId = this.workspace(payload.workspaceId);
         return payload.id === undefined
@@ -159,7 +163,8 @@ export class DesktopWorkflow {
       throw failure;
     }
   }
-  async start(payload) {
+  async start(payload, { images = [], signal: parentSignal } = {}) {
+    parentSignal?.throwIfAborted();
     this.admission?.require();
     const workspaceId = this.workspace(payload.workspaceId);
     const workspace = this.store.get("workspaces", workspaceId);
@@ -171,6 +176,8 @@ export class DesktopWorkflow {
       fail("INVALID_INPUT", "usePreset must be boolean");
     const caps = this.capabilities();
     if (!caps.dispatch) fail("UNSUPPORTED_CAPABILITY", caps.reasons.join("; "));
+    if (images.length && !caps.imageAttachments)
+      fail("UNSUPPORTED_CAPABILITY", "Native image attachment storage is unavailable");
     const parent = this.service("agents").get(parentSessionId);
     if (!parent) fail("NOT_FOUND", "Parent session is not a live host agent");
     this.flow.bound(workspaceId, parentSessionId);
@@ -216,8 +223,51 @@ export class DesktopWorkflow {
       stopRequested: false,
     };
     this.runs.set(run.item.id, run);
+    const signal = parentSignal
+      ? AbortSignal.any([parentSignal, run.abort.signal])
+      : run.abort.signal;
     run.ready = (async () => {
       try {
+        let imageBlocks = [];
+        if (images.length) {
+          signal.throwIfAborted();
+          run.item.imageStorage = "saving";
+          const attachments = this.service("attachments");
+          let refs;
+          try {
+            refs = await attachments.saveImages(
+              images.map((image) => ({
+                data: Uint8Array.from(Buffer.from(image.contentBase64, "base64")),
+                mediaType: image.mediaType,
+                name: image.path.split("/").at(-1),
+              })),
+            );
+          } catch (error) {
+            // The store may already have published content-addressed objects.
+            // It has no rollback API; deleting them could remove another user's data.
+            run.item.imageStorage = "unconfirmed";
+            throw error;
+          }
+          if (!Array.isArray(refs) || refs.length !== images.length) {
+            run.item.imageStorage = "unconfirmed";
+            fail("HOST_PROTOCOL_ERROR", "Native image storage returned an incomplete batch");
+          }
+          run.item.imageStorage = "saved";
+          run.item.images = images.map(({ contentBase64, ...source }, index) => ({
+            ...source,
+            attachment: refs[index],
+          }));
+          imageBlocks = refs.map((attachment) => ({ type: "image", attachment }));
+          signal.throwIfAborted();
+          if (this.closed) fail("CLOSED", "Workflow has been closed");
+          this.admission?.require();
+          this.flow.bound(workspaceId, parentSessionId);
+          if (
+            original(this.service("agents").get(parentSessionId)) !== original(parent) ||
+            original(this.service("attachments")) !== original(attachments)
+          )
+            fail("CONFLICT", "Parent agent or attachment storage changed before dispatch");
+        }
         const receipt = await runtime.startActivation({
           provider: "spawn",
           childId: sessionId,
@@ -230,10 +280,11 @@ export class DesktopWorkflow {
                 type: "text",
                 text: `工作区：${workspaceId}\n工作区范围声明：${workspace.scope ?? "未记录"}\n工作区授权声明（记录本身不构成新的执行许可）：${workspace.authorization ?? "未记录"}\n明确角色：${role}\n\n${definition.content}\n\n本次任务：\n${task}\n\n只执行明确分派且在用户授权范围内的任务；可在该范围内选择宿主已公开的技能和工具。保留宿主权限与审批边界，不扩大授权或绕过限制。回填事实、证据出处、缺失材料，不把推断写成已验证结果，不声称已自动完成完整攻击链。`,
               },
+              ...imageBlocks,
             ],
             ...(payload.usePreset === true ? { agentPreset: WORKFLOW_PRESET_ID } : {}),
           },
-          signal: run.abort.signal,
+          signal,
           delivery: "caller",
         });
         run.receipt = receipt;
@@ -251,7 +302,7 @@ export class DesktopWorkflow {
           (error) => this.finish(run, null, error),
         );
       } catch (error) {
-        run.item.status = run.stopRequested ? "stopped" : "failed";
+        run.item.status = run.stopRequested || signal.aborted ? "stopped" : "failed";
         run.item.error = diagnostic(error);
         run.item.finishedAt = now();
         // Official startActivation rolls back failed unpublished materializations.

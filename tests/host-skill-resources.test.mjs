@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { HostCatalog } from "../src/host/catalog.js";
 import {
   hostSkillResourceInventory,
@@ -89,6 +90,104 @@ test("host directory skills expose metadata, then deliver only selected exact te
       .resources[0].content,
     "UPDATED_AT_EXECUTION",
   );
+});
+
+test("local file directory URLs preserve encoded names, source metadata and exact selected text", async (t) => {
+  const f = fixture(t);
+  const root = join(f.root, "技能 100% #");
+  const path = "references/含空格 100% #.md";
+  mkdirSync(join(root, "references"), { recursive: true });
+  writeFileSync(join(root, path), f.reference);
+  writeFileSync(join(root, "references/unused.md"), "UNSELECTED_URL_RESOURCE");
+  f.ref.resources = [path];
+  const local = pathToFileURL(`${root}/`).href;
+  for (const url of [local, local.replace("file:///", "file://localhost/")]) {
+    f.definition.resourceBase = { kind: "url", url };
+    const listed = (await f.catalog.list()).skills[0];
+    assert.deepEqual(listed.resourceBase, f.definition.resourceBase);
+    assert.equal(listed.resourceStatus.state, "available");
+    assert.ok(listed.resources.some((item) => item.path === path));
+    assert.doesNotMatch(JSON.stringify(listed), /SYNTHETIC_HOST_REFERENCE|UNSELECTED_URL_RESOURCE/);
+    const result = await f.catalog.preflight({ skills: [f.ref] }, { includeContent: true });
+    assert.equal(result.status, "ready");
+    assert.deepEqual(result.skillBodies[0].resources, [
+      {
+        ...result.skills[0].resources[0],
+        content: f.reference,
+      },
+    ]);
+    assert.equal(result.skillBodies[0].resources[0].path, path);
+    assert.equal(result.skillBodies[0].resources[0].bytes, Buffer.byteLength(f.reference));
+    assert.doesNotMatch(JSON.stringify(result), /UNSELECTED_URL_RESOURCE/);
+  }
+});
+
+test("file URL resources reject remote, ambiguous, decorated and malformed bases without path fallback", async (t) => {
+  const f = fixture(t);
+  const local = pathToFileURL(`${f.directory}/`).href;
+  for (const url of [
+    "https://example.invalid/skill/",
+    local.replace("file:///", "file://example.invalid/"),
+    local.replace("file:///", "file://127.0.0.1/"),
+    local.replace("file:///", "file://[::1]/"),
+    local.slice(0, -1),
+    `${local}?query`,
+    `${local}#fragment`,
+    `${local}?`,
+    `${local}#`,
+    `${local}bad%2fpath/`,
+    `${local}bad%5Cpath/`,
+    `${local}bad%zzpath/`,
+    "file:relative/",
+    `${f.directory}/`,
+    `${local}bad\\path/`,
+  ]) {
+    f.definition.resourceBase = { kind: "url", url };
+    assert.equal(hostSkillResourceInventory(f.definition).resourceStatus.complete, false, url);
+    assert.throws(() => selectedHostSkillResources(f.definition, f.ref.resources), {
+      code: "SKILL_RESOURCE_UNSUPPORTED",
+    });
+    const result = await f.catalog.preflight({ skills: [f.ref] }, { includeContent: true });
+    assert.equal(result.status, "blocked", url);
+    assert.ok(result.checks.some((check) => check.code === "SKILL_RESOURCE_UNSUPPORTED"));
+    assert.doesNotMatch(JSON.stringify(result), /SYNTHETIC_HOST_REFERENCE/);
+  }
+});
+
+test("file directory URLs retain link, binary and size rejection before task delivery", async (t) => {
+  const f = fixture(t);
+  f.definition.resourceBase = { kind: "url", url: pathToFileURL(`${f.directory}/`).href };
+  for (const [bytes, code] of [
+    [Buffer.from([0xff]), "SKILL_RESOURCE_BINARY"],
+    [Buffer.from([65, 0, 66]), "SKILL_RESOURCE_BINARY"],
+    [Buffer.alloc(32 * 1024 + 1), "SKILL_RESOURCE_LIMIT"],
+  ]) {
+    writeFileSync(join(f.directory, "references/check.md"), bytes);
+    const result = await f.catalog.preflight({ skills: [f.ref] }, { includeContent: true });
+    assert.equal(result.status, "blocked");
+    assert.ok(result.checks.some((check) => check.code === code));
+    assert.equal(result.skillBodies[0].resources, undefined);
+  }
+  const linked = join(f.root, "linked-root");
+  symlinkSync(f.directory, linked);
+  for (const resourceBase of [
+    { kind: "url", url: pathToFileURL(`${linked}/`).href },
+    { kind: "directory", path: `${linked}/` },
+  ]) {
+    f.definition.resourceBase = resourceBase;
+    assert.throws(() => selectedHostSkillResources(f.definition, f.ref.resources), {
+      code: "SKILL_RESOURCE_PATH",
+    });
+  }
+  f.definition.resourceBase = { kind: "url", url: pathToFileURL(`${f.directory}/`).href };
+  unlinkSync(join(f.directory, "references/check.md"));
+  const outside = join(f.root, "outside.md");
+  writeFileSync(outside, "OUTSIDE_URL_SENTINEL");
+  symlinkSync(outside, join(f.directory, "references/check.md"));
+  const result = await f.catalog.preflight({ skills: [f.ref] }, { includeContent: true });
+  assert.equal(result.status, "blocked");
+  assert.ok(result.checks.some((check) => check.code === "SKILL_RESOURCE_PATH"));
+  assert.doesNotMatch(JSON.stringify(result), /OUTSIDE_URL_SENTINEL/);
 });
 
 test("selected host resources fail visibly after removal or link replacement without reading outside bytes", async (t) => {

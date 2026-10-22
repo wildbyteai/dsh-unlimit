@@ -9,7 +9,8 @@ import {
   readSync,
   realpathSync,
 } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { extname, isAbsolute, join, parse, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { fail, string } from "./validation.js";
 
 export function normalizeSkillResources(origin, paths) {
@@ -31,6 +32,104 @@ export function normalizeSkillResources(origin, paths) {
       fail("INVALID_INPUT", "Select unique exact resource paths relative to the skill root");
     seen.add(path);
     return path;
+  });
+}
+
+export function normalizeSkillSelections(origin, { resources, images }) {
+  const textPaths = normalizeSkillResources(origin, resources);
+  const imagePaths = normalizeSkillResources(origin, images);
+  const paths = [...(textPaths ?? []), ...(imagePaths ?? [])];
+  if (paths.length > 16 || new Set(paths).size !== paths.length)
+    fail("INVALID_INPUT", "Select at most 16 unique text and image resource paths per skill");
+  return {
+    ...(textPaths === undefined ? {} : { resources: textPaths }),
+    ...(imagePaths === undefined ? {} : { images: imagePaths }),
+  };
+}
+
+const IMAGE_MEDIA_TYPES = new Map([
+  [".png", "image/png"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".webp", "image/webp"],
+  [".gif", "image/gif"],
+]);
+
+// Preflight only reads the mounted policy. Native image validation and durable
+// storage remain the execution path's responsibility; this never saves images.
+export function skillImageBudget(attachments, count) {
+  const limits = attachments?.imageLimits;
+  if (
+    typeof attachments?.saveImages !== "function" ||
+    !["maxImageBytes", "maxImagesPerMessage", "maxMessageImageBytes"].every(
+      (key) => Number.isSafeInteger(limits?.[key]) && limits[key] > 0,
+    ) ||
+    !Array.isArray(limits?.mediaTypes) ||
+    !limits.mediaTypes.length ||
+    limits.mediaTypes.some((type) => typeof type !== "string" || !type.length)
+  )
+    fail("SKILL_IMAGE_UNSUPPORTED", "The mounted attachment service has no usable image policy");
+  if (!Number.isSafeInteger(count) || count < 0 || count > limits.maxImagesPerMessage)
+    fail("SKILL_IMAGE_LIMIT", "Selected images exceed the mounted attachment count limit");
+  return {
+    maxImageBytes: limits.maxImageBytes,
+    remainingBytes: limits.maxMessageImageBytes,
+    remainingImages: limits.maxImagesPerMessage,
+    mediaTypes: new Set(limits.mediaTypes),
+    blocked: false,
+  };
+}
+
+function imageMediaType(path, budget) {
+  const mediaType = IMAGE_MEDIA_TYPES.get(extname(path).toLowerCase());
+  if (!mediaType || !budget.mediaTypes.has(mediaType))
+    fail(
+      "SKILL_IMAGE_TYPE",
+      `Selected image extension is not accepted by the mounted policy: ${path}`,
+    );
+  return mediaType;
+}
+
+function reserveImage(path, bytes, budget) {
+  if (
+    budget.blocked ||
+    budget.remainingImages === 0 ||
+    bytes > budget.maxImageBytes ||
+    bytes > budget.remainingBytes
+  ) {
+    budget.blocked = true;
+    fail(
+      "SKILL_IMAGE_LIMIT",
+      `Selected images exceed the mounted attachment byte or count limit: ${path}`,
+    );
+  }
+  const maximum = Math.min(budget.maxImageBytes, budget.remainingBytes);
+  budget.remainingImages -= 1;
+  budget.remainingBytes -= bytes;
+  return maximum;
+}
+
+function imageFile(file, budget) {
+  const mediaType = imageMediaType(file.path, budget);
+  reserveImage(file.path, file.bytes, budget);
+  const bytes = Buffer.from(file.contentBase64, "base64");
+  if (bytes.length !== file.bytes)
+    fail("SKILL_RESOURCE_CHANGED", "Selected image bytes differ from their inspected size");
+  return {
+    path: file.path,
+    mediaType,
+    bytes: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    contentBase64: bytes.toString("base64"),
+  };
+}
+
+export function selectedSkillImages(item, paths, budget) {
+  normalizeSkillResources("project", paths);
+  return paths.map((path) => {
+    const file = item.files.find((file) => file.path === path);
+    if (!file) fail("SKILL_RESOURCE_MISSING", `Selected skill image is missing: ${path}`);
+    return imageFile(file, budget);
   });
 }
 
@@ -62,12 +161,41 @@ export function selectedSkillResources(item, paths) {
 
 function directoryRoot(item) {
   const base = item.resourceBase;
-  if (base?.kind !== "directory" || !isAbsolute(base.path ?? ""))
-    fail("SKILL_RESOURCE_UNSUPPORTED", "Skill provider has no absolute directory resource base");
-  const stat = lstatSync(base.path);
+  let path = base?.kind === "directory" ? base.path : undefined;
+  if (base?.kind === "url") {
+    try {
+      if (typeof base.url !== "string" || !/^file:\/\//iu.test(base.url) || base.url.includes("\\"))
+        throw new Error();
+      const url = new URL(base.url);
+      if (
+        url.protocol !== "file:" ||
+        url.host !== "" ||
+        !url.pathname.endsWith("/") ||
+        /[?#]/u.test(url.href) ||
+        /%2f|%5c/iu.test(url.pathname)
+      )
+        throw new Error();
+      // URL bases must name directories explicitly. resolve removes their
+      // trailing separator so lstat still detects a linked root directory.
+      path = resolve(fileURLToPath(url));
+    } catch {
+      fail(
+        "SKILL_RESOURCE_UNSUPPORTED",
+        "Skill URL resources require a local file directory URL without query or fragment",
+      );
+    }
+  }
+  if (!isAbsolute(path ?? ""))
+    fail(
+      "SKILL_RESOURCE_UNSUPPORTED",
+      "Skill provider has no absolute local directory resource base",
+    );
+  const rootLength = parse(path).root.length;
+  while (path.length > rootLength && path.endsWith(sep)) path = path.slice(0, -1);
+  const stat = lstatSync(path);
   if (!stat.isDirectory() || stat.isSymbolicLink())
     fail("SKILL_RESOURCE_PATH", "Skill resource base must be an ordinary directory");
-  return { path: realpathSync(base.path), stat };
+  return { path: realpathSync(path), stat };
 }
 
 const sameFile = (a, b) =>
@@ -91,14 +219,15 @@ function resourceStat(root, path) {
 }
 
 function resourceError(error) {
-  if (error.code?.startsWith("SKILL_RESOURCE_")) throw error;
+  if (error.code?.startsWith("SKILL_RESOURCE_") || error.code?.startsWith("SKILL_IMAGE_"))
+    throw error;
   if (["ENOENT", "ENOTDIR"].includes(error.code))
     fail("SKILL_RESOURCE_MISSING", "Skill resource directory or selected file is missing");
   fail("SKILL_RESOURCE_UNREADABLE", "Skill resources could not be read safely");
 }
 
-// A provider's directory is the only host resource authority. Never infer it
-// from SKILL.md paths or fetch URL/opaque provider resources.
+// A provider's directory or local file directory URL is the resource authority.
+// Never infer it from SKILL.md paths or fetch network/opaque provider resources.
 export function hostSkillResourceInventory(item) {
   try {
     const root = directoryRoot(item);
@@ -144,30 +273,31 @@ export function hostSkillResourceInventory(item) {
   }
 }
 
-export function selectedHostSkillResources(item, paths) {
-  normalizeSkillResources("host", paths);
-  if (paths.length === 0) return [];
+function hostSkillFiles(item, paths, limitFor) {
   try {
     const root = directoryRoot(item);
     const files = paths.map((path) => {
       const before = resourceStat(root, path);
-      if (before.stat.size > 32 * 1024)
-        fail("SKILL_RESOURCE_LIMIT", `Selected text resource exceeds 32 KiB: ${path}`);
+      const { maximum, code, message } = limitFor(path, before.stat.size);
+      if (before.stat.size > maximum) fail(code, message);
       const fd = openSync(before.target, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
         const opened = fstatSync(fd);
         if (!opened.isFile() || !sameFile(opened, before.stat))
           fail("SKILL_RESOURCE_CHANGED", "Selected resource changed before it was read");
-        const bytes = Buffer.alloc(32 * 1024 + 1);
+        const bytes = Buffer.alloc(Math.min(opened.size, maximum) + 1);
         let length = 0;
         while (length < bytes.length) {
           const count = readSync(fd, bytes, length, bytes.length - length, null);
           if (count === 0) break;
           length += count;
         }
-        if (length > 32 * 1024)
-          fail("SKILL_RESOURCE_LIMIT", `Selected text resource exceeds 32 KiB: ${path}`);
-        if (!sameFile(opened, fstatSync(fd)) || !sameFile(opened, resourceStat(root, path).stat))
+        if (length > maximum) fail(code, message);
+        if (
+          length !== opened.size ||
+          !sameFile(opened, fstatSync(fd)) ||
+          !sameFile(opened, resourceStat(root, path).stat)
+        )
           fail("SKILL_RESOURCE_CHANGED", "Selected resource changed while it was read");
         return { path, bytes: length, contentBase64: bytes.subarray(0, length).toString("base64") };
       } finally {
@@ -177,8 +307,41 @@ export function selectedHostSkillResources(item, paths) {
     const after = directoryRoot(item);
     if (after.path !== root.path || !sameFile(root.stat, after.stat))
       fail("SKILL_RESOURCE_CHANGED", "Skill resource directory changed during reading");
-    return selectedSkillResources({ files }, paths);
+    return files;
   } catch (error) {
     resourceError(error);
   }
+}
+
+export function selectedHostSkillResources(item, paths) {
+  normalizeSkillResources("host", paths);
+  if (paths.length === 0) return [];
+  const files = hostSkillFiles(item, paths, (path) => ({
+    maximum: 32 * 1024,
+    code: "SKILL_RESOURCE_LIMIT",
+    message: `Selected text resource exceeds 32 KiB: ${path}`,
+  }));
+  return selectedSkillResources({ files }, paths);
+}
+
+export function selectedHostSkillImages(item, paths, budget) {
+  normalizeSkillResources("host", paths);
+  if (paths.length === 0) return [];
+  const files = hostSkillFiles(item, paths, (path, bytes) => {
+    imageMediaType(path, budget);
+    return {
+      maximum: reserveImage(path, bytes, budget),
+      code: "SKILL_IMAGE_LIMIT",
+      message: `Selected images exceed the mounted attachment byte limit: ${path}`,
+    };
+  });
+  // The bounded host read already reserved these exact bytes in the shared
+  // budget; construct their content and provenance without reserving twice.
+  return files.map((file) => ({
+    path: file.path,
+    mediaType: imageMediaType(file.path, budget),
+    bytes: file.bytes,
+    sha256: createHash("sha256").update(Buffer.from(file.contentBase64, "base64")).digest("hex"),
+    contentBase64: file.contentBase64,
+  }));
 }

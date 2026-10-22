@@ -264,6 +264,14 @@ test("invalid model proposals retain raw output and cannot be treated as executa
   for (const [name, generated] of [
     ["invented capability", [task("a", { requirements: [{ kind: "tool", name: "invented" }] })]],
     ["unobserved directory", [task("a", { requirements: [{ kind: "directory", path: "/tmp" }] })]],
+    [
+      "unobserved image",
+      [
+        task("a", {
+          skills: [{ origin: "project", id: "local-skill", images: ["assets/guessed.png"] }],
+        }),
+      ],
+    ],
     ["missing dependency", [task("a", { dependsOn: ["missing"] })]],
     ["cycle", [task("a", { dependsOn: ["b"] }), task("b", { dependsOn: ["a"] })]],
     ["unknown role", [task("a", { role: "invented" })]],

@@ -42,14 +42,14 @@ await plans.dispatch("workflow.plan.stop", {
 
 `workflow` 必须是当前实例的 `DesktopWorkflow`；其 `store`、`flow`、`workspace()`、`service()`、`capabilities()` 和 `dispatch()` 是本模块使用的项目内合同。可选 `catalog` 使用当前 `HostCatalog.preflight(payload, { signal })`，不替代宿主权限或执行授权。调用层必须把模型工具的父会话绑定为真实调用会话，不能信任模型提供的其他会话 ID。
 
-| 动作                         | 输入                                                     | 输出与约束                                                                                                                                                                    |
-| ---------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `workflow.plan.capabilities` | `{}`                                                     | `{available,preflight,runtimeOnly:true,automaticTaskMatching,planDrafting,evidenceSummary:true,reasons}`；分派、停止接口缺失时 unavailable；自动执行还需目录 list/preflight。 |
-| `workflow.plan.propose`      | `{workspaceId,parentSessionId,goal}`                     | `{item}`；只生成待检查草稿，不启动生成任务。                                                                                                                                  |
-| `workflow.plan.run`          | `{workspaceId,parentSessionId,goal,summarize?:boolean}`  | `{item}`；规划完成且处置成功、结构及目录校验通过后，同一计划直接排队执行生成任务。                                                                                            |
-| `workflow.plan.create`       | `{workspaceId,parentSessionId,tasks,summarize?:boolean}` | `{item}`，初态 `queued`。校验项目、活动父会话、绑定、任务和角色；创建记录不代表已经启动执行者。                                                                               |
-| `workflow.plan.status`       | `{workspaceId,parentSessionId,id}`                       | `{item}`；只读本实例、对应父会话及项目的计划。即使入场授权已撤销、父会话已离线或改绑，仍能读取原计划。                                                                        |
-| `workflow.plan.stop`         | 同 status                                                | `{item,stopped}`；先停止排队，再通过原工作流停止本计划创建的收据。未确认清理时 `stopped:false`，可再次显式停止以重试处置。                                                    |
+| 动作                         | 输入                                                     | 输出与约束                                                                                                                                                                                     |
+| ---------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workflow.plan.capabilities` | `{}`                                                     | `{available,preflight,runtimeOnly:true,automaticTaskMatching,planDrafting,evidenceSummary:true,imageAttachments,reasons}`；分派、停止接口缺失时 unavailable；自动执行还需目录 list/preflight。 |
+| `workflow.plan.propose`      | `{workspaceId,parentSessionId,goal}`                     | `{item}`；只生成待检查草稿，不启动生成任务。                                                                                                                                                   |
+| `workflow.plan.run`          | `{workspaceId,parentSessionId,goal,summarize?:boolean}`  | `{item}`；规划完成且处置成功、结构及目录校验通过后，同一计划直接排队执行生成任务。                                                                                                             |
+| `workflow.plan.create`       | `{workspaceId,parentSessionId,tasks,summarize?:boolean}` | `{item}`，初态 `queued`。校验项目、活动父会话、绑定、任务和角色；创建记录不代表已经启动执行者。                                                                                                |
+| `workflow.plan.status`       | `{workspaceId,parentSessionId,id}`                       | `{item}`；只读本实例、对应父会话及项目的计划。即使入场授权已撤销、父会话已离线或改绑，仍能读取原计划。                                                                                         |
+| `workflow.plan.stop`         | 同 status                                                | `{item,stopped}`；先停止排队，再通过原工作流停止本计划创建的收据。未确认清理时 `stopped:false`，可再次显式停止以重试处置。                                                                     |
 
 `stopAll()` 先同步标记本实例的所有活动队列，再等待逐个收据停止，返回 `{items,stopped}`。它不关闭服务，后续仍可创建新计划。它不停止其他计划服务实例或人工直接分派的工作流。`close()` 禁止新建、停止本实例计划并返回同形结果；调用者必须检查 `stopped`，不能把未确认处置视为卸载成功。停止等待官方启动中的收据返回，以确认其所有权后处置；此时 status 显示 `stopping`，不承诺即时完成。
 
@@ -139,7 +139,7 @@ Controller、模型工具、HTTP 和 UI 由宿主集成层接入；这个模块�
 
 ## 精确技能选择与执行正文（2026-10-21）
 
-任务可显式携带 `skills:[{origin:"host"|"project",id}]`，最多 32 个不重复引用；每项只接受 origin/id 及可选 resources，不允许通过任务覆盖技能依赖。宿主技能编号使用目录返回的 ID，项目技能使用库内 ID。同名技能以来源和 ID 区分。规划目录新增 `kind:"skill-body"` 候选，模型只能选择实际候选中的精确引用；界面显示“技能正文来源”，填表和提交保持引用。旧 `requirements` 中的 `kind:"skill"` 仍只检查宿主登记可见性，不代表选择了正文。
+任务可显式携带 `skills:[{origin:"host"|"project",id}]`，最多 32 个不重复引用；每项只接受 origin/id 及可选 resources/images，不允许通过任务覆盖技能依赖。宿主技能编号使用目录返回的 ID，项目技能使用库内 ID。同名技能以来源和 ID 区分。规划目录新增 `kind:"skill-body"` 候选，模型只能选择实际候选中的精确引用；界面显示“技能正文来源”，填表和提交保持引用。旧 `requirements` 中的 `kind:"skill"` 仍只检查宿主登记可见性，不代表选择了正文。
 
 项目技能可以在 SKILL.md 顶部添加本项目命名空间字段：
 
@@ -171,7 +171,7 @@ dsh-unlimit-requirements: []
 }
 ```
 
-`resources` 为技能根内精确相对文件名数组，每个技能最多 16 个，不接受重复、绝对路径、URL、反斜杠、空段或 `..`；SKILL.md 已由原正文路径提供，不能重复选择。宿主技能仅接受提供者明确声明的目录资源根，详见下节。`catalog.read` 对项目技能返回附属文件的路径和字节数，不返回其正文。
+`resources` 为技能根内精确相对文件名数组，与下文 `images` 每个技能合计最多 16 个，不接受重复、绝对路径、URL、反斜杠、空段或 `..`；SKILL.md 已由原正文路径提供，不能重复选择。宿主技能接受提供者明确声明的目录或本地 file URL 资源根，详见下节。`catalog.read` 对项目技能返回附属文件的路径和字节数，不返回其正文。
 
 执行预检使用同一次 `SkillLibrary` 读取取得 SKILL.md、依赖声明与附属文件。保留既有目录/链接校验，不按用户路径额外打开磁盘、不访问网络。只有显式选择的文件以 `{path,content,bytes,sha256}` 进入所属任务的 `skillContext.resources`；未选文件不进入模型请求，普通预检只返回资源元数据。UTF-8 严格解码并保留 BOM、换行和空白，非 UTF-8 或含 NUL 的文件拒绝；单文件最多 32 KiB，整个任务仍受原有 32 KiB 上限约束，超限不截断、不启动执行者。缺失文件也阻断，不把只有 SKILL.md 的执行冒充完整资源交付。
 
@@ -183,14 +183,28 @@ dsh-unlimit-requirements: []
 
 生成草稿仍需另行提交；显式“规划并执行目标”按原流程直接进入执行队列。两者都在实际启动前重新读取当前技能、资源和依赖：规划后文件被删除时阻断，不能沿用规划时目录宣称正文仍可用。资源内容的变更使用执行时快照与摘要，不宣称锁定规划时内容。页面显示生成任务的技能及所选路径，原有手动编辑入口保留。
 
-当前真实官方模块隔离验证覆盖规划 → 选择 → 执行 → 日志 → 汇总的数据流，模型输出为合成。实际模型能否合理选择资源、URL/不透明提供者资源、二进制素材和真实桌面仍有差距。
+当前真实官方模块隔离验证覆盖规划 → 选择 → 执行 → 日志 → 汇总的数据流，模型输出为合成。实际模型能否合理选择资源、远端 URL/不透明提供者资源、其他二进制素材和真实桌面仍有差距；本地 file URL 和图片增量见下文。
 
 ## 宿主目录资源（2026-10-22）
 
-`host` 技能可使用同一 `resources` 引用。只接受当前会话 `registry.get` 所选定义明确提供的 `resourceBase:{kind:"directory",path:绝对路径}`，不从 SKILL.md 路径推测资源根，不访问 URL 或不透明提供者。同名技能仍按官方作用域选取；正文、声明和资源根来自同一次定义读取。
+`host` 技能可使用同一 `resources` 引用。只接受当前会话 `registry.get` 所选定义明确提供的 `resourceBase:{kind:"directory",path:绝对路径}`，或下文明确的本地 file URL；不从 SKILL.md 路径推测资源根，不访问远端 URL 或不透明提供者。同名技能仍按官方作用域选取；正文、声明和资源根来自同一次定义读取。
 
 目录只返回路径、字节数及 `resourceStatus`，不读取文件正文。最多 512 个总条目、200 个资源文件；链接、特殊文件、危险路径及不完整目录均报告不可用，不伪装成完整空目录。主技能正文仍可单独使用。
 
 规划只获得目录元数据，模型只能选择该技能快照内路径。实际启动前重新读取定义和选中文件，保留严格 UTF-8、BOM/空白、单文件 32 KiB、每技能 16 个及任务整体 32 KiB 限制；读取核对文件身份，不跟随链接。资源缺失、改变期间不一致、非文本或超限均阻断执行；未选资源不进入请求，也不自动执行脚本。
 
-官方 SkillRegistry 隔离验证目录及同名作用域选择；合成协调器验证规划后更新正文/资源会在执行时重新读取，删除资源则不启动执行者，资源仅交给所属任务。手动任务表、自动规划及正文面板均已接入。此批未做新增宿主资源的真实 AgentLoop 全链路或桌面安装验收；URL/不透明来源和二进制仍缺。
+官方 SkillRegistry 隔离验证目录及同名作用域选择；合成协调器验证规划后更新正文/资源会在执行时重新读取，删除资源则不启动执行者，资源仅交给所属任务。手动任务表、自动规划及正文面板均已接入。上述首批验证未包含宿主资源完整 AgentLoop；本轮已用下述目录/file URL 官方链路补验。桌面安装、远端 URL/不透明来源和其他二进制仍缺。
+
+## 本地 URL 与原生图片资源（2026-10-22）
+
+宿主明确声明 `resourceBase:{kind:"url",url:"file:///absolute/skill/"}` 时，可按本地目录读取。URL 必须是目录形状、无远端主机、query/hash、反斜杠或编码路径分隔符；标准化后的 localhost 等同本机。转换为本地路径后沿用目录根、文件身份和不跟随链接的校验，保留原始 resourceBase 元数据。不执行 URL 请求，不把 HTTP(S) 或不透明提供者推测为磁盘路径。
+
+技能引用新增 `images:["assets/diagram.png"]`。仅显式选择的 PNG/JPEG/WebP/GIF 进入原生附件路径；文本继续用 `resources`，两类路径合计每技能最多 16 个，不能重复或重叠。自动规划只获得路径/大小，生成图片路径必须属于该技能的目录快照。启动时重读图片；图片字节不占文本的 32 KiB 上限，技能正文、资源正文、图片来源元数据和依赖结果仍受该文本上限约束。
+
+目录预检取当前 `attachments.imageLimits` 的类型、数量、单张和总字节限制，跨所选技能共享预算。宿主选中文件在打开前检查预算并校验读取一致性；项目 SkillLibrary 保持原有整库/整技能快照读取，所以此预算约束选中内容的解码与交付，不代表全部项目磁盘 I/O 限额。未选文件不会被发送或保存为附件。预检不调用 `saveImages`；普通 API 只返回图片路径、类型、字节数和摘要，内部协调器才取得原始内容。
+
+实际分派在领槽后调用当前 `attachments.saveImages` 保存整批内容，再将原生 `{type:"image",attachment}` 放入子任务首轮请求。工作流通过内部参数接收目录读取的图片，不向外部 payload 开放任意附件引用。收据 `images` 记录 origin/id/path、原始类型/大小/SHA-256 与返回的原生 attachment 引用，`imageStorage` 为 saving/saved/unconfirmed；原始 base64 不进入任务文本、计划状态或 JSONL。附件服务会实际解码、验证并可能调整尺寸、格式或 GIF 帧，原始摘要与规范化附件摘要可以不同。已知不支持图片的模型仍由官方启动流程拒绝；接口可用不代表模型具备视觉能力。
+
+保存返回后再次检查取消、准入、父会话绑定/身份和附件服务身份，再启动执行者。官方 saveImages 没有取消或删除回滚 API：保存中停止需等待其返回，之后不启动子任务；已发布的共享内容对象保留。保存失败标记 unconfirmed，不宣称没有写入，也不删除可能被其他会话引用的内容。页面将附件保存与实际启动分别显示，保存成功不能冒充任务启动成功。
+
+官方隔离验证使用 SkillRegistry、LocalAttachmentStore、spawn/SubagentRuntime/AgentLoop 和物理 JSONL reader：目录与 file URL 文本资源贯通规划、执行时重读、持久读回和汇总；项目/宿主图片由规划选择后交给所属子任务，原生读图接口可返回实际规范化字节，未选图片和无图片任务保持隔离。损坏批次、宿主数量限制、纯文本模型拒绝、保存中取消与槽位清理均保留真实拒绝。模型传输为合成，不证明外部视觉模型效果。HTTP(S)/opaque、PDF/音视频/任意二进制附件、实际模型质量与桌面验收仍缺。
