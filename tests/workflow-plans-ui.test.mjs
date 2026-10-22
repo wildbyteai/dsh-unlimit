@@ -536,20 +536,23 @@ test("leaving while capability revalidation is pending never creates a plan", as
   assert.equal(ui.errors.length, 0);
 });
 
-test("explicit project resource paths pass through the task form and invalid resource types do not submit", async () => {
-  const ui = await setup();
-  const selected = {
-    ...task,
-    skills: [{ origin: "project", id: "evidence-review", resources: ["references/count.md"] }],
-  };
-  ui.host.node("json").value = JSON.stringify([selected]);
-  await ui.emit("create-form", "submit");
-  assert.deepEqual(ui.calls.find((call) => call.action === "workflow.plan.create").payload.tasks, [
-    selected,
-  ]);
-  assert.match(ui.view.html, /resources:/);
+test("explicit host and project resource paths pass through the task form and invalid resource types do not submit", async () => {
+  for (const origin of ["host", "project"]) {
+    const ui = await setup();
+    const selected = {
+      ...task,
+      skills: [{ origin, id: "evidence-review", resources: ["references/count.md"] }],
+    };
+    ui.host.node("json").value = JSON.stringify([selected]);
+    await ui.emit("create-form", "submit");
+    assert.deepEqual(
+      ui.calls.find((call) => call.action === "workflow.plan.create").payload.tasks,
+      [selected],
+    );
+    assert.match(ui.view.html, /resources:/);
+  }
   for (const ref of [
-    { origin: "host", id: "example", resources: ["a.md"] },
+    { origin: "unknown", id: "example", resources: ["a.md"] },
     { origin: "project", id: "example", resources: "a.md" },
   ]) {
     const invalid = await setup();

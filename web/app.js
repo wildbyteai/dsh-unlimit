@@ -30,7 +30,7 @@ const esc = (value) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
   );
 const state = {
-  page: "overview",
+  page: location.hash === "#environment" ? "environment" : "overview",
   status: null,
   admission: null,
   workspaces: [],
@@ -640,6 +640,10 @@ const bridgePending = new Map();
 window.addEventListener("message", (event) => {
   if (event.origin !== location.origin || event.source !== window.parent) return;
   const response = event.data;
+  if (response?.type === "dsh-unlimit:open-environment") {
+    navigate("environment");
+    return;
+  }
   if (!response || response.type !== "dsh-unlimit:draft-bridge-response") return;
   const pending = bridgePending.get(response.id);
   if (!pending) return;
@@ -757,7 +761,7 @@ function skeleton() {
 }
 function shell() {
   $("#app").innerHTML =
-    `<div class="shell"><aside class="sidebar"><div class="brand"><span class="brandmark">U</span><div><strong>UNLIMIT</strong><small>DESKTOP WORKSPACE</small></div></div><nav aria-label="主导航">${pages.map((p, i) => `${groups[i] ? `<div class="navgroup">${groups[i]}</div>` : ""}<button class="navitem ${p[0] === state.page ? "active" : ""}" data-page="${p[0]}"><span class="navicon" aria-hidden="true">${p[1]}</span>${p[2]}<span class="update-badge" data-updates="${p[0]}" hidden>有更新</span></button>`).join("")}</nav><div class="sidebarfooter"><div class="connection"><i class="dot off" id="connection-dot"></i><span id="connection-label">连接中</span></div><div id="version-label">独立桌面工作台</div></div></aside><main class="main"><header class="topbar"><div class="breadcrumb">DSH UNLIMIT <span style="margin:0 10px">/</span> <b id="crumb">工作台概览</b></div><div class="topright"><span class="tag gray" id="instance-label">本地实例</span><span>当前项目</span><select id="workspace-select" aria-label="当前演练项目"><option value="">尚未激活项目</option></select><button id="refresh-data" class="small" title="重新读取项目与当前页数据；保留本面板草稿">↻ 刷新数据</button></div></header><div class="content" id="content">${skeleton()}</div></main></div>`;
+    `<div class="shell"><aside class="sidebar"><div class="brand"><span class="brandmark">U</span><div><strong>UNLIMIT</strong><small>DESKTOP WORKSPACE</small></div></div><nav aria-label="主导航">${pages.map((p, i) => `${groups[i] ? `<div class="navgroup">${groups[i]}</div>` : ""}<button class="navitem ${p[0] === state.page ? "active" : ""}" data-page="${p[0]}"><span class="navicon" aria-hidden="true">${p[1]}</span>${p[2]}<span class="update-badge" data-updates="${p[0]}" hidden>有更新</span></button>`).join("")}</nav><div class="sidebarfooter"><div class="connection"><i class="dot off" id="connection-dot"></i><span id="connection-label">连接中</span></div><div id="version-label">独立桌面工作台</div></div></aside><main class="main"><header class="topbar"><div class="breadcrumb">DSH UNLIMIT <span style="margin:0 10px">/</span> <b id="crumb">${esc(descriptions[state.page][2])}</b></div><div class="topright"><span class="tag gray" id="instance-label">本地实例</span><span>当前项目</span><select id="workspace-select" aria-label="当前演练项目"><option value="">尚未激活项目</option></select><button id="refresh-data" class="small" title="重新读取项目与当前页数据；保留本面板草稿">↻ 刷新数据</button></div></header><div class="content" id="content">${skeleton()}</div></main></div>`;
   $("#refresh-data").onclick = () => {
     if (canLeaveEditor()) render();
   };
@@ -2031,7 +2035,7 @@ async function skillsPage() {
     value
       ? panel(
           "已读取技能正文",
-          `<div class="toolbar"><strong>${esc(value.item.name)}</strong><span class="tag gray">${originLabel(value.item.origin)}</span><span class="tag">正文可读</span><span class="tag orange">${value.item.dependency.state === "declared" ? "已有依赖声明 · 尚需预检" : value.item.dependency.state === "invalid" ? "依赖声明无效" : "依赖可用性未知"}</span></div><p class="info">${esc(value.item.provider || "dsh-unlimit")} · ${esc(value.item.source || "本地库")}。以下是上次明确读取的正文；读取不等于执行技能。</p><pre class="report">${esc(value.item.content)}</pre>`,
+          `<div class="toolbar"><strong>${esc(value.item.name)}</strong><span class="tag gray">${originLabel(value.item.origin)}</span><span class="tag">正文可读</span><span class="tag orange">${value.item.dependency.state === "declared" ? "已有依赖声明 · 尚需预检" : value.item.dependency.state === "invalid" ? "依赖声明无效" : "依赖可用性未知"}</span></div><p class="info">${esc(value.item.provider || "dsh-unlimit")} · ${esc(value.item.source || "本地库")}。以下是上次明确读取的正文；读取不等于执行技能。</p><pre class="report">${esc(value.item.content)}</pre><details><summary>附属资源 · ${value.item.resources?.length || 0} 个</summary><p class="info">${value.item.resourceStatus?.state === "unavailable" ? "此提供者未提供可安全读取的完整本地目录，正文仍可使用。" : "这里只列出文件路径和大小。任务中按准确路径选择后才读取文本，不自动执行脚本；二进制资源暂不支持。"}</p>${(value.item.resources || []).map((resource) => `<div class="twocoltext"><span class="mono">${esc(resource.path)}</span><span> · ${esc(resource.bytes)} 字节</span></div>`).join("")}</details>`,
         )
       : "";
   const sourcesHTML = catalog

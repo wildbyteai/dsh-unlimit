@@ -693,8 +693,11 @@ test("missing, binary and oversized resources block preparation without truncati
       f.catalog.preflight({ skills: [{ origin: "project", id: "local-one", resources: paths }] }),
       { code: "INVALID_INPUT" },
     );
-  await assert.rejects(
-    f.catalog.preflight({ skills: [{ origin: "host", id: "same-name", resources: ["ref.md"] }] }),
-    { code: "INVALID_INPUT" },
+  const hostWithoutResources = await f.catalog.preflight({
+    skills: [{ origin: "host", id: "same-name", resources: ["ref.md"] }],
+  });
+  assert.equal(hostWithoutResources.status, "blocked");
+  assert.ok(
+    hostWithoutResources.checks.some((check) => check.code === "SKILL_RESOURCE_UNSUPPORTED"),
   );
 });

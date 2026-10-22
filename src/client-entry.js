@@ -412,6 +412,130 @@ export function createDraftBridge(
   };
 }
 
+/** A non-blocking first-use notice. It never reads or changes the chat composer. */
+export function createEnvironmentNotice({ document, api, openEnvironment }) {
+  const abort = new AbortController();
+  let panel,
+    state,
+    busy = false;
+  const clear = () => {
+    panel?.remove();
+    panel = undefined;
+  };
+  const draw = (message, failed = false) => {
+    if (abort.signal.aborted) return;
+    clear();
+    panel = document.createElement("section");
+    panel.setAttribute("aria-label", "DSH Unlimit 首次环境配置");
+    Object.assign(panel.style, {
+      position: "fixed",
+      right: "24px",
+      bottom: "78px",
+      width: "320px",
+      zIndex: "2147483000",
+      padding: "18px",
+      borderRadius: "11px",
+      background: "#f5f4ee",
+      color: "#25342b",
+      border: "1px solid #aab6a2",
+      boxShadow: "0 8px 30px #17271c33",
+      font: "13px/1.6 -apple-system,sans-serif",
+    });
+    const title = document.createElement("strong");
+    title.textContent = "开始使用 DSH Unlimit";
+    const text = document.createElement("p");
+    text.textContent = message;
+    if (failed) text.setAttribute("role", "alert");
+    panel.append(title, text);
+    const action = (label, handler) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      Object.assign(button.style, {
+        padding: "7px 10px",
+        margin: "0 6px 6px 0",
+        cursor: "pointer",
+      });
+      button.addEventListener("click", () => {
+        if (!busy) void handler();
+      });
+      panel.append(button);
+    };
+    action("配置环境", () => {
+      openEnvironment();
+      clear();
+    });
+    if (!failed && state)
+      action("暂不配置，继续使用", async () => {
+        busy = true;
+        try {
+          const saved = await api(
+            "environment.onboarding",
+            { revision: state.revision, decision: "skip" },
+            abort.signal,
+          );
+          if (saved.onboarding?.state !== "skipped") throw new Error("Skip was not confirmed");
+          clear();
+        } catch (error) {
+          if (!abort.signal.aborted)
+            draw(
+              error.code === "CONFLICT"
+                ? "环境配置已在其他窗口改变。请重新读取后选择，未覆盖新配置。"
+                : "暂不配置的选择未能确认保存，请重新读取。普通聊天仍可使用。",
+              true,
+            );
+        } finally {
+          busy = false;
+        }
+      });
+    if (failed) action("重新读取", load);
+    action("本次收起", clear);
+    document.body.append(panel);
+  };
+  async function load() {
+    if (busy || abort.signal.aborted) return;
+    busy = true;
+    try {
+      const result = await api("environment.status", {}, abort.signal);
+      state = { revision: result.revision, onboarding: result.onboarding };
+      if (abort.signal.aborted) return;
+      if (
+        !Number.isSafeInteger(state.revision) ||
+        state.revision < 0 ||
+        !state.onboarding ||
+        !["pending", "configured", "skipped"].includes(state.onboarding.state)
+      )
+        throw new Error("Unknown environment state");
+      if (state.onboarding.state !== "pending") {
+        clear();
+        return;
+      }
+      const toolkit = await api("toolkit.status", {}, abort.signal);
+      if (abort.signal.aborted) return;
+      if (!Array.isArray(toolkit.tools)) throw new Error("Unknown toolkit state");
+      if (toolkit.tools.some((tool) => tool.available === true)) {
+        clear();
+        return;
+      }
+      draw(
+        "尚未配置本地演练工具。可以现在设置工具目录，也可以暂不配置；普通聊天和提示词功能照常使用。不会自动安装或执行工具。",
+      );
+    } catch {
+      if (!abort.signal.aborted)
+        draw("环境状态读取失败，不能判断工具是否已配置。普通聊天仍可使用。", true);
+    } finally {
+      busy = false;
+    }
+  }
+  return {
+    ready: load(),
+    dispose() {
+      abort.abort();
+      clear();
+    },
+  };
+}
+
 export function apply(ctx) {
   ctx.effect(() => {
     const button = document.createElement("button");
@@ -450,12 +574,17 @@ export function apply(ctx) {
     const escape = (event) => {
       if (event.key === "Escape" && overlay && overlay.style.display !== "none") close();
     };
-    button.addEventListener("click", () => {
+    const open = (page) => {
       if (overlay) {
-        if (overlay.style.display === "none") {
+        if (page || overlay.style.display === "none") {
           overlay.style.display = "flex";
           button.setAttribute("aria-expanded", "true");
           overlay.querySelector("button")?.focus();
+          if (page)
+            frame.contentWindow.postMessage(
+              { type: "dsh-unlimit:open-environment" },
+              location.origin,
+            );
         } else close();
         return;
       }
@@ -502,18 +631,39 @@ export function apply(ctx) {
       frame.addEventListener("load", () =>
         bridge.cancelAll("工作台页面已重新加载，已取消旧页面的草稿恢复"),
       );
-      frame.src = "/dsh-unlimit/ui/";
+      frame.src = `/dsh-unlimit/ui/${page ? "#environment" : ""}`;
       frame.title = "DSH Unlimit 工作台";
       Object.assign(frame.style, { width: "100%", flex: "1", border: "0", minHeight: "0" });
       overlay.append(header, frame);
       document.body.append(overlay);
       button.setAttribute("aria-expanded", "true");
       closeButton.focus();
-    });
+    };
+    button.addEventListener("click", () => open());
     document.addEventListener("keydown", escape);
     window.addEventListener("message", onBridge);
     document.body.append(button);
+    const notice = createEnvironmentNotice({
+      document,
+      openEnvironment: () => open("environment"),
+      async api(action, payload, signal) {
+        const response = await fetch("/dsh-unlimit/api", {
+          method: "POST",
+          credentials: "same-origin",
+          signal,
+          headers: { "Content-Type": "application/json", "X-DSH-Unlimit": "1" },
+          body: JSON.stringify({ action, payload }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok)
+          throw Object.assign(new Error("Environment request failed"), {
+            code: result.error?.code,
+          });
+        return result.data;
+      },
+    });
     return () => {
+      notice.dispose();
       bridge.dispose();
       document.removeEventListener("keydown", escape);
       window.removeEventListener("message", onBridge);

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
@@ -125,9 +125,53 @@ async function fixture(t) {
     mcp,
     library,
     toolkit,
+    directory,
     catalog: new HostCatalog(ctx, { library, toolkit }),
   };
 }
+
+test(
+  "official scoped skills retain directory resource authority and deliver only selected host text",
+  hostOnly,
+  async (t) => {
+    const { ctx, agent, skill, directory, catalog } = await fixture(t);
+    const globalRoot = join(directory, "global-resources");
+    const scopedRoot = join(directory, "scoped-resources");
+    for (const root of [globalRoot, scopedRoot])
+      mkdirSync(join(root, "references"), { recursive: true });
+    writeFileSync(join(globalRoot, "references/check.md"), "GLOBAL_SYNTHETIC_REFERENCE");
+    writeFileSync(join(scopedRoot, "references/check.md"), "SCOPED_SYNTHETIC_REFERENCE");
+    const first = agent("resource-first");
+    const second = agent("resource-second");
+    const extra = (path) => ({
+      resourceBase: { kind: "directory", path },
+      metadata: { "dsh-unlimit": { requirements: [] } },
+    });
+    ctx.get("skills").register(skill("resource-skill", "GLOBAL_BODY", extra(globalRoot)));
+    first.ctx.get("skills").register(skill("resource-skill", "SCOPED_BODY", extra(scopedRoot)));
+    const ref = { origin: "host", id: "resource-skill", resources: ["references/check.md"] };
+    for (const [current, body, resource] of [
+      [first, "SCOPED_BODY", "SCOPED_SYNTHETIC_REFERENCE"],
+      [second, "GLOBAL_BODY", "GLOBAL_SYNTHETIC_REFERENCE"],
+    ]) {
+      const listed = await catalog.list({ sessionId: current.id });
+      const entry = listed.skills.find((item) => item.origin === "host" && item.id === ref.id);
+      assert.deepEqual(entry.resources, [
+        { path: "references/check.md", bytes: Buffer.byteLength(resource) },
+      ]);
+      assert.equal(entry.resourceStatus.state, "available");
+      assert.doesNotMatch(JSON.stringify(listed), /SYNTHETIC_REFERENCE/);
+      const prepared = await catalog.preflight(
+        { sessionId: current.id, skills: [ref] },
+        { includeContent: true },
+      );
+      assert.equal(prepared.status, "ready");
+      assert.equal(prepared.skillBodies[0].content, body);
+      assert.equal(prepared.skillBodies[0].resources[0].content, resource);
+      assert.equal(prepared.skillBodies[0].origin, "host");
+    }
+  },
+);
 
 test(
   "official SkillRegistry/ToolRuntime preserve session layers, restriction and scoped shadowing",

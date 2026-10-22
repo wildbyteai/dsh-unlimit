@@ -2,7 +2,12 @@ import { statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { fail, object, string } from "../core/validation.js";
 import { normalizeServers } from "../core/servers.js";
-import { normalizeSkillResources, selectedSkillResources } from "../core/skill-resources.js";
+import {
+  hostSkillResourceInventory,
+  normalizeSkillResources,
+  selectedHostSkillResources,
+  selectedSkillResources,
+} from "../core/skill-resources.js";
 
 const ORIGINS = ["host", "project"];
 const ENVIRONMENT_KINDS = ["environment-variable", "environment-host", "environment-key"];
@@ -93,6 +98,7 @@ function summary(value, origin, id) {
     ...(origin === "project" && value.resources !== undefined
       ? { resources: value.resources.map(({ path, bytes }) => ({ path, bytes })) }
       : {}),
+    ...(origin === "host" ? hostSkillResourceInventory(value) : {}),
     ...(value.provider !== undefined ? { provider: value.provider } : {}),
     ...(value.source !== undefined ? { source: value.source } : {}),
     ...(value.path !== undefined ? { path: value.path } : {}),
@@ -529,7 +535,10 @@ export class HostCatalog {
       let resources;
       if (ref.resources !== undefined) {
         try {
-          resources = selectedSkillResources(item, ref.resources);
+          resources =
+            ref.origin === "host"
+              ? selectedHostSkillResources(item, ref.resources)
+              : selectedSkillResources(item, ref.resources);
           result.resources = resources.map(({ content, ...metadata }) => metadata);
         } catch (error) {
           ownChecks.push({

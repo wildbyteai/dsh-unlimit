@@ -48,6 +48,16 @@ HTTP 接口为 `maintenance.uninstall`，请求必须为 `{bundle:"dsh-unlimit",
 
 本插件不自动重启桌面。官方管理器返回 `restart-required` 时，回执明确提示用户保存工作后自行重启。已核对的 `fiber.restart()` 只重载插件，`Loader.exit()` 是空钩子；它们都不能充当桌面重启成功证据。尚无已适配的通用桌面 relaunch 公共合同，`LIFE-RESTART` 仍未实现、未实机验证。
 
+## 桌面重启入口复核（2026-10-22）
+
+只读核对发行清单摘要后，检查了 373 个官方包入口；4 个已修改入口跳过。范围内未发现可供本插件调用的公开 relaunch 合同，不据此推定 Electron 主进程绝无重启能力。
+
+- `dsh-desktop-host/lib/index.js` 第 251–335 行处理私有子进程 IPC，shutdown 并非插件重启服务。
+- `cordis-plugin-loader/lib/index.js` 第 664–665 行 `exit(){}` 为空；`dsh-cordis-host-runner` 未发现覆盖此钩子的重启服务。
+- `dsh-client-ui-plugin-manager/lib/client.js` 第 1851–1859 行仅处理 restart-required 通知；客户端 shortcuts 的 desktop-reload 文案也不是可调用的重启合同。
+
+因此保留 LIFE-RESTART 缺口，不以关闭进程、页面 reload 或插件 fiber restart 冒充桌面 relaunch。没有读取真实 profile、启动/停止实际宿主或执行 IPC。
+
 ## 本地包升级接口核查（2026-10-21）
 
 `0.2.1-rc.2` 的公开 `pluginManager.installBundle(spec, options)` 接受绝对 `.tgz/.tar.gz` 路径，但不能据此声明离线升级已实现。已核对发行清单中插件管理器的 JavaScript/JSON 文件摘要；本次仅阅读程序文件，未调用该接口、包管理器或真实 profile。

@@ -853,3 +853,16 @@ DSH_UNLIMIT_OFFICIAL_PACKAGES="$PWD/artifacts/official-packages" \
 - 使用 bundled Node v24.21.0、显式 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES` 执行 `node --expose-internals --test tests/*.test.mjs`，1117 通过、0 失败、0 跳过；日志 `artifacts/recovery-gaps-full.log`。定向日志 `artifacts/recovery-boundaries.log`。语法、来源、分层检查通过；客户端构建和离线打包通过，78 文件，SHA-256 `bf67b61a641a4d60a9ce3705403395d6f0c70d896a81b6de5365801b85f10637`，与上批相同，因为交付产品文件未改。
 
 117 项原验收前五列保持。此次只修改隔离测试、合成证据和功能清单/合同，没有 UI 变更或新增桌面验收声明；未安装、重载、请求真实模型或改动真实 DSH 配置、profile、会话。
+
+## 宿主目录资源与首次环境提示（2026-10-22）
+
+基于 `b1e8e30` 工作树，新增两条用户可用路径，117 项原验收前五列不变。
+
+- 宿主技能：明确目录资源根的路径/大小清单、正文面板资源展开、手动任务引用、自动规划选择和执行前重读已接通。官方 SkillRegistry 在临时目录验证作用域同名选择；合成计划协调器验证仅所选任务取得资源、规划后更新正文/文件使用执行时内容、删除后阻断且不启动执行者。拒绝目录链接/特殊文件/危险路径、超限、非文本；不从文件名推测 URL 或不透明提供者。该新增链路没有完整官方 AgentLoop 或真实模型验收。
+- 首次环境提示：实际客户端入口通过已有 API 读取状态；无工具且 pending 时提供配置、持久跳过及本次收起。跳过只写临时环境配置，冲突不覆盖，客户端销毁取消请求。没有读取/改写聊天草稿，也不拦截发送。自动化用临时 LocalEnvironment 验证持久跳过、配置/工具存在、冲突、失败和销毁。
+- 合成回环页面加载实际客户端源码，验证配置按钮打开正确环境页、跳过后重新加载不提示、合成聊天输入 `SYNTHETIC_DRAFT_KEEP` 保持；工作台正文面板展开 `references/checklist.md` 的路径与 47 字节大小，无 console error。视口约 1280×720；截图 `artifacts/environment-notice-preview.png` 与 `artifacts/host-skill-resources-preview.png`。仅临时数据和原创样本，两个预览进程正常退出、页面已关闭。
+- bundled Node v24.21.0，显式 `DSH_UNLIMIT_RUNTIME` 与 `DSH_UNLIMIT_OFFICIAL_PACKAGES`：`node --expose-internals --test tests/*.test.mjs` 1132 通过、0 失败、0 跳过，日志 `artifacts/gap-paths-full.log`。定向日志 `artifacts/new-paths-targeted.log`、`artifacts/host-resources-plan.log`。全套后仅调整初始环境页面包屑和资源大小间隔，已通过页面重新加载读回。
+
+重启接口只读复核范围见[维护合同](maintenance-contract.md#桌面重启入口复核2026-10-22)，仍无适配的 relaunch 接口。Hook、第三方记忆、完全卸载后旧提示词恢复、空闲 PTC 待办恢复、其他网络出口、URL/不透明来源及二进制资源、实际升级和桌面验收等缺口仍保留。没有安装、重载、读写真实 profile/配置/会话、请求真实模型或修改宿主程序；来源与许可声明不变。
+
+本批语法、来源、分层、格式检查通过；客户端构建及本地打包完成，78 文件，SHA-256 `81a9e6c3b31c30ad58f33ea2deaed5b65d3b3e7ad86bcf69ef434a23f3d10864`。最终原验收基线、包内容、首次提示和任务表专项复验通过，日志 `artifacts/gap-paths-final.log`。两个预览回环端口均已确认无监听。

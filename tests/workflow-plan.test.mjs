@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -1308,4 +1308,108 @@ test("oversized resource inventory is rejected without truncation or starting a 
     { code: "PLANNING_CONTEXT_LIMIT" },
   );
   assert.equal(f.starts.length, 0);
+});
+
+function hostResourceFixture(t) {
+  const f = skillFixture(t);
+  const root = join(f.directory, "host-resource-skill");
+  mkdirSync(join(root, "references"), { recursive: true });
+  writeFileSync(join(root, "references/selected.md"), "HOST_RESOURCE_AT_PLANNING");
+  writeFileSync(join(root, "references/unselected.md"), "HOST_RESOURCE_NOT_SELECTED");
+  const definition = {
+    name: "host-resource-skill",
+    description: "Original synthetic host resource skill",
+    content: "HOST_BODY_AT_PLANNING",
+    invocation: { modelInvocable: true },
+    provider: "synthetic-host-provider",
+    resourceBase: { kind: "directory", path: root },
+    metadata: { "dsh-unlimit": { requirements: [] } },
+  };
+  f.services.skills = {
+    snapshot: async () => ({ complete: true, skills: [definition] }),
+    get: async (id) => (id === definition.name ? definition : undefined),
+  };
+  return {
+    ...f,
+    root,
+    definition,
+    ref: { origin: "host", id: definition.name, resources: ["references/selected.md"] },
+  };
+}
+
+test("host resource auto-planning rereads exact selected text and delivers it only to its executor", async (t) => {
+  const f = hostResourceFixture(t);
+  const { item } = await f.plans.dispatch("workflow.plan.run", {
+    ...f.owner,
+    goal: "Use the registered host skill and its selected reference to inspect supplied records",
+  });
+  await until(() => f.starts.length === 1);
+  const planner = f.starts[0].request.prompt[0].text;
+  assert.match(planner, /references\/selected.md/);
+  assert.match(planner, /references\/unselected.md/);
+  assert.doesNotMatch(
+    planner,
+    /HOST_RESOURCE_AT_PLANNING|HOST_RESOURCE_NOT_SELECTED|HOST_BODY_AT_PLANNING/,
+  );
+  f.definition.content = "HOST_BODY_AT_EXECUTION";
+  writeFileSync(
+    join(f.root, "references/selected.md"),
+    "\uFEFFHOST_RESOURCE_AT_EXECUTION\r\nKeep spaces.  \n",
+  );
+  f.pending.get(f.starts[0].childId).resolve(
+    modelOutput({
+      tasks: [task("selected", { skills: [f.ref] }), task("unrelated")],
+    }),
+  );
+  await until(() => f.starts.length === 2);
+  const executor = f.starts[1].request.prompt[0].text;
+  const state = await f.status(item.id);
+  assert.deepEqual(state.proposal.tasks[0].skills, [f.ref]);
+  const body = state.tasks[1].skillContext[0];
+  assert.equal(body.origin, "host");
+  assert.equal(body.id, f.ref.id);
+  assert.equal(body.content, "HOST_BODY_AT_EXECUTION");
+  assert.equal(body.resources[0].content, "\uFEFFHOST_RESOURCE_AT_EXECUTION\r\nKeep spaces.  \n");
+  assert.match(body.resources[0].sha256, /^[a-f0-9]{64}$/);
+  assert.ok(executor.includes(JSON.stringify(body)));
+  assert.doesNotMatch(
+    executor,
+    /HOST_RESOURCE_AT_PLANNING|HOST_RESOURCE_NOT_SELECTED|HOST_BODY_AT_PLANNING/,
+  );
+  assert.equal(state.tasks[1].preflight.skillBodies, undefined);
+  f.pending.get(f.starts[1].childId).resolve(modelOutput({ result: "selected completed" }));
+  await until(() => f.starts.length === 3);
+  assert.doesNotMatch(
+    f.starts[2].request.prompt[0].text,
+    /HOST_RESOURCE_AT_EXECUTION|HOST_BODY_AT_EXECUTION/,
+  );
+  f.pending.get(f.starts[2].childId).resolve(modelOutput({ result: "unrelated completed" }));
+  await until(async () => (await f.status(item.id)).state === "completed");
+  assert.equal(f.flow.status(f.workspace.id).active.length, 0);
+});
+
+test("host resource removal after planning blocks the selected executor and preserves the proposal", async (t) => {
+  const f = hostResourceFixture(t);
+  const { item } = await f.plans.dispatch("workflow.plan.run", {
+    ...f.owner,
+    goal: "Use the host reference",
+  });
+  await until(() => f.starts.length === 1);
+  unlinkSync(join(f.root, "references/selected.md"));
+  f.pending
+    .get(f.starts[0].childId)
+    .resolve(modelOutput({ tasks: [task("selected", { skills: [f.ref] })] }));
+  const final = await until(async () => {
+    const state = await f.status(item.id);
+    return state.state === "finished-with-errors" && state;
+  });
+  assert.equal(final.proposal.state, "ready");
+  assert.deepEqual(final.proposal.tasks[0].skills, [f.ref]);
+  assert.equal(final.tasks[1].state, "blocked");
+  assert.equal(final.tasks[1].error.code, "DEPENDENCIES_UNAVAILABLE");
+  assert.ok(
+    final.tasks[1].preflight.checks.some((check) => check.code === "SKILL_RESOURCE_MISSING"),
+  );
+  assert.equal(f.starts.length, 1);
+  assert.equal(f.flow.status(f.workspace.id).active.length, 0);
 });
